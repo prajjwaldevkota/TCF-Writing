@@ -7436,6 +7436,78 @@
             "document2": "De nos jours, les entreprises veulent toujours plus de productivité et d’efficacité, et les\nemployés passent plus de temps sur les lieux de travail. Les entreprises cherchent toujours\ndes moyens ou astuces pour convaincre leurs employés qu’elles pensent à leur santé. Moi, ce qui m’importe, c’est de faire mon job sur mon temps de travail réel sans\nêtre obligé de faire des rallonges en heures supplémentaires. « Florian, ingénieur »."
           }
         }
+      },
+      {
+        "combination": 849,
+        "combinationNumber": 47,
+        "tasks": {
+          "task1": {
+            "instruction": "Vous avez commandé un objet sur Internet et après réception du colis, vous constatez que l’objet est cassé. Rédigez un e-mail au service clientèle pour signaler le problème, décrivez le dommage de l’objet et précisez ce que vous attendez comme solution.",
+            "minWords": 60,
+            "maxWords": 120
+          },
+          "task2": {
+            "instruction": "Vous avez visité une exposition de votre artiste préféré. Rédigez un article exprimant votre expérience lors de la visite. Décrivez ce que vous avez vu et vos impressions.",
+            "minWords": 120,
+            "maxWords": 150
+          },
+          "task3": {
+            "instruction": "Les Devoirs À La Maison : pour ou contre ?",
+            "title": "Les Devoirs À La Maison : pour ou contre ?",
+            "minWords": 120,
+            "maxWords": 180,
+            "document1": "Selon des associations de parents d’élèves, les devoirs à la maison sont utiles, car ils permettent aux élèves d’apprendre à organiser leur temps de manière autonome. Pour les parents, les devoirs sont un lien quotidien avec l’école. Même s’il est parfois difficile de suivre les devoirs après une journée de travail fatigante, ils apprécient ce moment partagé avec leurs enfants parce que ceux-ci sont contents que leurs parents s’intéressent à eux. C’est valorisant !",
+            "document2": "Nous protestons depuis longtemps contre les devoirs à la maison pour plusieurs raisons. Personne n’a jamais prouvé leur utilité pour améliorer les résultats des élèves. Beaucoup de parents ont peu de temps pour encadrer les devoirs de leurs enfants et certains parents ne savent pas le faire. Quant aux élèves, ceux qui ont réussi les exercices en classe perdent leur temps à les faire à la maison. Ceux qui ne sont pas aidés à la maison ne réussissent toujours pas, ils sont défavorisés. C’est pourquoi nous pensons qu’il faut supprimer les devoirs à la maison."
+          }
+        }
+      },
+      {
+        "combination": 850,
+        "combinationNumber": 48,
+        "tasks": {
+          "task1": {
+            "instruction": "« Je cherche un vélo en bon état et bon marché. Contactez-moi par courriel : mathieu@gmail.com\nVous avez un vélo à vendre. Vous écrivez un courriel pour décrire votre vélo et proposer un prix. Vous lui Donnez un RDV pour essayer le vélo.",
+            "minWords": 60,
+            "maxWords": 120
+          },
+          "task2": {
+            "instruction": "Vous avez passé une journée à la campagne avec vos amis. À votre retour, vous écrivez un message sur votre forum pour raconter à vos amis comment cette journée s'est passée. Vous expliquez ce que vous avez aimé (activités, lieu, animaux, etc...).",
+            "minWords": 120,
+            "maxWords": 150
+          },
+          "task3": {
+            "instruction": "Les sévérité des parents envers les enfants",
+            "title": "Les sévérité des parents envers les enfants",
+            "minWords": 120,
+            "maxWords": 180,
+            "document1": "Je vais bientôt avoir 22 ans et j'habite toujours chez mes parents. Mon père et ma mère restent autoritaires avec moi, même si je suis majeure. Quand j'étais mineure, je n'avais pas le droit de dormir dehors, ni même de dépasser 21h lorsque je sortais avec des amies. Maintenant, peu de choses ont changé ; certes, j'ai le droit de veiller plus tard la nuit, mais ma mère ne cesse de m'appeler sur mon téléphone portable jusqu'à ce que je sois de retour.",
+            "document2": "Les parents ont parfois peur d'être trop sévères avec leurs enfants. Ils craignent, qu'à cause d'un excès d'autorité, leurs enfants ne s'épanouissent pas et manquent plus tard de personnalité. Même si les parents acceptent, par amour, tout ce dont leurs enfants demandent, cela pourrait avoir des effets négatifs lorsqu'ils passent à l'âge adulte. En effet, pour vivre en communauté, il y a certaines règles à respecter."
+          }
+        }
+      },
+      {
+        "combination": 851,
+        "combinationNumber": 49,
+        "tasks": {
+          "task1": {
+            "instruction": "Vous êtes locataire d’un appartement trop grand pour vous. Écrivez une annonce dans un journal pour chercher un colocataire (superficie de l’appartement, caractère du colocataire, prix, etc…).",
+            "minWords": 60,
+            "maxWords": 120
+          },
+          "task2": {
+            "instruction": "Vous venez de commencer une nouvelle activité de loisir (sport, danse, etc.). Écrivez un article sur votre blog pour parler de cette expérience.",
+            "minWords": 120,
+            "maxWords": 150
+          },
+          "task3": {
+            "instruction": "La Gratuité Des Musées : Pour Ou Contre ?",
+            "title": "La Gratuité Des Musées : Pour Ou Contre ?",
+            "minWords": 120,
+            "maxWords": 180,
+            "document1": "La gratuité des musées peut entraîner une surfréquentation, ce qui nuit à la qualité de l’expérience des visiteurs. De plus, cela peut réduire les ressources financières des musées, affectant ainsi leur entretien et la préservation des œuvres. Un tarif réduit serait une meilleure solution pour rendre la culture accessible tout en soutenant les musées.",
+            "document2": "La gratuité des musées est une excellente initiative. Cela rend la culture accessible à tous, indépendamment de leur situation financière. J’ai pu visiter plusieurs musées gratuitement, ce qui m’a permis d’enrichir mes connaissances sans me soucier du coût. Pour moi, la gratuité des musées contribue à l’éducation du public et au partage du patrimoine culturel."
+          }
+        }
       }
     ]
   },
