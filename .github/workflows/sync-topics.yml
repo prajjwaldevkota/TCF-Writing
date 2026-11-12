@@ -36,3 +36,4 @@ jobs:
           else
             echo "No new topics found today. Everything is up to date."
           fi
+
