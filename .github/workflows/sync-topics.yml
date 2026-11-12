@@ -1,0 +1,38 @@
+name: Daily TCF Topics Auto-Sync
+
+on:
+  schedule:
+    # Runs everyday at 12:00 UTC (8:00 AM EDT)
+    - cron: '0 12 * * *'
+  workflow_dispatch: # Allows manual trigger anytime from GitHub Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  check-and-sync-topics:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run topics sync scraper
+        run: python3 scripts/import_data.py
+
+      - name: Commit and push if new topics found
+        run: |
+          if ! git diff --quiet src/data/questions.json; then
+            echo "New topics detected! Committing changes..."
+            git config --local user.email "github-actions[bot]@users.noreply.github.com"
+            git config --local user.name "github-actions[bot]"
+            git add src/data/questions.json
+            git commit -m "Auto-sync: update latest TCF writing topics from source"
+            git push origin main
+          else
+            echo "No new topics found today. Everything is up to date."
+          fi
