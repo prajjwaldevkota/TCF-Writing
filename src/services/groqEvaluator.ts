@@ -116,24 +116,45 @@ export async function evaluateTcfSubmissionWithGroq(
 
   const modelName = import.meta.env.VITE_GROQ_MODEL || 'llama-3.3-70b-versatile';
 
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    signal: AbortSignal.timeout(120000),
-    body: JSON.stringify({
-      model: modelName,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: promptContent },
-      ],
-      temperature: 0.15,
-      max_tokens: 8192,
-      response_format: { type: 'json_object' },
-    }),
+  const requestBody = JSON.stringify({
+    model: modelName,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: promptContent },
+    ],
+    temperature: 0.15,
+    max_tokens: 8192,
+    response_format: { type: 'json_object' },
   });
+
+  // Try /api/groq endpoint first (Vercel Edge function & Vite dev proxy prevent browser CORS)
+  let response: Response;
+  try {
+    response = await fetch('/api/groq', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      signal: AbortSignal.timeout(120000),
+      body: requestBody,
+    });
+
+    if (response.status === 404) {
+      throw new Error('Endpoint /api/groq not found, fallback to direct');
+    }
+  } catch (proxyErr) {
+    // Fallback to direct Groq API endpoint
+    response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      signal: AbortSignal.timeout(120000),
+      body: requestBody,
+    });
+  }
 
   if (!response.ok) {
     const errorBody = await response.text().catch(() => '');
