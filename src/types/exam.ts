@@ -33,6 +33,13 @@ export interface ExamAnswers {
 
 import { AIEvaluation } from './aiEvaluation';
 
+export interface DualAiEvaluation {
+  gemini: AIEvaluation | null;
+  groq: AIEvaluation | null;
+  geminiError?: string | null;
+  groqError?: string | null;
+}
+
 export interface ExamResult {
   id?: string;
   date?: string;
@@ -51,5 +58,6 @@ export interface ExamResult {
   practiceTasks?: TaskKey[];
   allocatedMinutes?: number;
   aiEvaluation?: AIEvaluation;
+  dualAiEvaluation?: DualAiEvaluation;
 }
 

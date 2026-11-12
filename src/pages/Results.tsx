@@ -8,7 +8,10 @@ import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { AIEvaluation } from '../types/aiEvaluation';
 import { AIEvaluationView } from '../components/AIEvaluationView';
+import { DualEvaluationView } from '../components/DualEvaluationView';
 import { evaluateTcfSubmissionWithGemini, setGeminiApiKey } from '../services/geminiEvaluator';
+import { evaluateDual, getAvailableProviders, DualEvaluationResult } from '../services/dualEvaluator';
+import { evaluateTcfSubmissionWithGroq, setGroqApiKey } from '../services/groqEvaluator';
 import { updateStoredSubmission } from '../utils/storage';
 import { updateSubmissionAiFeedback } from '../lib/supabase';
 import { saveEvaluationMistakes } from '../utils/mistakesStorage';
@@ -34,39 +37,125 @@ export const Results: React.FC<ResultsProps> = ({
 
   // AI Evaluation states
   const [evaluation, setEvaluation] = useState<AIEvaluation | null>(result.aiEvaluation || null);
+  const [dualResult, setDualResult] = useState<DualEvaluationResult | null>(
+    result.dualAiEvaluation
+      ? {
+          gemini: result.dualAiEvaluation.gemini,
+          groq: result.dualAiEvaluation.groq,
+          geminiError: result.dualAiEvaluation.geminiError || null,
+          groqError: result.dualAiEvaluation.groqError || null,
+          primary: result.dualAiEvaluation.gemini || result.dualAiEvaluation.groq,
+        }
+      : null
+  );
   const [evaluating, setEvaluating] = useState<boolean>(false);
   const [evalError, setEvalError] = useState<string | null>(null);
+
+  const [availableProviders, setAvailableProviders] = useState(getAvailableProviders());
+  const isDualAvailable = availableProviders.gemini && availableProviders.groq;
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, []);
 
+  const handleConfigureKeys = () => {
+    const choice = window.prompt(
+      language === 'en'
+        ? "Configure AI Keys:\n1 - Google Gemini API Key\n2 - Groq Cloud API Key\nType 1 or 2:"
+        : "Configurer les clés IA :\n1 - Clé API Google Gemini\n2 - Clé API Groq Cloud\nTapez 1 ou 2 :"
+    );
+
+    if (choice === '1') {
+      const gKey = window.prompt(
+        language === 'en'
+          ? "Enter Google Gemini API key (or leave empty to reset):"
+          : "Entrez la clé API Google Gemini (ou laissez vide pour réinitialiser) :"
+      );
+      if (gKey !== null) {
+        setGeminiApiKey(gKey);
+        setAvailableProviders(getAvailableProviders());
+      }
+    } else if (choice === '2') {
+      const qKey = window.prompt(
+        language === 'en'
+          ? "Enter Groq API key (from console.groq.com):"
+          : "Entrez la clé API Groq (depuis console.groq.com) :"
+      );
+      if (qKey !== null) {
+        setGroqApiKey(qKey);
+        setAvailableProviders(getAvailableProviders());
+      }
+    }
+  };
+
+  /** Start Evaluation: runs dual if both keys available, or single */
   const handleStartEvaluation = async () => {
     setEvaluating(true);
     setEvalError(null);
 
     try {
-      const evalData = await evaluateTcfSubmissionWithGemini(result);
-      setEvaluation(evalData);
+      const providers = getAvailableProviders();
+      if (!providers.gemini && !providers.groq) {
+        throw new Error(
+          language === 'en'
+            ? "No AI API key found. Please configure a Gemini or Groq key."
+            : "Aucune clé API IA trouvée. Veuillez configurer une clé Gemini ou Groq."
+        );
+      }
 
-      // Persist in LocalStorage
-      const updatedResult: ExamResult = {
-        ...result,
-        aiEvaluation: evalData
-      };
-      updateStoredSubmission(updatedResult);
+      // If both available, perform dual evaluation
+      if (providers.gemini && providers.groq) {
+        const dual = await evaluateDual(result);
+        setDualResult(dual);
 
-      // Save mistakes to local Mistakes Bank
-      saveEvaluationMistakes(evalData, updatedResult);
+        if (dual.primary) {
+          setEvaluation(dual.primary);
+          const updatedResult: ExamResult = {
+            ...result,
+            aiEvaluation: dual.primary,
+            dualAiEvaluation: {
+              gemini: dual.gemini,
+              groq: dual.groq,
+              geminiError: dual.geminiError,
+              groqError: dual.groqError,
+            },
+          };
+          updateStoredSubmission(updatedResult);
+          saveEvaluationMistakes(dual.primary, updatedResult);
 
-      // Persist in Supabase if logged in
-      if (user && result.id) {
-        try {
-          const { error } = await updateSubmissionAiFeedback(result.id, user.id, evalData);
-          if (error) throw error;
-        } catch (dbErr) {
-          console.warn('Could not sync AI evaluation to Supabase:', dbErr);
-          setEvalError('Évaluation enregistrée dans ce navigateur. Synchronisation du compte échouée : ' + (dbErr instanceof Error ? dbErr.message : String(dbErr)));
+          if (user && result.id) {
+            try {
+              const { error } = await updateSubmissionAiFeedback(result.id, user.id, dual.primary);
+              if (error) throw error;
+            } catch (dbErr) {
+              console.warn('Could not sync AI evaluation to Supabase:', dbErr);
+            }
+          }
+        } else {
+          throw new Error(dual.geminiError || dual.groqError || "L'évaluation a échoué.");
+        }
+      } else {
+        // Run whichever is available
+        const evalData = providers.gemini
+          ? await evaluateTcfSubmissionWithGemini(result)
+          : await evaluateTcfSubmissionWithGroq(result);
+
+        setEvaluation(evalData);
+        const updatedResult: ExamResult = {
+          ...result,
+          aiEvaluation: evalData,
+        };
+        updateStoredSubmission(updatedResult);
+        saveEvaluationMistakes(evalData, updatedResult);
+
+        if (user && result.id) {
+          try {
+            const { error } = await updateSubmissionAiFeedback(result.id, user.id, evalData);
+            if (error) throw error;
+          } catch (dbErr) {
+            console.warn('Could not sync AI evaluation to Supabase:', dbErr);
+            setEvalError('Évaluation enregistrée dans ce navigateur. Synchronisation du compte échouée : ' + (dbErr instanceof Error ? dbErr.message : String(dbErr)));
+          }
         }
       }
     } catch (err: any) {
@@ -217,15 +306,32 @@ Temps utilisé : ${formatTime(result.timeUsedSeconds)}${result.allocatedMinutes 
             {/* Action Buttons */}
             <div className="flex flex-wrap items-center gap-2 shrink-0 self-start sm:self-center">
               {(!evaluation || !evaluation.pedagogical) && (
-                <button
-                  type="button"
-                  onClick={() => handleStartEvaluation()}
-                  disabled={evaluating}
-                  className="px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
-                >
-                  <span>🤖</span>
-                  <span>{evaluating ? t('Évaluation en cours...') : t('Évaluer avec l’IA (Coach TCF)')}</span>
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleStartEvaluation()}
+                    disabled={evaluating}
+                    className="px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
+                  >
+                    <span>{isDualAvailable ? '⚡🤖' : '🤖'}</span>
+                    <span>
+                      {evaluating
+                        ? t('Évaluation en cours...')
+                        : isDualAvailable
+                        ? (language === 'en' ? 'Dual AI Evaluation (Gemini + Groq)' : 'Évaluation Double (Gemini + Groq)')
+                        : t('Évaluer avec l’IA (Coach TCF)')}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleConfigureKeys}
+                    title={language === 'en' ? 'Configure Gemini / Groq API Keys' : 'Configurer les clés Gemini / Groq'}
+                    className="p-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-bold text-xs transition-all shadow-xs cursor-pointer"
+                  >
+                    ⚙️
+                  </button>
+                </div>
               )}
 
               <button
@@ -250,7 +356,11 @@ Temps utilisé : ${formatTime(result.timeUsedSeconds)}${result.allocatedMinutes 
             <div className="mb-6 p-4 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center gap-3 animate-pulse">
               <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin shrink-0"></div>
               <div className="text-xs text-indigo-900">
-                <p className="font-bold">{t("Lecture pédagogique en cours...")}</p>
+                <p className="font-bold">
+                  {isDualAvailable
+                    ? (language === 'en' ? 'Dual AI review in progress (Gemini 2.5 + Groq Llama 3.3)...' : 'Évaluation double en cours (Gemini 2.5 + Groq Llama 3.3 en parallèle)...')
+                    : t("Lecture pédagogique en cours...")}
+                </p>
                 <p className="text-indigo-700 mt-0.5">{t("Deux passes de lecture : communication, puis maîtrise de la langue. Aucun score officiel ni niveau NCLC ne sera attribué.")}</p>
               </div>
             </div>
@@ -266,16 +376,10 @@ Temps utilisé : ${formatTime(result.timeUsedSeconds)}${result.allocatedMinutes 
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
-                  onClick={() => {
-                    const customKey = window.prompt(t('Entrez une clé API Google Gemini (ou laissez vide pour réinitialiser) :'));
-                    if (customKey !== null) {
-                      setGeminiApiKey(customKey);
-                      handleStartEvaluation();
-                    }
-                  }}
+                  onClick={handleConfigureKeys}
                   className="px-2.5 py-1 bg-white border border-slate-300 rounded font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
                 >
-                  {t('Clé API')}
+                  {t('Clés API')}
                 </button>
                 <button
                   type="button"
@@ -407,7 +511,7 @@ Temps utilisé : ${formatTime(result.timeUsedSeconds)}${result.allocatedMinutes 
           </div>
 
           {/* AI Evaluation View Component */}
-          {evaluation && (
+          {(dualResult || evaluation) && (
             <div className="mb-8 space-y-4">
               <div className="p-3 sm:p-4 rounded-xl bg-purple-50/90 border border-purple-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
                 <div className="flex items-center gap-2.5 text-xs text-purple-900">
@@ -430,17 +534,26 @@ Temps utilisé : ${formatTime(result.timeUsedSeconds)}${result.allocatedMinutes 
                 )}
               </div>
 
-              <AIEvaluationView
-                evaluation={evaluation}
-                combination={result.combination}
-                userAnswers={result.answers}
-                wordCounts={result.wordCounts}
-              />
+              {dualResult ? (
+                <DualEvaluationView
+                  gemini={dualResult.gemini}
+                  groq={dualResult.groq}
+                  geminiError={dualResult.geminiError}
+                  groqError={dualResult.groqError}
+                />
+              ) : evaluation ? (
+                <AIEvaluationView
+                  evaluation={evaluation}
+                  combination={result.combination}
+                  userAnswers={result.answers}
+                  wordCounts={result.wordCounts}
+                />
+              ) : null}
             </div>
           )}
 
           {/* Individual Tasks Display (shown before AI evaluation is triggered) */}
-          {!evaluation && (
+          {!evaluation && !dualResult && (
             <div className="space-y-6">
               {tasksList.map((tItem) => {
                 const text = result.answers[tItem.key];
