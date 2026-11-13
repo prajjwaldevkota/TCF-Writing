@@ -37,6 +37,7 @@ export interface AIEvaluation {
   nclc_crosscheck?: NclcComparison;
   pedagogical?: PedagogicalAssessment;
   model?: string;
+  prompt_hash?: string;
   rubric_version?: string;
   id: string;
   created_at: string;

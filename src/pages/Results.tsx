@@ -1,3 +1,4 @@
+import { RUBRIC_VERSION } from '../services/evaluationInstructions';
 import { crosscheckedPrimary } from '../utils/nclcComparison';
 import { NclcCrosscheck } from '../components/NclcCrosscheck';
 import { mockProjectionEligibility } from '../services/pedagogicalAssessment';
@@ -311,7 +312,7 @@ Temps utilisé : ${formatTime(result.timeUsedSeconds)}${result.allocatedMinutes 
 
             {/* Action Buttons */}
             <div className="flex flex-wrap items-center gap-2 shrink-0 self-start sm:self-center">
-              {(!evaluation || !evaluation.pedagogical) && (
+              {(!evaluation || !evaluation.pedagogical || evaluation.rubric_version !== RUBRIC_VERSION) && (
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
@@ -537,8 +538,8 @@ Temps utilisé : ${formatTime(result.timeUsedSeconds)}${result.allocatedMinutes 
                   <span className="text-base shrink-0">📝</span>
                   <p className="font-medium">
                     {language === 'en'
-                      ? 'Mistakes from this evaluation are saved to your Mistakes Bank in the Dashboard.'
-                      : 'Les fautes de cette évaluation sont enregistrées dans votre carnet de fautes (Tableau de bord).'}
+                      ? (evaluation ? 'Verified corrections from the available review are saved to your Mistakes Bank.' : 'No new corrections were saved: neither AI review succeeded.')
+                      : (evaluation ? 'Les corrections vérifiées du bilan disponible sont enregistrées dans votre carnet.' : 'Aucune nouvelle correction enregistrée : aucun bilan IA n’a abouti.')}
                   </p>
                 </div>
                 {onDashboardClick && (

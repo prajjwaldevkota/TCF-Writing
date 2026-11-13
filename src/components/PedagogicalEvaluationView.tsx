@@ -151,6 +151,9 @@ const TaskCard: React.FC<{ taskKey: string; task: PedagogicalTask; en: boolean }
           </div>
         )}
 
+        {task.level_evidence && task.level_evidence.length > 0 && <CollapsibleSection title={en ? 'Why this level range?' : 'Pourquoi cette plage de niveau ?'} icon="🔎" defaultOpen={true}><div className="space-y-3">{task.level_evidence.map((entry,i)=><div key={i} className="border-l-2 border-emerald-300 pl-3"><blockquote className="text-sm font-medium">« {entry.quote} »</blockquote><p className="text-sm leading-7 mt-1">{entry.explanation}</p></div>)}</div></CollapsibleSection>}
+        {task.model_answer_warning && <p className="text-xs text-amber-800">{task.model_answer_warning}</p>}
+        {task.validation_warnings && task.validation_warnings.length>0 && <div role="status" className="border border-amber-200 bg-amber-50 rounded-lg p-4 text-sm text-amber-900"><p className="font-semibold mb-2">{en?'Some AI feedback could not be verified':'Certains éléments du bilan IA n’ont pas pu être vérifiés'}</p><ul className="list-disc pl-5 space-y-2">{task.validation_warnings.map((warning,i)=><li key={i}>{warning}</li>)}</ul></div>}
         {/* Strengths */}
         {task.strengths && task.strengths.length > 0 && (
           <CollapsibleSection
@@ -351,7 +354,7 @@ const TaskCard: React.FC<{ taskKey: string; task: PedagogicalTask; en: boolean }
         {/* Model Answer */}
         {task.model_answer && task.model_answer.trim() && (
           <CollapsibleSection
-            title={en ? 'Model Answer (Target Level)' : 'Réponse modèle (niveau cible)'}
+            title={en ? 'Illustrative Answer' : 'Exemple de réponse'}
             icon="💎"
             defaultOpen={false}
           >
@@ -375,8 +378,8 @@ const TaskCard: React.FC<{ taskKey: string; task: PedagogicalTask; en: boolean }
             </div>
             <p className="text-[11px] text-slate-400 mt-2">
               {en
-                ? 'This model answer targets one level above your estimated range. Use it for study, not memorization.'
-                : 'Cette réponse modèle vise un niveau au-dessus de votre plage estimée. Utilisez-la pour l\'étude, pas pour la mémorisation.'}
+                ? 'Illustrative answer for study, not a certified CEFR exemplar. Adapt the structure to the prompt.'
+                : 'Exemple de rédaction non certifié, proposé pour votre entraînement. Utilisez-la pour l\'étude, pas pour la mémorisation.'}
             </p>
           </CollapsibleSection>
         )}
@@ -415,8 +418,8 @@ export const PedagogicalEvaluationView: React.FC<{ evaluation: AIEvaluation }> =
             </p>
             <p className="text-xs text-slate-500 mt-2">
               {en
-                ? 'Two reading passes; no task averaging. Dimension scores produce an indicative /20. A complete mock may receive a separate estimated NCLC range.'
-                : 'Deux passes de lecture, sans moyenne des tâches. Les scores par dimension produisent une note indicative sur 20. Un examen blanc complet peut recevoir une plage NCLC estimée distincte.'}
+                ? 'Two reading passes with quoted evidence. No invented points or task averaging. A complete mock may receive a separate estimated NCLC range.'
+                : 'Deux passes de lecture avec citations. Aucun barème inventé ni moyenne des tâches. Un examen blanc complet peut recevoir une plage NCLC estimée distincte.'}
             </p>
           </div>
 
@@ -427,6 +430,7 @@ export const PedagogicalEvaluationView: React.FC<{ evaluation: AIEvaluation }> =
         </div>
       </div>
 
+      {evaluation.rubric_version !== 'pedagogical-evidence-v5' && <p className="p-4 rounded-lg bg-amber-50 text-sm">{en?'Earlier review: this used different rating instructions and may contain custom practice points. Reassess to use the current evidence-based guide.':'Ancien bilan : consignes différentes, avec possibles notes pédagogiques personnalisées. Relancez l’évaluation pour utiliser le guide actuel fondé sur les observations.'}</p>}
       {/* NCLC Projection */}
       <div className="border border-emerald-200 bg-emerald-50 p-5 rounded-xl">
         <h3 className="font-semibold text-emerald-900">
@@ -464,6 +468,7 @@ export const PedagogicalEvaluationView: React.FC<{ evaluation: AIEvaluation }> =
         <span className="font-mono">{evaluation.model}</span>
         <span>·</span>
         <span className="font-mono">{evaluation.rubric_version}</span>
+        {evaluation.prompt_hash && <span title="Assessment request fingerprint" className="font-mono">{evaluation.prompt_hash.slice(0,12)}</span>}
         <span>·</span>
         <span>{assessment.feedback_language.toUpperCase()}</span>
       </div>

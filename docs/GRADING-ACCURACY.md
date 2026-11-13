@@ -56,3 +56,38 @@ connection test; it was not selected. The local configuration now pins
 connection tests AND independent assessments of a synthetic Task 1 invitation.
 The latter correctly produced no full-exam NCLC range. This is an integration
 check, not a validated accuracy benchmark; no learner submissions were used.
+
+## Evidence contract v5
+
+Gemini and Groq now receive the same instruction builder in
+`src/services/evaluationInstructions.ts`, including the same guide and task payload.
+No new dimension points, invented weights or /20 averages are requested or computed.
+Historical reviews remain readable, with an earlier-instructions notice and a way
+to reassess. Strengths, illustrative answers and correction explanations remain.
+
+A level range requires two supporting quotations from the learner's answer, with
+explanations. Harmless apostrophe, hyphen and whitespace differences are resolved
+back to exact original excerpts; invented wording is rejected. Missing prompts,
+missing Task 3 sources and blanks cause withholding. Optional illustrative answers
+that miss the requested word limits are omitted with an explanation.
+
+Each new review stores the rubric version and a SHA-256 fingerprint of its system
+instructions and input payload. Two-model NCLC comparisons refuse to combine
+mismatched request fingerprints. This supports reproducibility; it is not an accuracy
+or confidence metric. Both providers passed a live synthetic Task 1 integration
+check under v5, with two verified quotations each, identical request fingerprints,
+and no numeric score. Human calibration remains outstanding.
+
+## Partial-review recovery
+
+An unmatched or malformed correction is now omitted with a visible warning instead
+of discarding the entire provider review. Only quotations resolved to the learner's
+original text enter the saved correction list/Mistakes Bank. Unicode composition,
+apostrophe, hyphen and spacing variations are matched back to exact original text;
+missing or genuinely different words are not accepted by fuzzy matching.
+
+If fewer than two supporting level quotations survive validation, the task range is
+withheld. A complete-mock NCLC projection is also withheld whenever any task range
+is unsupported. A missing correction section is reported as incomplete, not as an
+error-free answer. Structural errors, invalid score fields and invalid ranges still
+fail validation. Previously saved reviews are not silently rewritten.

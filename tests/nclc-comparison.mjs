@@ -14,3 +14,7 @@ assert.deepEqual(g.pedagogical.mock_projection,{lower:6,upper:8,rationale:'Indep
 assert.equal(crosscheckedPrimary(result(null),result(7,8)).pedagogical.mock_projection.rationale,'Independent evidence.');
 assert.equal(crosscheckedPrimary(null,null),null);
 console.log('PASS: matching, overlap, disagreement withholding, one-provider failure, both withheld, and preservation of independent reviews.');
+
+assert.equal(compareNclc({...result(6,8),prompt_hash:'first'},{...result(6,8),prompt_hash:'different'}).status,'incomparable');
+assert.equal(crosscheckedPrimary({...result(6,8),prompt_hash:'first'},{...result(6,8),prompt_hash:'different'}).pedagogical.mock_projection,null);
+console.log('PASS: different prompts or answers cannot be combined.');

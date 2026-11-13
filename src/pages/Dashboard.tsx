@@ -227,7 +227,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     .sort((a,b) => Date.parse(b.aiEvaluation!.created_at) - Date.parse(a.aiEvaluation!.created_at))[0]
     ?.aiEvaluation;
   const latestProjection = latestNclcReview?.pedagogical?.mock_projection;
-  const nclcDisagreement = latestNclcReview?.nclc_crosscheck?.status === 'disagreement';
+  const nclcDisagreement = ['disagreement','incomparable'].includes(latestNclcReview?.nclc_crosscheck?.status || '');
   const projectionLabel = latestProjection
     ? `${latestProjection.lower === 3 ? '<4' : latestProjection.lower}–${latestProjection.upper === 10 ? '10+' : latestProjection.upper}`
     : null;
