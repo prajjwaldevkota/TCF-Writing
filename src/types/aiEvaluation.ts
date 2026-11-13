@@ -1,3 +1,4 @@
+import type { NclcComparison } from '../utils/nclcComparison';
 import type { PedagogicalAssessment } from '../services/pedagogicalAssessment';
 export type CefrLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
 
@@ -33,6 +34,7 @@ export interface TaskEvaluation {
 }
 
 export interface AIEvaluation {
+  nclc_crosscheck?: NclcComparison;
   pedagogical?: PedagogicalAssessment;
   model?: string;
   rubric_version?: string;

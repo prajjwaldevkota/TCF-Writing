@@ -222,10 +222,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
     };
   }, []);
 
-  const latestProjection = submissions
-    .filter(s => s.aiEvaluation?.pedagogical?.mock_projection)
+  const latestNclcReview = submissions
+    .filter(s => s.aiEvaluation?.pedagogical)
     .sort((a,b) => Date.parse(b.aiEvaluation!.created_at) - Date.parse(a.aiEvaluation!.created_at))[0]
-    ?.aiEvaluation?.pedagogical?.mock_projection;
+    ?.aiEvaluation;
+  const latestProjection = latestNclcReview?.pedagogical?.mock_projection;
+  const nclcDisagreement = latestNclcReview?.nclc_crosscheck?.status === 'disagreement';
   const projectionLabel = latestProjection
     ? `${latestProjection.lower === 3 ? '<4' : latestProjection.lower}–${latestProjection.upper === 10 ? '10+' : latestProjection.upper}`
     : null;
@@ -319,8 +321,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </h3>
           <div className="flex items-baseline gap-1.5">
             <p className="text-lg sm:text-xl font-black text-slate-900 leading-tight">
-              {projectionLabel || submissions.filter(s => s.aiEvaluation?.pedagogical).length}
-              <span className="text-[11px] font-normal text-slate-400 ml-0.5">{projectionLabel ? 'NCLC' : (language === 'en' ? 'reviews' : 'bilans')}</span>
+              {nclcDisagreement ? (language === 'en' ? 'Models disagree' : 'Modèles en désaccord') : projectionLabel || submissions.filter(s => s.aiEvaluation?.pedagogical).length}
+              <span className="text-[11px] font-normal text-slate-400 ml-0.5">{nclcDisagreement ? '' : projectionLabel ? 'NCLC' : (language === 'en' ? 'reviews' : 'bilans')}</span>
             </p>
 
           </div>

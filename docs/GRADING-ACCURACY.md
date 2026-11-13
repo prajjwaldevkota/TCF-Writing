@@ -34,3 +34,25 @@ correct; human evaluation is still needed.
 Live integration check: one synthetic Task 1 invitation returned B2–C1, one priority,
 all three evidence domains, and null numeric/NCLC values with the configured model.
 This verifies integration, not accuracy. No real exam or benchmark score was inferred.
+
+## Two-model NCLC cross-check
+
+Both independent reviews are retained. The combined headline no longer automatically
+prefers Gemini. Matching intervals are labelled matching; overlapping intervals keep
+the full combined coverage (the union), so an overlap cannot create false precision.
+Disjoint intervals produce a visible disagreement and no combined NCLC estimate.
+A one-model success is explicitly labelled a single-model estimate. Agreement is
+not a calibrated confidence score and does not establish accuracy.
+
+The numerical dimension scores are pedagogical indicators only; agreement in those
+scores is not evidence that an NCLC judgment is correct. Validate against independent
+human-labelled work before treating projections as reliable readiness measurements.
+
+Connection/assessment checks on 2026-11-12 found the previously configured
+`gemini-2.5-flash` and `llama-3.3-70b-versatile` unavailable to these keys (HTTP 404).
+Model-list endpoints accepted both keys. Gemini 3.8 Flash timed out in a minimal
+connection test; it was not selected. The local configuration now pins
+`gemini-3.1-flash-lite` and Groq `openai/gpt-oss-120b`, both verified with minimal
+connection tests AND independent assessments of a synthetic Task 1 invitation.
+The latter correctly produced no full-exam NCLC range. This is an integration
+check, not a validated accuracy benchmark; no learner submissions were used.

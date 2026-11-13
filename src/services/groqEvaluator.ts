@@ -114,7 +114,7 @@ export async function evaluateTcfSubmissionWithGroq(
     }))
   });
 
-  const modelName = import.meta.env.VITE_GROQ_MODEL || 'llama-3.3-70b-versatile';
+  const modelName = import.meta.env.VITE_GROQ_MODEL || 'openai/gpt-oss-120b';
 
   const requestBody = JSON.stringify({
     model: modelName,

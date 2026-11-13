@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';import fs from 'node:fs';import ts from 'typescript';
+const code=ts.transpileModule(fs.readFileSync('src/utils/nclcComparison.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+const{compareNclc,crosscheckedPrimary}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+const result=(lower,upper)=>({model:'fixture',pedagogical:{feedback_language:'en',mock_projection:lower===null?null:{lower,upper,rationale:'Independent evidence.'}}});
+assert.equal(compareNclc(result(6,8),result(6,8)).status,'matching');
+assert.deepEqual(compareNclc(result(6,8),result(7,9)).range,{lower:6,upper:9});
+assert.equal(compareNclc(result(4,5),result(7,8)).status,'disagreement');
+assert.equal(crosscheckedPrimary(result(4,5),result(7,8)).pedagogical.mock_projection,null);
+assert.equal(compareNclc(result(6,8),null).status,'single');
+assert.equal(compareNclc(result(null),result(null)).status,'withheld');
+const g=result(6,8),q=result(7,9);const saved=crosscheckedPrimary(g,q);
+assert.deepEqual(saved.pedagogical.mock_projection,{lower:6,upper:9,rationale:saved.pedagogical.mock_projection.rationale});
+assert.deepEqual(g.pedagogical.mock_projection,{lower:6,upper:8,rationale:'Independent evidence.'});
+assert.equal(crosscheckedPrimary(result(null),result(7,8)).pedagogical.mock_projection.rationale,'Independent evidence.');
+assert.equal(crosscheckedPrimary(null,null),null);
+console.log('PASS: matching, overlap, disagreement withholding, one-provider failure, both withheld, and preservation of independent reviews.');

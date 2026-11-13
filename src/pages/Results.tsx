@@ -1,3 +1,6 @@
+import { crosscheckedPrimary } from '../utils/nclcComparison';
+import { NclcCrosscheck } from '../components/NclcCrosscheck';
+import { mockProjectionEligibility } from '../services/pedagogicalAssessment';
 import React, { useState, useEffect } from 'react';
 import { ExamResult, TaskKey } from '../types/exam';
 import { formatTime } from '../utils/wordCount';
@@ -9,7 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import { AIEvaluation } from '../types/aiEvaluation';
 import { AIEvaluationView } from '../components/AIEvaluationView';
 import { DualEvaluationView } from '../components/DualEvaluationView';
-import { evaluateTcfSubmissionWithGemini, setGeminiApiKey } from '../services/geminiEvaluator';
+import { evaluateTcfSubmissionWithGemini, setGeminiApiKey, getActiveEvaluatedTasks } from '../services/geminiEvaluator';
 import { evaluateDual, getAvailableProviders, DualEvaluationResult } from '../services/dualEvaluator';
 import { evaluateTcfSubmissionWithGroq, setGroqApiKey } from '../services/groqEvaluator';
 import { updateStoredSubmission } from '../utils/storage';
@@ -36,7 +39,7 @@ export const Results: React.FC<ResultsProps> = ({
   const [copiedTask, setCopiedTask] = useState<string | null>(null);
 
   // AI Evaluation states
-  const [evaluation, setEvaluation] = useState<AIEvaluation | null>(result.aiEvaluation || null);
+  const [evaluation, setEvaluation] = useState<AIEvaluation | null>(result.dualAiEvaluation ? crosscheckedPrimary(result.dualAiEvaluation.gemini, result.dualAiEvaluation.groq) : result.aiEvaluation || null);
   const [dualResult, setDualResult] = useState<DualEvaluationResult | null>(
     result.dualAiEvaluation
       ? {
@@ -44,7 +47,7 @@ export const Results: React.FC<ResultsProps> = ({
           groq: result.dualAiEvaluation.groq,
           geminiError: result.dualAiEvaluation.geminiError || null,
           groqError: result.dualAiEvaluation.groqError || null,
-          primary: result.dualAiEvaluation.gemini || result.dualAiEvaluation.groq,
+          primary: crosscheckedPrimary(result.dualAiEvaluation.gemini, result.dualAiEvaluation.groq),
         }
       : null
   );
@@ -53,6 +56,9 @@ export const Results: React.FC<ResultsProps> = ({
 
   const [availableProviders, setAvailableProviders] = useState(getAvailableProviders());
   const isDualAvailable = availableProviders.gemini && availableProviders.groq;
+  const nclcEligibility = mockProjectionEligibility(result, getActiveEvaluatedTasks(result));
+  const nclcEstimate = evaluation?.pedagogical?.mock_projection;
+
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
@@ -292,7 +298,7 @@ Temps utilisé : ${formatTime(result.timeUsedSeconds)}${result.allocatedMinutes 
               <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight leading-snug">
                 {isPractice
                   ? `${t('Entraînement terminé')} : ${practiceTitle}`
-                  : t('Examen officiel terminé')}
+                  : (language === 'en' ? 'Full mock completed' : 'Examen blanc terminé')}
               </h1>
 
               {/* Description */}
@@ -350,6 +356,19 @@ Temps utilisé : ${formatTime(result.timeUsedSeconds)}${result.allocatedMinutes 
               </button>
             </div>
           </div>
+
+          <section className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-5" aria-label={language === 'en' ? 'Get your estimated NCLC' : 'Obtenir votre NCLC estimé'}>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="max-w-2xl"><p className="studio-eyebrow">{language === 'en' ? 'FULL-MOCK READINESS' : 'BILAN DE L’EXAMEN BLANC'}</p><h2 className="text-xl font-semibold mt-2">{language === 'en' ? 'Get your estimated NCLC writing range' : 'Obtenir votre plage NCLC estimée en expression écrite'}</h2>
+                <p className="text-sm mt-3 leading-7">{language === 'en' ? 'Complete all three tasks, keep each response within its word range, and include both Task 3 documents. The assessor reviews the full set and explains an estimated NCLC range. Your practice /20 score is not converted into NCLC.' : 'Complétez les trois tâches dans les plages de mots demandées, avec les deux documents de la tâche 3. L’IA examine l’ensemble et justifie une plage NCLC estimée. La note pédagogique sur 20 n’est pas convertie en NCLC.'}</p>
+                {!nclcEligibility.eligible && <p className="text-sm mt-3 font-medium" role="status">{language === 'en' ? nclcEligibility.reason_en : nclcEligibility.reason_fr}</p>}
+                {nclcEstimate && <p className="text-lg font-semibold mt-3">NCLC {nclcEstimate.lower === 3 ? '<4' : nclcEstimate.lower}–{nclcEstimate.upper === 10 ? '10+' : nclcEstimate.upper} · {language === 'en' ? 'AI estimate' : 'estimation IA'}</p>}
+              </div>
+              <button type="button" className="studio-primary" disabled={evaluating || !nclcEligibility.eligible} onClick={handleStartEvaluation}>{evaluating ? (language === 'en' ? 'Assessing…' : 'Analyse en cours…') : nclcEstimate ? (language === 'en' ? 'Reassess NCLC' : 'Réévaluer le NCLC') : (language === 'en' ? 'Estimate NCLC' : 'Estimer le NCLC')}</button>
+            </div>
+            {evaluation?.nclc_crosscheck && <NclcCrosscheck comparison={evaluation.nclc_crosscheck}/> }
+            <details className="mt-4 text-sm"><summary className="cursor-pointer font-medium">{language === 'en' ? 'How this estimate works' : 'Comment fonctionne cette estimation'}</summary><ol className="list-decimal pl-5 mt-3 space-y-2 leading-7"><li>{language === 'en' ? 'Choose Full Exam in the library, write all three responses, then finish the session.' : 'Choisissez Examen complet dans la bibliothèque, rédigez les trois réponses, puis terminez la séance.'}</li><li>{language === 'en' ? 'Click Estimate NCLC. This runs a new AI review using the configured provider(s).' : 'Cliquez sur Estimer le NCLC : une nouvelle analyse utilise le ou les modèles configurés.'}</li><li>{language === 'en' ? 'Read the range and its evidence. If both models run, compare their separate judgments; disagreement is not averaged away.' : 'Lisez la plage et sa justification. Avec deux modèles, comparez leurs jugements distincts : les désaccords ne sont pas masqués par une moyenne.'}</li></ol><p className="mt-3 text-xs text-slate-600">{language === 'en' ? 'This is an uncalibrated practice estimate, not an official result or a guarantee. The assessor can withhold it when serious task-fulfilment risks remain.' : 'Estimation de pratique non calibrée, sans valeur officielle ni garantie. L’IA peut la suspendre en présence de risques importants de non-respect des consignes.'}</p></details>
+          </section>
 
           {/* Evaluating Loading State Indicator */}
           {evaluating && (

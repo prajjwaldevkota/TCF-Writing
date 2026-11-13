@@ -34,7 +34,7 @@ export const TaskEditor: React.FC<TaskEditorProps> = ({
   isPracticeMode = false,
   onInsertCharacter
 }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { isAdmin } = useAuth();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isPromptExpanded, setIsPromptExpanded] = useState<boolean>(true);
@@ -42,7 +42,7 @@ export const TaskEditor: React.FC<TaskEditorProps> = ({
 
   // Allow copy/cut/paste and keyboard shortcuts exclusively for Admin
   const allowCopyPaste = Boolean(
-    isAdmin || (typeof window !== 'undefined' && localStorage.getItem('tcf_admin_logged_in') === 'true')
+    isPracticeMode || isAdmin || (typeof window !== 'undefined' && localStorage.getItem('tcf_admin_logged_in') === 'true')
   );
 
   // Keep focus on textarea when task changes
@@ -259,10 +259,10 @@ export const TaskEditor: React.FC<TaskEditorProps> = ({
 
           {allowCopyPaste && (
             <span
-              title={t('Le copier-coller et les raccourcis clavier sont débloqués pour le compte administrateur.')}
+              title={isPracticeMode ? (language === 'en' ? 'Copy and paste is enabled during targeted practice.' : 'Le copier-coller est autorisé en pratique ciblée.') : t('Le copier-coller et les raccourcis clavier sont débloqués pour le compte administrateur.')}
               className="hidden sm:inline-flex items-center gap-1 bg-amber-50 border border-amber-300 text-amber-800 text-xs px-2.5 py-0.5 rounded font-bold ml-1 shadow-2xs"
             >
-              👑 {t('Admin : Copier-coller autorisé')}
+              {isPracticeMode ? (language === 'en' ? 'Practice: copy/paste enabled' : 'Pratique : copier-coller autorisé') : t('Admin : Copier-coller autorisé')}
             </span>
           )}
         </div>

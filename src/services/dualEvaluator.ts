@@ -1,3 +1,4 @@
+import { crosscheckedPrimary } from '../utils/nclcComparison';
 import { ExamResult } from '../types/exam';
 import { AIEvaluation } from '../types/aiEvaluation';
 import { evaluateTcfSubmissionWithGemini, getGeminiApiKey } from './geminiEvaluator';
@@ -10,7 +11,7 @@ export interface DualEvaluationResult {
   groq: AIEvaluation | null;
   geminiError: string | null;
   groqError: string | null;
-  /** The "primary" result to save: Gemini if available, else Groq */
+  /** Saved review with a comparison of independent NCLC estimates */
   primary: AIEvaluation | null;
 }
 
@@ -67,7 +68,7 @@ export async function evaluateDual(result: ExamResult): Promise<DualEvaluationRe
     groq: groqResult,
     geminiError,
     groqError,
-    primary: geminiResult || groqResult,
+    primary: crosscheckedPrimary(geminiResult, groqResult),
   };
 }
 

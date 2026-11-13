@@ -1,3 +1,4 @@
+import { WritingTemplatePanel } from '../components/WritingTemplatePanel';
 import React, { useState, useEffect, useCallback } from 'react';
 import { ExamCombination, ExamAnswers, TaskKey, ExamResult } from '../types/exam';
 import { useExamTimer } from '../hooks/useExamTimer';
@@ -36,10 +37,10 @@ export const Simulator: React.FC<SimulatorProps> = ({
   durationMinutes = 60,
   hideHeader = false
 }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { isAdmin } = useAuth();
   const allowCopyPaste = Boolean(
-    isAdmin || (typeof window !== 'undefined' && localStorage.getItem('tcf_admin_logged_in') === 'true')
+    isPracticeMode || isAdmin || (typeof window !== 'undefined' && localStorage.getItem('tcf_admin_logged_in') === 'true')
   );
 
   useEffect(() => {
@@ -62,6 +63,7 @@ export const Simulator: React.FC<SimulatorProps> = ({
     task2: '',
     task3: ''
   });
+  const [templatesOpen, setTemplatesOpen] = useState(false);
   const [isFinishModalOpen, setIsFinishModalOpen] = useState<boolean>(false);
 
   const initialDurationMinutes = isPracticeMode ? (durationMinutes || 15) : 60;
@@ -246,6 +248,8 @@ export const Simulator: React.FC<SimulatorProps> = ({
         </div>
       </div>
 
+      <div className="practice-reference-toolbar"><span>{language === 'en' ? 'Writing templates' : 'Modèles de rédaction'} · T{activeTask.slice(-1)}</span><button id="writing-template-toggle" type="button" className="studio-secondary" aria-expanded={templatesOpen} onClick={()=>setTemplatesOpen(open=>!open)}>{templatesOpen ? (language === 'en' ? 'Close templates' : 'Fermer les modèles') : (language === 'en' ? 'Open templates' : 'Ouvrir les modèles')}</button></div>
+      {templatesOpen && <WritingTemplatePanel activeTask={activeTask} isPracticeMode={isPracticeMode} onClose={()=>{setTemplatesOpen(false);document.getElementById('writing-template-toggle')?.focus();}}/>}
       {/* Main Exam Grid */}
       <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Left Sidebar: Task Navigation (Desktop) */}

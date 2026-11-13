@@ -165,7 +165,7 @@ const ComparisonSummary: React.FC<{ gemini: AIEvaluation; groq: AIEvaluation; en
         }`}>
           <span className="font-semibold">
             {Math.abs(gemini.overall_score - groq.overall_score) <= 2
-              ? (en ? '✓ High agreement' : '✓ Fort accord')
+              ? (en ? '✓ Similar practice scores' : '✓ Notes pédagogiques proches')
               : (en ? '⚠ Divergent scores' : '⚠ Scores divergents')}
           </span>
           <span className="ml-2">
