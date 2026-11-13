@@ -1,6 +1,7 @@
 import { buildEvaluationInstructions, instructionFingerprint } from './evaluationInstructions';
 import { validatePedagogicalAssessment } from './pedagogicalAssessment';
-import { safeParseGeminiJson, getActiveEvaluatedTasks } from './geminiEvaluator';
+import { getActiveEvaluatedTasks } from './geminiEvaluator';
+import { safeParseGeminiJson } from './aiJson';
 import { ExamResult, TaskKey } from '../types/exam';
 import { AIEvaluation } from '../types/aiEvaluation';
 import { countFrenchWords } from '../utils/wordCount';
@@ -58,48 +59,60 @@ export async function evaluateTcfSubmissionWithGroq(
     response_format: { type: 'json_object' },
   });
 
-  // Try /api/groq endpoint first (Vercel Edge function & Vite dev proxy prevent browser CORS)
-  let response: Response;
-  try {
-    response = await fetch('/api/groq', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      signal: AbortSignal.timeout(120000),
-      body: requestBody,
-    });
+  // A malformed or truncated model response gets one fresh attempt with the
+  // same instructions and answers. Never ask another model to invent missing grades.
+  async function requestAssessment() {
+    // Try /api/groq endpoint first (Vercel Edge function & Vite dev proxy prevent browser CORS)
+    let response: Response;
+    try {
+      response = await fetch('/api/groq', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        signal: AbortSignal.timeout(120000),
+        body: requestBody,
+      });
 
-    if (response.status === 404) {
-      throw new Error('Endpoint /api/groq not found, fallback to direct');
+      if (response.status === 404) {
+        throw new Error('Endpoint /api/groq not found, fallback to direct');
+      }
+    } catch (proxyErr) {
+      // Fallback to direct Groq API endpoint
+      response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        signal: AbortSignal.timeout(120000),
+        body: requestBody,
+      });
     }
-  } catch (proxyErr) {
-    // Fallback to direct Groq API endpoint
-    response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      signal: AbortSignal.timeout(120000),
-      body: requestBody,
-    });
+
+    if (!response.ok) {
+      const errorBody = await response.text().catch(() => '');
+      throw new Error(`Groq ${modelName}: HTTP ${response.status}. ${errorBody.slice(0, 200)}. Évaluation non enregistrée.`);
+    }
+
+    const payload = await response.json();
+    const choice = payload?.choices?.[0];
+    if (choice?.finish_reason === 'length') {
+      throw new Error('Réponse Groq tronquée : la limite de sortie a été atteinte. Veuillez relancer l’évaluation.');
+    }
+    return safeParseGeminiJson(choice?.message?.content);
+  }
+  let parsed: unknown;
+  try {
+    parsed = await requestAssessment();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (!/format JSON|Plusieurs objets JSON|tronquée|Réponse vide/.test(message)) throw error;
+    parsed = await requestAssessment();
   }
 
-  if (!response.ok) {
-    const errorBody = await response.text().catch(() => '');
-    throw new Error(`Groq ${modelName}: HTTP ${response.status}. ${errorBody.slice(0, 200)}. Évaluation non enregistrée.`);
-  }
-
-  const payload = await response.json();
-  const rawText = payload?.choices?.[0]?.message?.content;
-
-  if (!rawText) {
-    throw new Error("Réponse vide reçue de l'API Groq.");
-  }
-
-  const assessment = validatePedagogicalAssessment(safeParseGeminiJson(rawText), activeTaskKeys, result);
+  const assessment = validatePedagogicalAssessment(parsed, activeTaskKeys, result);
   if (assessment.feedback_language !== feedbackLanguage) throw new Error('AI returned the wrong feedback language.');
 
   const tasks: AIEvaluation['tasks'] = {};
