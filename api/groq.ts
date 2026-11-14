@@ -37,6 +37,7 @@ export default async function handler(req: Request) {
       status: groqRes.status,
       headers: {
         'Content-Type': 'application/json',
+        ...(groqRes.headers.get('Retry-After') ? {'Retry-After': groqRes.headers.get('Retry-After')!} : {}),
       },
     });
   } catch (err: any) {

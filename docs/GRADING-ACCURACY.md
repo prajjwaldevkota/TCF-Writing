@@ -91,3 +91,22 @@ withheld. A complete-mock NCLC projection is also withheld whenever any task ran
 is unsupported. A missing correction section is reported as incomplete, not as an
 error-free answer. Structural errors, invalid score fields and invalid ranges still
 fail validation. Previously saved reviews are not silently rewritten.
+
+## Provider quotas and optional second opinion
+
+The results page uses Gemini by default when its key is available. Groq is an
+explicit optional second opinion; if Groq is the only configured provider, it
+remains usable on its own. NCLC eligibility and evidence requirements do not
+require two providers. Provider agreement is still not calibrated accuracy.
+
+Groq makes one generation per explicit attempt: malformed output, truncation and
+transport timeouts do not cause automatic replay. Concurrent identical requests
+in the same tab share one in-flight promise. A 429 records a cooldown for that
+key/model, using Retry-After (or a 60-second fallback when no usable header is
+provided). Only the hashed key/model identity and deadline are stored. The Vercel
+proxy forwards Retry-After. Quota coordination is local to the browser; two friends
+sharing an account still share the provider's account limits.
+
+Requesting a second opinion reuses successful saved reviews only when both their
+input fingerprint and rubric version match the current request. Groq failure
+preserves a successful Gemini review and its supported single-model NCLC range.

@@ -1,3 +1,5 @@
+import { buildEvaluationInstructions, instructionFingerprint } from './evaluationInstructions';
+import { getActiveEvaluatedTasks } from './geminiEvaluator';
 import { crosscheckedPrimary } from '../utils/nclcComparison';
 import { ExamResult } from '../types/exam';
 import { AIEvaluation } from '../types/aiEvaluation';
@@ -43,17 +45,24 @@ export async function evaluateWithProvider(
  * Run BOTH Gemini and Groq evaluations in parallel.
  * Returns whichever succeed; errors are captured but don't block the other provider.
  */
-export async function evaluateDual(result: ExamResult): Promise<DualEvaluationResult> {
+export async function evaluateDual(result: ExamResult, previous?: DualEvaluationResult | null): Promise<DualEvaluationResult> {
   const available = getAvailableProviders();
+  const language = localStorage.getItem('tcf_language') === 'en' ? 'en' : 'fr';
+  const instructions = buildEvaluationInstructions(result, getActiveEvaluatedTasks(result), language);
+  const hash = await instructionFingerprint(instructions.systemPrompt + "\n" + instructions.userPrompt);
+  const reuse = (review: AIEvaluation | null | undefined) =>
+    review?.prompt_hash === hash && review.rubric_version === instructions.rubricVersion ? review : null;
+  const savedGemini = reuse(previous?.gemini);
+  const savedGroq = reuse(previous?.groq);
 
   const geminiPromise = available.gemini
-    ? evaluateTcfSubmissionWithGemini(result)
+    ? (savedGemini ? Promise.resolve(savedGemini) : evaluateTcfSubmissionWithGemini(result))
         .then<[AIEvaluation, null]>(r => [r, null])
         .catch<[null, string]>(e => [null, e?.message || 'Gemini evaluation failed'])
     : Promise.resolve<[null, string]>([null, 'No Gemini API key configured']);
 
   const groqPromise = available.groq
-    ? evaluateTcfSubmissionWithGroq(result)
+    ? (savedGroq ? Promise.resolve(savedGroq) : evaluateTcfSubmissionWithGroq(result))
         .then<[AIEvaluation, null]>(r => [r, null])
         .catch<[null, string]>(e => [null, e?.message || 'Groq evaluation failed'])
     : Promise.resolve<[null, string]>([null, 'No Groq API key configured']);

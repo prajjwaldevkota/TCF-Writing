@@ -2,7 +2,7 @@ import { RUBRIC_VERSION } from '../services/evaluationInstructions';
 import { crosscheckedPrimary } from '../utils/nclcComparison';
 import { NclcCrosscheck } from '../components/NclcCrosscheck';
 import { mockProjectionEligibility } from '../services/pedagogicalAssessment';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ExamResult, TaskKey } from '../types/exam';
 import { formatTime } from '../utils/wordCount';
 import { cleanDocumentText, fixMojibake, normalizeParagraphText } from '../utils/cleanText';
@@ -56,7 +56,10 @@ export const Results: React.FC<ResultsProps> = ({
   const [evalError, setEvalError] = useState<string | null>(null);
 
   const [availableProviders, setAvailableProviders] = useState(getAvailableProviders());
+  const [includeGroq, setIncludeGroq] = useState(false);
+  const evaluationInFlight = useRef(false);
   const isDualAvailable = availableProviders.gemini && availableProviders.groq;
+  const useDual = isDualAvailable && includeGroq;
   const nclcEligibility = mockProjectionEligibility(result, getActiveEvaluatedTasks(result));
   const nclcEstimate = evaluation?.pedagogical?.mock_projection;
 
@@ -95,8 +98,10 @@ export const Results: React.FC<ResultsProps> = ({
     }
   };
 
-  /** Start Evaluation: runs dual if both keys available, or single */
-  const handleStartEvaluation = async () => {
+  /** Gemini by default; a second provider is an explicit choice. */
+  const handleStartEvaluation = async (withGroq = includeGroq) => {
+    if (evaluationInFlight.current) return;
+    evaluationInFlight.current = true;
     setEvaluating(true);
     setEvalError(null);
 
@@ -111,8 +116,13 @@ export const Results: React.FC<ResultsProps> = ({
       }
 
       // If both available, perform dual evaluation
-      if (providers.gemini && providers.groq) {
-        const dual = await evaluateDual(result);
+      if (providers.gemini && providers.groq && withGroq) {
+        const previous = dualResult || (evaluation ? {
+          gemini: evaluation.model?.startsWith('groq/') ? null : evaluation,
+          groq: evaluation.model?.startsWith('groq/') ? evaluation : null,
+          geminiError: null, groqError: null, primary: evaluation,
+        } : null);
+        const dual = await evaluateDual(result, previous);
         setDualResult(dual);
 
         if (dual.primary) {
@@ -148,9 +158,11 @@ export const Results: React.FC<ResultsProps> = ({
           : await evaluateTcfSubmissionWithGroq(result);
 
         setEvaluation(evalData);
+        setDualResult(null);
         const updatedResult: ExamResult = {
           ...result,
           aiEvaluation: evalData,
+          dualAiEvaluation: undefined,
         };
         updateStoredSubmission(updatedResult);
         saveEvaluationMistakes(evalData, updatedResult);
@@ -169,6 +181,7 @@ export const Results: React.FC<ResultsProps> = ({
       console.error('Error during AI evaluation:', err);
       setEvalError(err?.message || "Une erreur est survenue lors de l'évaluation avec l'IA.");
     } finally {
+      evaluationInFlight.current = false;
       setEvaluating(false);
     }
   };
@@ -320,11 +333,11 @@ Temps utilisé : ${formatTime(result.timeUsedSeconds)}${result.allocatedMinutes 
                     disabled={evaluating}
                     className="px-4 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
                   >
-                    <span>{isDualAvailable ? '⚡🤖' : '🤖'}</span>
+                    <span>{useDual ? '⚡🤖' : '🤖'}</span>
                     <span>
                       {evaluating
                         ? t('Évaluation en cours...')
-                        : isDualAvailable
+                        : useDual
                         ? (language === 'en' ? 'Dual AI Evaluation (Gemini + Groq)' : 'Évaluation Double (Gemini + Groq)')
                         : t('Évaluer avec l’IA (Coach TCF)')}
                     </span>
@@ -358,6 +371,15 @@ Temps utilisé : ${formatTime(result.timeUsedSeconds)}${result.allocatedMinutes 
             </div>
           </div>
 
+          {isDualAvailable && (
+            <label className="mb-5 flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm">
+              <input type="checkbox" checked={includeGroq} disabled={evaluating} onChange={event => setIncludeGroq(event.target.checked)} className="mt-1" />
+              <span><strong>{language === 'en' ? 'Add a Groq second opinion (optional)' : 'Ajouter un second avis Groq (facultatif)'}</strong>
+                <span className="block mt-1 text-slate-600">{language === 'en' ? 'Gemini handles grading by default, including supported NCLC estimates. Groq uses a separate quota; its failure does not invalidate Gemini’s review.' : 'Gemini assure la correction par défaut, y compris les estimations NCLC étayées. Groq utilise un quota distinct ; son échec n’invalide pas le bilan Gemini.'}</span>
+              </span>
+            </label>
+          )}
+
           <section className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-5" aria-label={language === 'en' ? 'Get your estimated NCLC' : 'Obtenir votre NCLC estimé'}>
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="max-w-2xl"><p className="studio-eyebrow">{language === 'en' ? 'FULL-MOCK READINESS' : 'BILAN DE L’EXAMEN BLANC'}</p><h2 className="text-xl font-semibold mt-2">{language === 'en' ? 'Get your estimated NCLC writing range' : 'Obtenir votre plage NCLC estimée en expression écrite'}</h2>
@@ -365,11 +387,17 @@ Temps utilisé : ${formatTime(result.timeUsedSeconds)}${result.allocatedMinutes 
                 {!nclcEligibility.eligible && <p className="text-sm mt-3 font-medium" role="status">{language === 'en' ? nclcEligibility.reason_en : nclcEligibility.reason_fr}</p>}
                 {nclcEstimate && <p className="text-lg font-semibold mt-3">NCLC {nclcEstimate.lower === 3 ? '<4' : nclcEstimate.lower}–{nclcEstimate.upper === 10 ? '10+' : nclcEstimate.upper} · {language === 'en' ? 'AI estimate' : 'estimation IA'}</p>}
               </div>
-              <button type="button" className="studio-primary" disabled={evaluating || !nclcEligibility.eligible} onClick={handleStartEvaluation}>{evaluating ? (language === 'en' ? 'Assessing…' : 'Analyse en cours…') : nclcEstimate ? (language === 'en' ? 'Reassess NCLC' : 'Réévaluer le NCLC') : (language === 'en' ? 'Estimate NCLC' : 'Estimer le NCLC')}</button>
+              <button type="button" className="studio-primary" disabled={evaluating || !nclcEligibility.eligible} onClick={() => handleStartEvaluation()}>{evaluating ? (language === 'en' ? 'Assessing…' : 'Analyse en cours…') : nclcEstimate ? (language === 'en' ? 'Reassess NCLC' : 'Réévaluer le NCLC') : (language === 'en' ? 'Estimate NCLC' : 'Estimer le NCLC')}</button>
             </div>
             {evaluation?.nclc_crosscheck && <NclcCrosscheck comparison={evaluation.nclc_crosscheck}/> }
-            <details className="mt-4 text-sm"><summary className="cursor-pointer font-medium">{language === 'en' ? 'How this estimate works' : 'Comment fonctionne cette estimation'}</summary><ol className="list-decimal pl-5 mt-3 space-y-2 leading-7"><li>{language === 'en' ? 'Choose Full Exam in the library, write all three responses, then finish the session.' : 'Choisissez Examen complet dans la bibliothèque, rédigez les trois réponses, puis terminez la séance.'}</li><li>{language === 'en' ? 'Click Estimate NCLC. This runs a new AI review using the configured provider(s).' : 'Cliquez sur Estimer le NCLC : une nouvelle analyse utilise le ou les modèles configurés.'}</li><li>{language === 'en' ? 'Read the range and its evidence. If both models run, compare their separate judgments; disagreement is not averaged away.' : 'Lisez la plage et sa justification. Avec deux modèles, comparez leurs jugements distincts : les désaccords ne sont pas masqués par une moyenne.'}</li></ol><p className="mt-3 text-xs text-slate-600">{language === 'en' ? 'This is an uncalibrated practice estimate, not an official result or a guarantee. The assessor can withhold it when serious task-fulfilment risks remain.' : 'Estimation de pratique non calibrée, sans valeur officielle ni garantie. L’IA peut la suspendre en présence de risques importants de non-respect des consignes.'}</p></details>
+            <details className="mt-4 text-sm"><summary className="cursor-pointer font-medium">{language === 'en' ? 'How this estimate works' : 'Comment fonctionne cette estimation'}</summary><ol className="list-decimal pl-5 mt-3 space-y-2 leading-7"><li>{language === 'en' ? 'Choose Full Exam in the library, write all three responses, then finish the session.' : 'Choisissez Examen complet dans la bibliothèque, rédigez les trois réponses, puis terminez la séance.'}</li><li>{language === 'en' ? 'Click Estimate NCLC. Gemini is used by default, or Groq if only its key is configured.' : 'Cliquez sur Estimer le NCLC : Gemini est utilisé par défaut, ou Groq si seule sa clé est configurée.'}</li><li>{language === 'en' ? 'Read the range and its evidence. If both models run, compare their separate judgments; disagreement is not averaged away.' : 'Lisez la plage et sa justification. Avec deux modèles, comparez leurs jugements distincts : les désaccords ne sont pas masqués par une moyenne.'}</li></ol><p className="mt-3 text-xs text-slate-600">{language === 'en' ? 'This is an uncalibrated practice estimate, not an official result or a guarantee. The assessor can withhold it when serious task-fulfilment risks remain.' : 'Estimation de pratique non calibrée, sans valeur officielle ni garantie. L’IA peut la suspendre en présence de risques importants de non-respect des consignes.'}</p></details>
           </section>
+
+          {evaluation && isDualAvailable && !dualResult?.groq && (
+            <button type="button" disabled={evaluating} className="studio-secondary mb-5" onClick={() => { setIncludeGroq(true); void handleStartEvaluation(true); }}>
+              {language === 'en' ? 'Request Groq second opinion' : 'Demander un second avis Groq'}
+            </button>
+          )}
 
           {/* Evaluating Loading State Indicator */}
           {evaluating && (
@@ -377,8 +405,8 @@ Temps utilisé : ${formatTime(result.timeUsedSeconds)}${result.allocatedMinutes 
               <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin shrink-0"></div>
               <div className="text-xs text-indigo-900">
                 <p className="font-bold">
-                  {isDualAvailable
-                    ? (language === 'en' ? 'Dual AI review in progress (Gemini 2.5 + Groq Llama 3.3)...' : 'Évaluation double en cours (Gemini 2.5 + Groq Llama 3.3 en parallèle)...')
+                  {useDual
+                    ? (language === 'en' ? 'Gemini review and optional Groq second opinion in progress…' : 'Analyse Gemini et second avis Groq en cours…')
                     : t("Lecture pédagogique en cours...")}
                 </p>
                 <p className="text-indigo-700 mt-0.5">{t("Deux passes de lecture : communication, puis maîtrise de la langue. Aucun score officiel ni niveau NCLC ne sera attribué.")}</p>
