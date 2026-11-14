@@ -32,7 +32,7 @@ export function saveSubmission(result: ExamResult): ExamResult {
   };
 
   // Add to beginning of array
-  const updated = [newSubmission, ...submissions];
+  const updated = [newSubmission, ...submissions.filter(s => s.id !== newSubmission.id)];
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
   } catch (e) {
@@ -42,7 +42,7 @@ export function saveSubmission(result: ExamResult): ExamResult {
   return newSubmission;
 }
 
-export function updateStoredSubmission(updatedResult: ExamResult): void {
+export function updateStoredSubmission(updatedResult: ExamResult): boolean {
   try {
     const submissions = getStoredSubmissions();
     const index = submissions.findIndex((s) => s.id === updatedResult.id);
@@ -52,8 +52,10 @@ export function updateStoredSubmission(updatedResult: ExamResult): void {
       submissions.unshift(updatedResult);
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(submissions));
+    return true;
   } catch (e) {
     console.error('Error updating submission in localStorage:', e);
+    return false;
   }
 }
 
@@ -108,15 +110,26 @@ export function mergeSubmissions(primary: ExamResult[], secondary: ExamResult[])
   // Secondary (LocalStorage) added only if not duplicate
   for (const sub of secondary) {
     const cKey = getContentKey(sub);
-    const existing = (sub.id ? byId.get(sub.id) : undefined) || byContent.get(cKey);
+    const existing = (sub.id ? byId.get(sub.id) : undefined) || (sub.cloudId ? byId.get(sub.cloudId) : undefined) || byContent.get(cKey);
     if (existing) {
       // Only merge evaluations of the exact same complete answers.
       const sameAnswers = (['task1', 'task2', 'task3'] as const).every(
         (key) => (existing.answers[key] || '') === (sub.answers[key] || '')
       );
+      if (sameAnswers) {
+        existing.isPracticeMode = sub.isPracticeMode ?? existing.isPracticeMode;
+        existing.practiceTask = sub.practiceTask ?? existing.practiceTask;
+        existing.practiceTasks = sub.practiceTasks ?? existing.practiceTasks;
+        existing.allocatedMinutes = sub.allocatedMinutes ?? existing.allocatedMinutes;
+        existing.revisionOf = sub.revisionOf ?? existing.revisionOf;
+        existing.createdAt = sub.createdAt ?? existing.createdAt;
+        existing.cloudId = sub.cloudId ?? existing.cloudId;
+        existing.combination = sub.combination;
+      }
       if (sameAnswers && sub.aiEvaluation && (!existing.aiEvaluation ||
-        Date.parse(sub.aiEvaluation.created_at) > Date.parse(existing.aiEvaluation.created_at))) {
+        Date.parse(sub.aiEvaluation.created_at) >= Date.parse(existing.aiEvaluation.created_at))) {
         existing.aiEvaluation = sub.aiEvaluation;
+        existing.dualAiEvaluation = sub.dualAiEvaluation;
       }
       continue;
     }

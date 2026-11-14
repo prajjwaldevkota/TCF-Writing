@@ -1,64 +1,54 @@
-# Private TCF writing lab
+# Run Écriture locally or on your Vercel project
 
-This is a local fork of the original simulator. It is not deployed.
+## Local practice
 
-## Start
+1. Run `npm ci`, then `npm run dev -- --host 127.0.0.1`.
+2. Open the printed URL. No account or database is required to practise.
+3. Open **Settings & AI / Réglages et IA** and save your own Gemini API key.
+   Groq is optional. Never reuse someone else's embedded API key.
+4. Write a guided task or a full mock. Request feedback only when ready.
+5. Export your writing from Settings regularly. Clearing browser data removes
+   local submissions, correction review status, and drafts.
 
-1. Create your own Supabase project. Run `supabase/schema.sql`, then
-   `supabase/repair-ai-feedback.sql` in its SQL editor.
-2. Copy `.env.example` to `.env.local`. Set your project URL and publishable/anon
-   key. The original database defaults have been removed.
-3. Add `VITE_GEMINI_MODEL=gemini-3.1-flash-lite` (the model observed serving the
-   upstream tests). This pins the engine; it is not an accuracy recommendation.
-4. Run `npm ci`, then `npm run dev -- --host 127.0.0.1`.
-5. Configure your own Gemini API key in the app's AI configuration screen.
-   Do not copy the upstream site's embedded key.
+Copy `.env.example` to `.env.local` only if you need build defaults or optional
+account storage. `VITE_GEMINI_MODEL` and `VITE_GROQ_MODEL` pin the chosen model;
+model accessibility must match your own provider account. These identifiers are
+public configuration and do not establish grading accuracy.
 
-For two people, invite both accounts through your own Supabase dashboard and
-disable public signups. Row-level policies restrict submissions to their owner.
-Your friend can run their own copy using the same Supabase configuration.
-Localhost is only accessible on the computer running it; no shared hosting has
-been configured. Each browser's unsynced feedback stays on that browser.
+Browser-entered API keys are stored in localStorage and override build defaults.
+Build variables prefixed with VITE are embedded in browser code. Keep actual
+server secrets unprefixed and behind a server endpoint if you later extend the
+architecture. The app retains the browser-to-Gemini evaluation path; the Groq
+endpoint proxies requests and forwards rate-limit cooldown headers.
 
-This retains the upstream browser-to-Gemini API architecture. API keys configured
-in the browser are accessible to that browser; VITE variables are public build
-configuration, never server secrets. Use a backend proxy before wider hosting.
-Automatic upstream administrator submission notifications and the hardcoded
-administrator login bypass have been disabled/removed.
+## Optional Supabase accounts
 
-## Confirmed upstream defects
+Use your own project. Run `supabase/schema.sql`, followed by
+`supabase/repair-ai-feedback.sql`, in that project's SQL editor. Configure
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. For two learners, create/invite
+both accounts and disable public sign-ups if you want invitation-only access.
+Keep the supplied row-level ownership policies enabled.
 
-Both examined submissions returned 11/20, B2, CLB 7. The second was January 2026,
-Combination 33; the first was February 2026, Combination 4.
+Sign in from Settings. New submissions are written locally before the cloud
+request starts. A failed cloud write does not remove local work. Feedback saves
+through the existing `ai_feedback` column; it also carries the practice context
+and original question snapshot for later retrieval. This needs no new database
+column. Unfinished drafts and correction-review status remain browser-local.
+Use **Sync my account** to retrieve cloud submissions. The merge preserves local
+practice/revision metadata and the latest saved review for identical answers.
 
-The server returned HTTP 400 / PGRST204:
-`Could not find the 'ai_feedback' column of 'submissions' in the schema cache`.
-The supplied schema also lacks an owner UPDATE policy. The repair adds both.
-The UI previously ignored returned save errors, and server-first merging dropped
-local feedback on reload. Both paths are corrected here. Missing evaluations now
-display “Not evaluated”; a genuine zero remains zero.
+Existing records without feedback may lack practice metadata. Local metadata is
+preserved when available; the new app does not manufacture missing original
+instructions. Legacy numeric reviews remain readable as historical feedback.
 
-The grader previously substituted 14/20 when a task score was missing. Invalid
-or missing scores now fail explicitly. Word counts are recalculated from the text,
-and evaluations record model and rubric version. Model failures no longer silently
-switch to another grading engine. No one else's cloud database was changed.
+## Vercel
 
-## Pedagogical assessment (v3)
+The repository already contains `vercel.json`, builds with `npm run build`, and
+serves `dist`. Keep the existing GitHub/Vercel project. Configure model IDs and any
+optional build defaults in that project's environment, then redeploy after
+changing them. A successful Git push alone is not verification of a completed
+Vercel deployment or its provider credentials.
 
-The evaluator now follows `docs/tcf-writing-evaluation-guide.md`. It uses task-level
-ranges and evidence instead of numeric task scores or equal-task averages. At the learner’s request,
-complete eligible mocks also receive a separate uncalibrated NCLC range. Old numerical estimates remain labelled as legacy and are excluded
-from the new task-level progress view. Open an old result and click AI evaluation
-to replace it with the new review. This makes one API request.
-
-Feedback follows the selected app language. Task 3 needs the prompt and both
-source documents; otherwise its range is withheld. Blank responses are unassessed,
-not automatically assigned an official zero. Word count uses whitespace-delimited
-sign groups without splitting punctuation, apostrophes or hyphens.
-
-The two reading passes are in one model request. They are not independent official
-examiner judgments. Accuracy remains unverified: see `docs/GRADING-ACCURACY.md` for
-the benchmark protocol. FEI pages blocked the automated source recheck; the source
-statements are supplied by the learner and must be rechecked before exam reliance.
-
-See `docs/LOCAL-REFERENCE-AUDIT.md` for the supplied TCFFormation materials.
+The current UI and practice flow are documented in [README.md](README.md).
+The limits of AI grading and outstanding calibration work are documented in
+[docs/GRADING-ACCURACY.md](docs/GRADING-ACCURACY.md).

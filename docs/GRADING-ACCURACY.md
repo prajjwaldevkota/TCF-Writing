@@ -110,3 +110,24 @@ sharing an account still share the provider's account limits.
 Requesting a second opinion reuses successful saved reviews only when both their
 input fingerprint and rubric version match the current request. Groq failure
 preserves a successful Gemini review and its supported single-model NCLC range.
+
+## Practice workflow rebuild
+
+The active app now opens a local-first practice workspace without an authentication
+gate. The NCLC 7 learning goal appears in study guidance only and is not added to
+the grading request. The assessment contract and evidence checks are unchanged.
+The results screen keeps the learner's answer next to its review, offers a
+revision linked to the original submission, and uses saved corrections for
+self-reviewed exercises without additional model calls.
+
+Gemini runs only on an explicit feedback request. Groq is requested separately
+from review options. The matching provider review is cached by input fingerprint,
+rubric and feedback language; concurrent identical requests share one promise.
+Changed answers or language cannot reuse the old review. New complete mocks may
+show a supported Gemini-only NCLC range; no second model is required. A projection
+still remains withheld when the evidence or task requirements do not support it.
+
+Browser QA used isolated profiles and synthetic provider fixtures, including a
+full-mock NCLC display and a Groq 429 after a successful Gemini review. These tests
+verify application behaviour, not the accuracy of a model's judgment. No live
+human-grade calibration or real account-sync test was performed for this rebuild.

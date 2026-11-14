@@ -12,13 +12,13 @@ const inFlight = new Map<string, Promise<AIEvaluation>>();
 const GROQ_API_KEY_STORAGE = 'tcf_groq_api_key';
 
 export function getGroqApiKey(): string {
-  const envKey = (import.meta as any).env?.VITE_GROQ_API_KEY;
-  if (envKey && typeof envKey === 'string' && envKey.trim().length > 0) {
-    return envKey.trim();
-  }
   const localKey = localStorage.getItem(GROQ_API_KEY_STORAGE);
   if (localKey && localKey.trim().length > 0) {
     return localKey.trim();
+  }
+  const envKey = (import.meta as any).env?.VITE_GROQ_API_KEY;
+  if (envKey && typeof envKey === 'string' && envKey.trim().length > 0) {
+    return envKey.trim();
   }
   return '';
 }

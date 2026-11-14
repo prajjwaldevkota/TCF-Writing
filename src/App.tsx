@@ -1,420 +1,363 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Home } from './pages/Home';
-import { Simulator } from './pages/Simulator';
-import { Results } from './pages/Results';
-import { Login } from './pages/Login';
-import { Dashboard } from './pages/Dashboard';
-import { Feedback } from './pages/Feedback';
-import { AppLayout } from './components/AppLayout';
-import { ExamCombination, ExamResult, TaskKey } from './types/exam';
-import { saveSubmission, getStoredSubmissions, syncStoredSubmissions, mergeSubmissions } from './utils/storage';
-import { getStoredMistakes } from './utils/mistakesStorage';
-import { MistakesRevisionModal } from './components/MistakesRevisionModal';
-import { saveSubmissionToSupabase, fetchSubmissionsFromSupabase } from './lib/supabase';
-import { getLocalISOString } from './utils/dateUtils';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import { sendSubmissionNotification } from './services/notificationService';
-import { LanguageProvider, useLanguage } from './context/LanguageContext';
-
-const MainRouter: React.FC = () => {
-  const { user, loading, isEmailVerified, signOut, isAdmin, isConfigured } = useAuth();
-  const { t } = useLanguage();
-
-  const [view, setView] = useState<'home' | 'simulator' | 'results' | 'dashboard' | 'feedback'>('home');
-  const [dashboardTab, setDashboardTab] = useState<'submissions' | 'mistakes' | 'admin'>('submissions');
-
-  // Auto-redirect returning users with evaluated submissions to Dashboard on first load
-  const hasAutoRedirected = useRef(false);
-  const [activeCombo, setActiveCombo] = useState<ExamCombination | null>(null);
-  const [activeYear, setActiveYear] = useState<string>('2026');
-  const [activeMonth, setActiveMonth] = useState<string>('Septembre');
-  const [startedAt, setStartedAt] = useState<string>('');
-  const [examResult, setExamResult] = useState<ExamResult | null>(null);
-  const [isPracticeMode, setIsPracticeMode] = useState<boolean>(false);
-  const [practiceTask, setPracticeTask] = useState<TaskKey>('task1');
-  const [practiceTasks, setPracticeTasks] = useState<TaskKey[]>(['task1']);
-  const [practiceDuration, setPracticeDuration] = useState<number>(60);
-  const [submissionsCount, setSubmissionsCount] = useState<number>(() => {
-    try {
-      return getStoredSubmissions().length;
-    } catch {
-      return 0;
-    }
-  });
-  const [mistakesCount, setMistakesCount] = useState<number>(() => {
-    try {
-      return getStoredMistakes().length;
-    } catch {
-      return 0;
-    }
-  });
-  const [retakePendingCombo, setRetakePendingCombo] = useState<{ combo: ExamCombination; year: string; month: string } | null>(null);
-  const [showRetakeMistakesModal, setShowRetakeMistakesModal] = useState<boolean>(false);
-
-  const [showSlowNotice, setShowSlowNotice] = useState(false);
-
+import React, { useEffect, useRef, useState } from "react";
+import { Home } from "./pages/Home";
+import { PracticeLibrary, allQuestions } from "./pages/PracticeLibrary";
+import { Simulator } from "./pages/Simulator";
+import { Results } from "./pages/Results";
+import { Templates } from "./pages/Templates";
+import { Progress } from "./pages/Progress";
+import { Notebook } from "./pages/Notebook";
+import { Settings } from "./pages/Settings";
+import { Login } from "./pages/Login";
+import { AppLayout, AppView } from "./components/AppLayout";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import { LanguageProvider, useLanguage } from "./context/LanguageContext";
+import type { ExamResult, TaskKey } from "./types/exam";
+import {
+  DRAFT_KEY,
+  QuestionEntry,
+  loadPracticeSession,
+  makeSession,
+  PracticeSession,
+  savePracticeSession,
+  resultTimestamp,
+  practicedKeys,
+} from "./utils/practice";
+import {
+  getStoredSubmissions,
+  saveSubmission,
+  updateStoredSubmission,
+  mergeSubmissions,
+  syncStoredSubmissions,
+} from "./utils/storage";
+import { feedbackWithContext } from "./utils/reviewState";
+import { saveEvaluationMistakes } from "./utils/mistakesStorage";
+import {
+  fetchSubmissionsFromSupabase,
+  saveSubmissionToSupabase,
+  updateSubmissionAiFeedback,
+} from "./lib/supabase";
+const validViews: AppView[] = [
+  "home",
+  "library",
+  "templates",
+  "simulator",
+  "results",
+  "dashboard",
+  "notebook",
+  "settings",
+  "login",
+];
+function route() {
+  const [view, id] = location.hash.replace(/^#\/?/, "").split("/");
+  return {
+    view: validViews.includes(view as AppView)
+      ? (view as AppView)
+      : ("home" as AppView),
+    id,
+  };
+}
+function MainRouter() {
+  const { user, userName, isConfigured } = useAuth();
+  const { language } = useLanguage();
+  const en = language === "en";
+  const [view, setView] = useState<AppView>(() => route().view);
+  const [submissions, setSubmissions] = useState(() =>
+    getStoredSubmissions().sort(
+      (a, b) => resultTimestamp(b) - resultTimestamp(a),
+    ),
+  );
+  const [draft, setDraft] = useState<PracticeSession | null>(
+    loadPracticeSession,
+  );
+  const [active, setActive] = useState<ExamResult | null>(
+    () => getStoredSubmissions().find((s) => s.id === route().id) || null,
+  );
+  const [notice, setNotice] = useState("");
+  const [syncStatus, setSyncStatus] = useState("");
+  const syncedUser = useRef("");
+  const refresh = () => {
+    setSubmissions(
+      getStoredSubmissions().sort(
+        (a, b) => resultTimestamp(b) - resultTimestamp(a),
+      ),
+    );
+    setDraft(loadPracticeSession());
+  };
+  const navigate = (next: AppView, result?: ExamResult) => {
+    if (result) setActive(result);
+    setView(next);
+    location.hash = `/${next}${next === "results" && result?.id ? "/" + result.id : ""}`;
+  };
   useEffect(() => {
+    const onHash = () => {
+      const next = route();
+      setView(next.view);
+      if (next.view === "results" && next.id)
+        setActive(getStoredSubmissions().find((s) => s.id === next.id) || null);
+      window.scrollTo(0, 0);
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+  const sync = async () => {
+    if (!user || !isConfigured) return;
+    setSyncStatus(en ? "Syncing account…" : "Synchronisation du compte…");
     try {
-      setSubmissionsCount(getStoredSubmissions().length);
-      setMistakesCount(getStoredMistakes().length);
-    } catch {}
-  }, [view]);
-
-  // Auto-redirect: if user is authenticated and has past AI-evaluated submissions,
-  // send them to the Dashboard (with analytics) instead of the Exam Selector on first load.
-  useEffect(() => {
-    if (hasAutoRedirected.current) return;
-    if (loading || !user) return;
-
-    try {
-      const stored = getStoredSubmissions();
-      const hasEvaluated = stored.some(
-        (s) => s.aiEvaluation && (s.aiEvaluation.pedagogical || typeof s.aiEvaluation.overall_score === 'number')
+      const response = await fetchSubmissionsFromSupabase(user.id);
+      if (response.error) throw response.error;
+      syncStoredSubmissions(
+        mergeSubmissions(response.submissions, getStoredSubmissions()),
       );
-      if (hasEvaluated) {
-        hasAutoRedirected.current = true;
-        setDashboardTab('submissions');
-        setView('dashboard');
-        return;
-      }
-
-      // If local storage is empty, also check Supabase for returning users on a new device or cleared cache
-      if (isConfigured) {
-        fetchSubmissionsFromSupabase(user.id).then(({ submissions: dbSubs }) => {
-          if (dbSubs && dbSubs.length > 0) {
-            const merged = mergeSubmissions(dbSubs, stored);
-            syncStoredSubmissions(merged);
-            const hasEvalDb = merged.some(
-              (s) => s.aiEvaluation && (s.aiEvaluation.pedagogical || typeof s.aiEvaluation.overall_score === 'number')
+      refresh();
+      setSyncStatus(
+        en
+          ? "Account synced. Your local drafts stay on this device."
+          : "Compte synchronisé. Vos brouillons locaux restent sur cet appareil.",
+      );
+    } catch (e) {
+      setSyncStatus(
+        en
+          ? "Cloud sync unavailable. Your local work is still available."
+          : "Synchronisation indisponible. Votre travail local reste accessible.",
+      );
+    }
+  };
+  useEffect(() => {
+    if (user && isConfigured && syncedUser.current !== user.id) {
+      syncedUser.current = user.id;
+      void sync();
+    }
+  }, [user?.id, isConfigured]);
+  const start = (
+    entry: QuestionEntry,
+    task: TaskKey | "exam",
+    revision?: ExamResult,
+  ) => {
+    if (
+      draft &&
+      !window.confirm(
+        en
+          ? "Replace your unfinished session? Its current draft will be replaced. Export a backup in Settings first if you want to keep it."
+          : "Remplacer la séance en cours ? Son brouillon sera remplacé. Exportez d’abord une sauvegarde dans les réglages si vous souhaitez le conserver.",
+      )
+    )
+      return;
+    const session = makeSession(entry, task, revision);
+    if (!savePracticeSession(session)) {
+      setNotice(
+        en
+          ? "Cannot save a draft. Browser storage is unavailable. Export a backup before continuing."
+          : "Impossible de sauvegarder un brouillon. Le stockage est indisponible. Exportez une sauvegarde avant de continuer.",
+      );
+      return;
+    }
+    setDraft(session);
+    setNotice("");
+    navigate("simulator");
+  };
+  const quickStart = (task: TaskKey | "exam") => {
+    const available = allQuestions.filter(
+      (q) =>
+        (task !== "exam" && task !== "task3") ||
+        Boolean(
+          q.combination.tasks.task3.document1?.trim() &&
+          q.combination.tasks.task3.document2?.trim(),
+        ),
+    );
+    const entry =
+      available.find(
+        (q) =>
+          !submissions.some(
+            (s) =>
+              s.year === q.year &&
+              s.month === q.month &&
+              s.combination.combinationNumber ===
+                q.combination.combinationNumber &&
+              (task === "exam"
+                ? !s.isPracticeMode
+                : practicedKeys(s).includes(task)),
+          ),
+      ) || available[0];
+    if (entry) start(entry, task);
+  };
+  const saveReview = (result: ExamResult) => {
+    const stored = updateStoredSubmission(result);
+    if (!stored) {
+      setActive((previous) => (previous?.id === result.id ? result : previous));
+      setNotice(
+        en
+          ? "The review was generated but could not be saved. Keep this page open and copy the feedback before freeing browser storage."
+          : "Le bilan a été généré mais n’a pas pu être sauvegardé. Gardez cette page ouverte et copiez le bilan avant de libérer du stockage.",
+      );
+      return;
+    }
+    saveEvaluationMistakes(result.aiEvaluation!, result);
+    setActive((previous) => (previous?.id === result.id ? result : previous));
+    refresh();
+    if (user && isConfigured && result.id) {
+      void updateSubmissionAiFeedback(
+        result.cloudId || result.id,
+        user.id,
+        feedbackWithContext(result),
+      ).then(({ error }) => {
+        if (error)
+          setSyncStatus(
+            en
+              ? "Feedback saved locally. Cloud sync failed."
+              : "Bilan sauvegardé localement. Synchronisation du cloud échouée.",
+          );
+      });
+    }
+  };
+  const finish = (result: ExamResult): boolean => {
+    const saved = saveSubmission(result);
+    if (!getStoredSubmissions().some((s) => s.id === saved.id)) {
+      setNotice(
+        en
+          ? "Your response could not be saved. Keep this page open and export a backup."
+          : "Votre texte n’a pas pu être enregistré. Gardez cette page ouverte et exportez une sauvegarde.",
+      );
+      return false;
+    }
+    localStorage.removeItem(DRAFT_KEY);
+    setDraft(null);
+    refresh();
+    navigate("results", saved);
+    if (user && isConfigured) {
+      void saveSubmissionToSupabase(user.id, saved)
+        .then(async ({ data, error }) => {
+          if (error) {
+            setSyncStatus(
+              en
+                ? "Writing saved locally. Cloud copy unavailable."
+                : "Texte enregistré localement. Copie cloud indisponible.",
             );
-            if (hasEvalDb && !hasAutoRedirected.current) {
-              hasAutoRedirected.current = true;
-              setDashboardTab('submissions');
-              setView('dashboard');
+            return;
+          }
+          if (data?.id) {
+            const latest = getStoredSubmissions().find(
+              (s) => s.id === saved.id,
+            );
+            if (latest) {
+              const updated = { ...latest, cloudId: data.id };
+              updateStoredSubmission(updated);
+              setActive((previous) =>
+                previous?.id === updated.id ? updated : previous,
+              );
+              refresh();
+              if (latest.aiEvaluation)
+                await updateSubmissionAiFeedback(
+                  data.id,
+                  user.id,
+                  feedbackWithContext(latest),
+                );
             }
           }
-        }).catch(() => {});
-      }
-    } catch {
-      // fail silently — just stay on exam selector
-    }
-  }, [loading, user, isConfigured]);
-
-  useEffect(() => {
-    let t: any;
-    if (loading) {
-      t = setTimeout(() => setShowSlowNotice(true), 3500);
-    } else {
-      setShowSlowNotice(false);
-    }
-    return () => clearTimeout(t);
-  }, [loading]);
-
-  // Automatically scroll to the top of the page whenever the view/route changes
-  useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-  }, [view]);
-
-  // Keep Neumorphism UI theme active on root
-  useEffect(() => {
-    document.documentElement.classList.remove('theme-neumorphism', 'neu-theme');
-    document.documentElement.classList.remove('dark', 'theme-ocean', 'theme-classic');
-    try {
-      localStorage.removeItem('tcf_color_theme');
-    } catch {}
-  }, []);
-
-  // 1. Loading screen while determining auth session
-  if (loading) {
-    return (
-      <div
-        className="min-h-screen flex flex-col items-center justify-center p-4 text-center"
-        style={{ backgroundColor: '#e8edf5', color: '#1e293b' }}
-      >
-        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-slate-600 font-medium text-sm mb-2">Chargement de votre session...</p>
-        {showSlowNotice && (
-          <div className="mt-4 p-3 bg-white border border-slate-200 rounded-lg max-w-xs text-xs text-slate-500 shadow-xs">
-            <p className="mb-2">La vérification réseau prend du temps en raison de votre connexion.</p>
-            <button
-              type="button"
-              onClick={() => window.location.reload()}
-              className="px-3 py-1.5 bg-blue-600 text-white font-medium rounded text-xs hover:bg-blue-700 transition-colors cursor-pointer"
-            >
-              Recharger
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // 1.5. If view is feedback and user is not authenticated, show standalone Feedback
-  if (view === 'feedback' && (!user || !isEmailVerified)) {
-    return (
-      <Feedback
-        onHomeClick={() => setView('home')}
-        userEmail={user?.email}
-      />
-    );
-  }
-
-  // 2. Gatekeeper: If user is not logged in OR email is not verified, show Login page as the 1st page
-  if (!user || !isEmailVerified) {
-    return (
-      <Login
-        onSuccess={() => {
-          hasAutoRedirected.current = false;
-          setView('home');
-        }}
-        onFeedbackClick={() => setView('feedback')}
-      />
-    );
-  }
-
-  // 3. User is authenticated and verified -> give full access to Home, Simulator, Dashboard, and Results
-  const handleStartExam = (
-    combo: ExamCombination,
-    year: string,
-    month: string,
-    practiceMode: boolean = false,
-    task: TaskKey | TaskKey[] = 'task1',
-    duration: number = 60
-  ) => {
-    setActiveCombo(combo);
-    setActiveYear(year);
-    setActiveMonth(month);
-    setIsPracticeMode(practiceMode);
-    if (Array.isArray(task)) {
-      setPracticeTasks(task);
-      setPracticeTask(task[0] || 'task1');
-    } else {
-      setPracticeTasks([task]);
-      setPracticeTask(task);
-    }
-    setPracticeDuration(duration);
-    setStartedAt(getLocalISOString());
-    setView('simulator');
-  };
-
-  const handleFinishExam = async (result: ExamResult) => {
-    let finalResult = result;
-
-    if (user) {
-      try {
-        const { data, error } = await saveSubmissionToSupabase(
-          user.id,
-          result,
-          startedAt || getLocalISOString(new Date(Date.now() - (result.timeUsedSeconds || 0) * 1000))
+        })
+        .catch(() =>
+          setSyncStatus(
+            en
+              ? "Writing saved locally. Cloud copy unavailable."
+              : "Texte enregistré localement. Copie cloud indisponible.",
+          ),
         );
-        if (data?.id) {
-          finalResult = {
-            ...result,
-            id: data.id
-          };
-        }
-      } catch (err) {
-        console.error('Error saving submission to Supabase:', err);
-      }
     }
-
-    setStartedAt('');
-    const savedLocal = saveSubmission(finalResult);
-    setExamResult(savedLocal);
-    try {
-      setSubmissionsCount(getStoredSubmissions().length);
-    } catch {}
-
-    // Trigger Admin Notification for monitored users
-    try {
-      const candidateEmail = user?.email || localStorage.getItem('tcf_demo_user') || 'utilisateur@tcf.local';
-      await Promise.race([
-        sendSubmissionNotification(candidateEmail, finalResult),
-        new Promise((resolve) => setTimeout(resolve, 5000))
-      ]);
-    } catch (notifErr) {
-      console.warn('Notification execution caught error:', notifErr);
-    }
-
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-    setView('results');
+    return true;
   };
-
-  const handleViewPastSubmission = (result: ExamResult) => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-    setExamResult(result);
-    setView('results');
-  };
-
-  const handleNavigateToMistakes = () => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-    setDashboardTab('mistakes');
-    setView('dashboard');
-  };
-
-  const handleRetakeCombination = (combo: ExamCombination, year: string, month: string) => {
-    const storedMistakes = getStoredMistakes();
-    if (storedMistakes && storedMistakes.length > 0) {
-      setRetakePendingCombo({ combo, year, month });
-      setShowRetakeMistakesModal(true);
-    } else {
-      handleStartExam(combo, year, month, false, 'task1', 60);
-    }
-  };
-
-  const handleGoHome = () => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-    setView('home');
-    setActiveCombo(null);
-    setExamResult(null);
-    setStartedAt('');
-    setIsPracticeMode(false);
-  };
-
-  const handleSignOut = async () => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-    await signOut();
-    setView('home');
-  };
-
-  // Determine layout subtitle and combinationTitle
-  const getLayoutSubtitle = () => {
-    if (view === 'home') {
-      return undefined;
-    }
-    if (view === 'dashboard') {
-      return isAdmin ? t("Espace Administrateur avec gestion des alertes.") : t("Bienvenue sur votre tableau de bord personnel.");
-    }
-    if (view === 'simulator') {
-      return isPracticeMode ? t("Entraînement chronométré") : t("Examen en cours (60 minutes)");
-    }
-    if (view === 'results') {
-      return examResult?.isPracticeMode ? t("Compte-rendu d'entraînement") : t("Compte-rendu de votre session d'examen");
-    }
-    if (view === 'feedback') {
-      return t("Vos retours, suggestions et messages de remerciements");
-    }
-    return undefined;
-  };
-
-  const getLayoutComboTitle = () => {
-    if (view === 'simulator' && activeCombo) {
-      return `${t('Combinaison')} ${activeCombo.combinationNumber} — ${t(activeMonth)} ${activeYear}`;
-    }
-    if (view === 'results' && examResult) {
-      const comboNum = examResult.combination?.combinationNumber || examResult.combination?.combination;
-      return `${t('Combinaison')} ${comboNum} — ${t(examResult.month)} ${examResult.year}`;
-    }
-    return undefined;
-  };
-
-  return (
-    <AppLayout
-      currentView={view}
-      subtitle={getLayoutSubtitle()}
-      combinationTitle={getLayoutComboTitle()}
-      onNavigateHome={handleGoHome}
-      onNavigateDashboard={() => {
-        setDashboardTab('submissions');
-        setView('dashboard');
-      }}
-      onNavigateMistakes={handleNavigateToMistakes}
-      mistakesCount={mistakesCount}
-      isMistakesTabActive={view === 'dashboard' && dashboardTab === 'mistakes'}
-      onNavigateFeedback={() => setView('feedback')}
-      onStartNewExam={handleGoHome}
-      onSignOut={handleSignOut}
-      submissionsCount={submissionsCount}
-    >
-      {view === 'home' && (
-        <Home
-          hideHeader
-          onStartExam={handleStartExam}
-          onViewSubmission={handleViewPastSubmission}
-          onDashboardClick={() => {
-            setDashboardTab('submissions');
-            setView('dashboard');
-          }}
-          onNavigateToMistakes={handleNavigateToMistakes}
-          onFeedbackClick={() => setView('feedback')}
-          onLogoutClick={handleSignOut}
-          userEmail={user.email}
-        />
-      )}
-
-      {view === 'dashboard' && (
-        <Dashboard
-          initialTab={dashboardTab}
-          onTabChange={(tab) => setDashboardTab(tab === 'mistakes' ? 'mistakes' : 'submissions')}
-          onStartNewExam={handleGoHome}
-          onViewSubmission={handleViewPastSubmission}
-          onRetakeCombination={handleRetakeCombination}
-          onHomeClick={handleGoHome}
-          onFeedbackClick={() => setView('feedback')}
-        />
-      )}
-
-      {/* Retake Combination Mistakes Check Modal */}
-      {showRetakeMistakesModal && retakePendingCombo && (
-        <MistakesRevisionModal
-          isOpen={showRetakeMistakesModal}
-          mistakes={getStoredMistakes()}
-          trainingModeLabel={t('Examen complet (60 minutes)')}
-          combinationLabel={`${t('Combinaison')} ${retakePendingCombo.combo.combinationNumber || (retakePendingCombo.combo as any)?.combination || 1} (${t(retakePendingCombo.month)} ${retakePendingCombo.year})`}
-          onConfirmStart={() => {
-            setShowRetakeMistakesModal(false);
-            handleStartExam(retakePendingCombo.combo, retakePendingCombo.year, retakePendingCombo.month, false, 'task1', 60);
-            setRetakePendingCombo(null);
-          }}
-          onGoToMistakes={() => {
-            setShowRetakeMistakesModal(false);
-            setRetakePendingCombo(null);
-            handleNavigateToMistakes();
-          }}
-          onCancel={() => {
-            setShowRetakeMistakesModal(false);
-            setRetakePendingCombo(null);
-          }}
-        />
-      )}
-
-      {view === 'simulator' && activeCombo && (
+  const name = user ? userName : en ? "My workspace" : "Mon espace";
+  const content = () => {
+    if (view === "simulator" && draft)
+      return (
         <Simulator
-          hideHeader
-          combination={activeCombo}
-          year={activeYear}
-          month={activeMonth}
-          isPracticeMode={isPracticeMode}
-          practiceTask={practiceTasks.join(',')}
-          practiceTasks={practiceTasks}
-          durationMinutes={practiceDuration}
-          onFinishExam={handleFinishExam}
-          onCancelExam={handleGoHome}
+          key={draft.sessionId}
+          initialSession={draft}
+          onDraftChange={setDraft}
+          onFinishExam={finish}
+          onCancelExam={() => navigate("home")}
         />
-      )}
-
-      {view === 'results' && examResult && (
+      );
+    if (view === "results" && active)
+      return (
         <Results
-          hideHeader
-          result={examResult}
-          onHomeClick={handleGoHome}
-          onDashboardClick={() => setView('dashboard')}
-          onFeedbackClick={() => setView('feedback')}
+          key={active.id}
+          result={active}
+          onSave={saveReview}
+          onRevise={(s, key) =>
+            start(
+              {
+                id: `${s.year}-${s.month}-${s.combination.combinationNumber}`,
+                year: s.year,
+                month: s.month,
+                combination: s.combination,
+              },
+              key,
+              s,
+            )
+          }
+          onHomeClick={() => navigate("home")}
+          onSettings={() => navigate("settings")}
+          onNotebook={() => navigate("notebook")}
         />
-      )}
-
-      {view === 'feedback' && (
-        <Feedback
-          hideHeader
-          onHomeClick={handleGoHome}
-          userEmail={user?.email}
+      );
+    if (view === "library")
+      return <PracticeLibrary onStart={start} submissions={submissions} />;
+    if (view === "templates")
+      return <Templates onPractice={() => navigate("library")} />;
+    if (view === "dashboard")
+      return (
+        <Progress
+          submissions={submissions}
+          onOpen={(s) => navigate("results", s)}
+          onPractice={() => navigate("library")}
         />
+      );
+    if (view === "notebook")
+      return <Notebook onPractice={() => navigate("library")} />;
+    if (view === "settings")
+      return (
+        <Settings
+          onLogin={() => navigate("login")}
+          onDataChange={refresh}
+          onSync={sync}
+          syncStatus={syncStatus}
+        />
+      );
+    if (view === "login")
+      return (
+        <Login
+          onSuccess={() => navigate("home")}
+          onHomeClick={() => navigate("home")}
+        />
+      );
+    return (
+      <Home
+        name={user ? userName : ""}
+        submissions={submissions}
+        draft={draft}
+        onResume={() => navigate("simulator")}
+        onPractice={quickStart}
+        onLibrary={() => navigate("library")}
+        onTemplates={() => navigate("templates")}
+        onOpen={(s) => navigate("results", s)}
+        onNotebook={() => navigate("notebook")}
+      />
+    );
+  };
+  return (
+    <AppLayout view={view} onNavigate={navigate} name={name} hasDraft={!!draft}>
+      {notice && (
+        <div className="notice warning" role="alert">
+          {notice}
+          <button className="text-button" onClick={() => navigate("settings")}>
+            {en ? "Open settings" : "Ouvrir les réglages"}
+          </button>
+        </div>
       )}
+      {content()}
     </AppLayout>
   );
-};
-
-export const App: React.FC = () => {
+}
+export function App() {
   return (
     <LanguageProvider>
       <AuthProvider>
@@ -422,4 +365,4 @@ export const App: React.FC = () => {
       </AuthProvider>
     </LanguageProvider>
   );
-};
+}

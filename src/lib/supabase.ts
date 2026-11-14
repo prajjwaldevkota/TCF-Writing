@@ -71,6 +71,7 @@ export async function saveSubmissionToSupabase(
     : getLocalISOString(new Date(now.getTime() - (result.timeUsedSeconds || 0) * 1000));
 
   const payload = {
+    ...(result.id && /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(result.id) ? {id: result.id} : {}),
     user_id: userId,
     year: result.year,
     month: result.month,
@@ -148,10 +149,20 @@ export async function fetchSubmissionsFromSupabase(
       minute: '2-digit'
     });
 
+    const context = (row as any).ai_feedback?.practice_context;
+    const originalCombination = context?.combination;
+    const validSnapshot = originalCombination?.tasks && ['task1','task2','task3'].every(k => typeof originalCombination.tasks[k]?.instruction === 'string' && typeof originalCombination.tasks[k]?.minWords === 'number' && typeof originalCombination.tasks[k]?.maxWords === 'number');
+    const inferredPractice = !context && (row as any).ai_feedback?.evaluated_tasks?.length < 3;
     return {
+      isPracticeMode: typeof context?.isPracticeMode === 'boolean' ? context.isPracticeMode : inferredPractice || undefined,
+      practiceTasks: Array.isArray(context?.practiceTasks) ? context.practiceTasks : inferredPractice ? (row as any).ai_feedback.evaluated_tasks : undefined,
+      practiceTask: context?.practiceTask,
+      allocatedMinutes: context?.allocatedMinutes,
+      revisionOf: context?.revisionOf,
       id: row.id,
+      createdAt: context?.createdAt || row.completed_at || row.created_at,
       date: dateFormatted,
-      combination: fallbackCombo,
+      combination: validSnapshot ? originalCombination : fallbackCombo,
       year: row.year,
       month: row.month,
       timeUsedSeconds: row.duration_seconds,

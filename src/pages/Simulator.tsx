@@ -1,370 +1,780 @@
-import { WritingTemplatePanel } from '../components/WritingTemplatePanel';
-import React, { useState, useEffect, useCallback } from 'react';
-import { ExamCombination, ExamAnswers, TaskKey, ExamResult } from '../types/exam';
-import { useExamTimer } from '../hooks/useExamTimer';
-import { TaskSidebar } from '../components/TaskSidebar';
-import { TaskEditor } from '../components/TaskEditor';
-import { SubmissionPanel } from '../components/SubmissionPanel';
-import { ConfirmationModal } from '../components/ConfirmationModal';
-import { countFrenchWords, formatTime } from '../utils/wordCount';
-import { CharacterPanel } from '../components/CharacterPanel';
-import { Header } from '../components/Header';
-import { useLanguage } from '../context/LanguageContext';
-import { useAuth } from '../context/AuthContext';
-
-interface SimulatorProps {
-  combination: ExamCombination;
-  year: string;
-  month: string;
-  onFinishExam: (result: ExamResult) => void;
-  onCancelExam: () => void;
-  isPracticeMode?: boolean;
-  practiceTask?: TaskKey | string;
-  practiceTasks?: TaskKey[];
-  durationMinutes?: number;
-  hideHeader?: boolean;
-}
-
-export const Simulator: React.FC<SimulatorProps> = ({
-  combination,
-  year,
-  month,
+import React, { useEffect, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  BookOpen,
+  Check,
+  ChevronDown,
+  Clock3,
+  FileCheck2,
+  Pause,
+  Play,
+  Save,
+} from "lucide-react";
+import type { ExamResult, TaskKey } from "../types/exam";
+import {
+  PracticeSession,
+  savePracticeSession,
+  sessionElapsed,
+  TASK_INFO,
+  TASK_KEYS,
+} from "../utils/practice";
+import { countFrenchWords, formatTime } from "../utils/wordCount";
+import { cleanDocumentText, normalizeParagraphText } from "../utils/cleanText";
+import { WritingTemplatePanel } from "../components/WritingTemplatePanel";
+import { useLanguage } from "../context/LanguageContext";
+const CHECKS = {
+  task1: [
+    "Le destinataire et le but du message sont clairs.",
+    "J’ai inclus tous les détails demandés.",
+    "Mon introduction et ma fin conviennent au destinataire.",
+    "J’ai relu les accords, les verbes et les accents.",
+  ],
+  task2: [
+    "Mon récit suit une progression facile à suivre.",
+    "J’ai donné des détails concrets.",
+    "Mes commentaires répondent à l’objectif du texte.",
+    "Le ton et la forme conviennent aux lecteurs.",
+  ],
+  task3: [
+    "J’ai reformulé le point de vue de chaque document.",
+    "J’ai établi un lien entre les deux points de vue.",
+    "Ma position est claire, avec une raison ou un exemple.",
+    "Ma conclusion correspond à mon argumentation.",
+  ],
+};
+const CHECKS_EN = {
+  task1: [
+    "The reader and purpose are clear.",
+    "I included all requested details.",
+    "My opening and closing suit the recipient.",
+    "I checked agreements, verbs and accents.",
+  ],
+  task2: [
+    "My account has a clear progression.",
+    "I included concrete details.",
+    "My comments serve the purpose of the text.",
+    "The tone and format suit the readership.",
+  ],
+  task3: [
+    "I reformulated both documents’ viewpoints.",
+    "I connected and compared the two views.",
+    "My position has a reason or an example.",
+    "My conclusion follows my argument.",
+  ],
+};
+export function Simulator({
+  initialSession,
   onFinishExam,
   onCancelExam,
-  isPracticeMode = false,
-  practiceTask = 'task1',
-  practiceTasks,
-  durationMinutes = 60,
-  hideHeader = false
-}) => {
-  const { t, language } = useLanguage();
-  const { isAdmin } = useAuth();
-  const allowCopyPaste = Boolean(
-    isPracticeMode || isAdmin || (typeof window !== 'undefined' && localStorage.getItem('tcf_admin_logged_in') === 'true')
-  );
-
+  onDraftChange,
+}: {
+  initialSession: PracticeSession;
+  onFinishExam: (result: ExamResult) => boolean;
+  onCancelExam: () => void;
+  onDraftChange: (session: PracticeSession) => void;
+}) {
+  const { language } = useLanguage();
+  const en = language === "en";
+  const [session, setSession] = useState(initialSession);
+  const [now, setNow] = useState(Date.now());
+  const [saved, setSaved] = useState(true);
+  const [panel, setPanel] = useState<"plan" | "check">("plan");
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [templates, setTemplates] = useState(false);
+  const [finish, setFinish] = useState(false);
+  const [saveFailure, setSaveFailure] = useState(false);
+  const modalRef = useRef<HTMLElement>(null);
+  const finishButtonRef = useRef<HTMLButtonElement>(null);
+  const finished = useRef(false);
+  const textRef = useRef<HTMLTextAreaElement>(null);
+  const coachRef = useRef<HTMLElement>(null);
+  const task = session.activeTask;
+  const info = TASK_INFO[task];
+  const requirement = session.combination.tasks[task];
+  const elapsed = sessionElapsed(session, now);
+  const isExam = session.mode === "exam";
+  const timeLeft = Math.max(0, 3600 - elapsed);
+  const words = countFrenchWords(session.answers[task]);
+  const inRange =
+    words >= requirement.minWords && words <= requirement.maxWords;
+  const update = (patch: Partial<PracticeSession>) => {
+    const next = { ...session, ...patch, savedAt: new Date().toISOString() };
+    setSaved(savePracticeSession(next));
+    setSession(next);
+    onDraftChange(next);
+  };
+  const complete = () => {
+    if (finished.current) return;
+    const counts = Object.fromEntries(
+      TASK_KEYS.map((k) => [k, countFrenchWords(session.answers[k])]),
+    ) as ExamResult["wordCounts"];
+    const result: ExamResult = {
+      id: session.sessionId,
+      createdAt: new Date().toISOString(),
+      combination: session.combination,
+      year: session.year,
+      month: session.month,
+      answers: session.answers,
+      wordCounts: counts,
+      timeUsedSeconds: isExam ? Math.min(elapsed, 3600) : elapsed,
+      isPracticeMode: !isExam,
+      practiceTask: session.keys.join(","),
+      practiceTasks: session.keys,
+      allocatedMinutes: isExam ? 60 : undefined,
+      revisionOf: session.revisionOf,
+    };
+    if (onFinishExam(result)) finished.current = true;
+    else setSaveFailure(true);
+  };
   useEffect(() => {
-    if (allowCopyPaste) {
-      document.body.classList.remove('select-none');
-    }
-  }, [allowCopyPaste]);
-
-  const activeTaskKeys: TaskKey[] = isPracticeMode && practiceTasks && practiceTasks.length > 0
-    ? practiceTasks
-    : isPracticeMode && practiceTask
-    ? (typeof practiceTask === 'string' ? (practiceTask.split(',') as TaskKey[]) : [practiceTask])
-    : ['task1', 'task2', 'task3'];
-
-  const initialTask: TaskKey = activeTaskKeys[0] || 'task1';
-  const [activeTask, setActiveTask] = useState<TaskKey>(initialTask);
-  const [isMobileAccentsOpen, setIsMobileAccentsOpen] = useState<boolean>(false);
-  const [answers, setAnswers] = useState<ExamAnswers>({
-    task1: '',
-    task2: '',
-    task3: ''
-  });
-  const [templatesOpen, setTemplatesOpen] = useState(false);
-  const [isFinishModalOpen, setIsFinishModalOpen] = useState<boolean>(false);
-
-  const initialDurationMinutes = isPracticeMode ? (durationMinutes || 15) : 60;
-  const initialDurationSeconds = initialDurationMinutes * 60;
-
-  const draftKey = isPracticeMode
-    ? `tcf_practice_${activeTaskKeys.join('_')}_${combination.combinationNumber}_${year}_${month}`
-    : `tcf_draft_${combination.combinationNumber}_${year}_${month}`;
-
-  // Load draft from localStorage if present
-  useEffect(() => {
-    try {
-      const savedDraft = localStorage.getItem(draftKey);
-      if (savedDraft) {
-        setAnswers(JSON.parse(savedDraft));
+    if (!finish) return;
+    const before = finishButtonRef.current;
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setFinish(false);
+        return;
       }
-    } catch (e) {}
-  }, [draftKey]);
-
-  const wordCounts = {
-    task1: countFrenchWords(answers.task1),
-    task2: countFrenchWords(answers.task2),
-    task3: countFrenchWords(answers.task3)
-  };
-
-  const handleTimerExpire = useCallback(() => {
-    localStorage.removeItem(draftKey);
-    onFinishExam({
-      combination,
-      year,
-      month,
-      timeUsedSeconds: initialDurationSeconds,
-      answers,
-      wordCounts: {
-        task1: countFrenchWords(answers.task1),
-        task2: countFrenchWords(answers.task2),
-        task3: countFrenchWords(answers.task3)
+      if (event.key === "Tab") {
+        const controls = modalRef.current?.querySelectorAll<HTMLElement>(
+          'button:not(:disabled),a[href],input,textarea,select,[tabindex="0"]',
+        );
+        if (!controls?.length) return;
+        const first = controls[0],
+          last = controls[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", keydown);
+    return () => {
+      document.removeEventListener("keydown", keydown);
+      before?.focus();
+    };
+  }, [finish]);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    if (isExam && timeLeft === 0 && !finished.current) complete();
+  }, [timeLeft]);
+  useEffect(() => {
+    const before = (event: BeforeUnloadEvent) => {
+      if (!savePracticeSession(session)) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", before);
+    return () => window.removeEventListener("beforeunload", before);
+  }, [session]);
+  const toggleTimer = () =>
+    update(
+      session.runningSince
+        ? { elapsedSeconds: sessionElapsed(session), runningSince: null }
+        : { runningSince: Date.now() },
+    );
+  const insert = (character: string) => {
+    const editor = textRef.current;
+    if (!editor) return;
+    const a = editor.selectionStart;
+    const b = editor.selectionEnd;
+    update({
+      answers: {
+        ...session.answers,
+        [task]:
+          session.answers[task].slice(0, a) +
+          character +
+          session.answers[task].slice(b),
       },
-      isPracticeMode,
-      practiceTask: activeTaskKeys.join(','),
-      practiceTasks: activeTaskKeys,
-      allocatedMinutes: initialDurationMinutes
     });
-  }, [combination, year, month, answers, onFinishExam, draftKey, isPracticeMode, activeTaskKeys, initialDurationMinutes, initialDurationSeconds]);
-
-  const { secondsRemaining, timeUsedSeconds, isFinished } = useExamTimer({
-    initialMinutes: initialDurationMinutes,
-    onExpire: handleTimerExpire
-  });
-
-  const handleUpdateAnswer = (val: string) => {
-    setAnswers((prev) => {
-      const updated = { ...prev, [activeTask]: val };
-      try {
-        localStorage.setItem(draftKey, JSON.stringify(updated));
-      } catch (e) {}
-      return updated;
+    requestAnimationFrame(() => {
+      editor.focus();
+      editor.setSelectionRange(a + character.length, a + character.length);
     });
   };
-
-  const handleInsertCharacter = (char: string) => {
-    const activeTextarea = document.querySelector('textarea');
-    if (activeTextarea) {
-      const start = activeTextarea.selectionStart;
-      const end = activeTextarea.selectionEnd;
-      const text = activeTextarea.value;
-      const newText = text.substring(0, start) + char + text.substring(end);
-      handleUpdateAnswer(newText);
-      
-      setTimeout(() => {
-        activeTextarea.focus();
-        activeTextarea.setSelectionRange(start + char.length, start + char.length);
-      }, 0);
-    } else {
-      handleUpdateAnswer(answers[activeTask] + char);
-    }
-  };
-
-  const taskKeys: TaskKey[] = activeTaskKeys;
-  const currentIndex = taskKeys.indexOf(activeTask);
-
-  const handlePrevTask = () => {
-    if (currentIndex > 0) {
-      setActiveTask(taskKeys[currentIndex - 1]);
-    }
-  };
-
-  const handleNextTask = () => {
-    if (currentIndex < taskKeys.length - 1) {
-      setActiveTask(taskKeys[currentIndex + 1]);
-    }
-  };
-
-  const confirmFinish = () => {
-    localStorage.removeItem(draftKey);
-    setIsFinishModalOpen(false);
-    onFinishExam({
-      combination,
-      year,
-      month,
-      timeUsedSeconds,
-      answers,
-      wordCounts,
-      isPracticeMode,
-      practiceTask: activeTaskKeys.join(','),
-      practiceTasks: activeTaskKeys,
-      allocatedMinutes: initialDurationMinutes
-    });
-  };
-
-  const practiceTitleLabel = activeTaskKeys.map((k) => t(`Tâche ${k.slice(-1)}`)).join(' + ');
-
   return (
-    <div className={`flex flex-col bg-white dark:bg-gray-900 ${hideHeader ? 'h-full w-full' : 'h-screen w-screen'} overflow-hidden ${allowCopyPaste ? 'select-text' : 'select-none'}`}>
-      {/* Header */}
-      {!hideHeader && (
-        <Header
-          onHomeClick={onCancelExam}
-          subtitle={
-            isPracticeMode
-              ? `${t('Entraînement')} — ${practiceTitleLabel}`
-              : t("Examen en cours")
-          }
-          combinationTitle={`${t('Combinaison')} ${combination.combinationNumber} — ${t(month)} ${year}`}
-        />
-      )}
-
-      {/* Mobile Exam Navigation Bar (lg:hidden) */}
-      <div className="lg:hidden bg-white border-b border-slate-200 px-3 py-1.5 flex items-center justify-between gap-1.5 shrink-0 shadow-2xs select-none">
-        {/* Task Switcher Pills */}
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 min-w-0">
-          {activeTaskKeys.map((k) => {
-            const num = k.slice(-1);
-            const isActive = activeTask === k;
-            const count = wordCounts[k];
-            return (
-              <button
-                key={k}
-                type="button"
-                onClick={() => setActiveTask(k)}
-                className={`px-2.5 py-1 rounded text-xs font-bold transition-all flex items-center gap-1 shrink-0 cursor-pointer ${
-                  isActive
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                <span>T{num}</span>
-                <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                    isActive ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-700'
-                  }`}
-                >
-                  {count}
-                </span>
-              </button>
-            );
-          })}
+    <div className="page-enter writing-workspace">
+      <div className="workspace-heading">
+        <button className="text-button" onClick={onCancelExam}>
+          <ArrowLeft size={16} />
+          {en ? "Save & leave" : "Enregistrer et quitter"}
+        </button>
+        <div className="row">
+          <span className={`badge ${isExam ? "sand" : "sage"}`}>
+            {isExam
+              ? en
+                ? "FULL MOCK · 60 MIN"
+                : "EXAMEN BLANC · 60 MIN"
+              : en
+                ? "GUIDED PRACTICE"
+                : "PRATIQUE GUIDÉE"}
+          </span>
+          <span className="muted text-small desktop-only">
+            {session.month} {session.year} · Série{" "}
+            {session.combination.combinationNumber}
+          </span>
         </div>
-
-        {/* Right Timer & Accents Sheet Trigger */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <div
-            className={`flex items-center gap-1 text-xs font-mono font-bold px-2 py-1 rounded border ${
-              secondsRemaining < 300
-                ? 'bg-red-50 text-red-700 border-red-300 animate-pulse'
-                : 'bg-slate-100 text-slate-800 border-slate-200'
-            }`}
-          >
-            <span>⏱️</span>
-            <span>{formatTime(secondsRemaining)}</span>
+      </div>
+      <div className="writer-top">
+        <div>
+          <p className="eyebrow">
+            {session.revisionOf
+              ? en
+                ? "MAKE THIS VERSION BETTER"
+                : "AMÉLIOREZ CETTE VERSION"
+              : "EXPRESSION ÉCRITE"}
+          </p>
+          <h1>
+            {en ? info.en : info.fr}
+            <span className="heading-dot">.</span>
+          </h1>
+        </div>
+        <div
+          className={`writer-timer ${isExam && timeLeft < 300 ? "urgent" : ""}`}
+        >
+          <Clock3 size={20} />
+          <div>
+            <strong>{formatTime(isExam ? timeLeft : elapsed)}</strong>
+            <small>
+              {isExam
+                ? en
+                  ? "remaining"
+                  : "restantes"
+                : session.runningSince
+                  ? en
+                    ? "writing time"
+                    : "temps de rédaction"
+                  : en
+                    ? "timer optional"
+                    : "chrono facultatif"}
+            </small>
           </div>
-
+          {!isExam && (
+            <button
+              className="icon-button"
+              onClick={toggleTimer}
+              aria-label={
+                session.runningSince
+                  ? en
+                    ? "Pause timer"
+                    : "Mettre le chrono en pause"
+                  : en
+                    ? "Start timer"
+                    : "Démarrer le chrono"
+              }
+            >
+              {session.runningSince ? <Pause size={18} /> : <Play size={18} />}
+            </button>
+          )}
+        </div>
+      </div>
+      <div
+        className="writer-task-tabs"
+        role="tablist"
+        aria-label={en ? "Writing tasks" : "Tâches de rédaction"}
+      >
+        {session.keys.map((key) => (
           <button
-            type="button"
-            onClick={() => setIsMobileAccentsOpen(true)}
-            className="p-1 px-2 rounded bg-slate-100 hover:bg-slate-200 active:bg-slate-300 border border-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
-            title={t('Tableau de caractères & Conditions')}
+            key={key}
+            role="tab"
+            aria-selected={task === key}
+            onClick={() => {
+              update({ activeTask: key });
+              setPanel("plan");
+            }}
           >
-            <span>⌨️</span>
-            <span className="hidden xs:inline">{t('Accents')}</span>
+            <span className={`task-dot ${TASK_INFO[key].color}`}>
+              {TASK_INFO[key].number}
+            </span>
+            Tâche {TASK_INFO[key].number}
+            <small>
+              {countFrenchWords(session.answers[key])} {en ? "words" : "mots"}
+            </small>
+          </button>
+        ))}
+        <span className={`autosave ${saved ? "" : "error-text"}`} role="status">
+          {saved ? <Check size={14} /> : <Save size={14} />}{" "}
+          {saved
+            ? en
+              ? "Draft saved"
+              : "Brouillon sauvegardé"
+            : en
+              ? "Storage full — copy your text"
+              : "Stockage plein — copiez votre texte"}
+        </span>
+      </div>
+      {!isExam && (
+        <div className="writer-mobile-tools">
+          <button
+            className="button secondary"
+            onClick={() => setTemplates(true)}
+          >
+            <BookOpen size={15} />
+            {en ? "Writing templates" : "Modèles de rédaction"}
+          </button>
+          <button
+            className="text-button"
+            onClick={() => {
+              setPanel("check");
+              requestAnimationFrame(() =>
+                coachRef.current?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "start",
+                }),
+              );
+            }}
+          >
+            <Check size={15} />
+            {en ? "My checklist" : "Ma liste de vérification"}
           </button>
         </div>
-      </div>
-
-      <div className="practice-reference-toolbar"><span>{language === 'en' ? 'Writing templates' : 'Modèles de rédaction'} · T{activeTask.slice(-1)}</span><button id="writing-template-toggle" type="button" className="studio-secondary" aria-expanded={templatesOpen} onClick={()=>setTemplatesOpen(open=>!open)}>{templatesOpen ? (language === 'en' ? 'Close templates' : 'Fermer les modèles') : (language === 'en' ? 'Open templates' : 'Ouvrir les modèles')}</button></div>
-      {templatesOpen && <WritingTemplatePanel activeTask={activeTask} isPracticeMode={isPracticeMode} onClose={()=>{setTemplatesOpen(false);document.getElementById('writing-template-toggle')?.focus();}}/>}
-      {/* Main Exam Grid */}
-      <div className="flex-1 flex overflow-hidden min-h-0">
-        {/* Left Sidebar: Task Navigation (Desktop) */}
-        <div className="hidden lg:flex shrink-0">
-          <TaskSidebar
-            activeTask={activeTask}
-            onSelectTask={setActiveTask}
-            wordCounts={wordCounts}
-            isPracticeMode={isPracticeMode}
-            practiceTask={activeTaskKeys.join(',')}
-            practiceTasks={activeTaskKeys}
-          />
-        </div>
-
-        {/* Center: Active Task Editor */}
-        <TaskEditor
-          taskKey={activeTask}
-          taskRequirement={combination.tasks[activeTask]}
-          value={answers[activeTask]}
-          onChange={handleUpdateAnswer}
-          onPrevTask={handlePrevTask}
-          onNextTask={handleNextTask}
-          onFinishExam={() => setIsFinishModalOpen(true)}
-          isFirstTask={currentIndex === 0}
-          isLastTask={currentIndex === taskKeys.length - 1}
-          disabled={isFinished}
-          isPracticeMode={isPracticeMode}
-          onInsertCharacter={handleInsertCharacter}
-        />
-
-        {/* Right Sidebar: Timer, Accent Keyboard, Submission Conditions (Desktop) */}
-        <div className="hidden lg:flex shrink-0">
-          <SubmissionPanel
-            timeRemainingSeconds={secondsRemaining}
-            wordCounts={wordCounts}
-            onInsertCharacter={handleInsertCharacter}
-            isPracticeMode={isPracticeMode}
-            practiceTask={activeTaskKeys.join(',')}
-            practiceTasks={activeTaskKeys as any}
-          />
-        </div>
-      </div>
-
-      {/* Mobile Accents & Checklist Bottom Sheet */}
-      {isMobileAccentsOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden flex flex-col justify-end">
-          <div
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
-            onClick={() => setIsMobileAccentsOpen(false)}
-          />
-          <div className="relative bg-white rounded-t-2xl shadow-2xl p-4 max-h-[82vh] overflow-y-auto z-10 space-y-4 animate-slideInUp border-t border-slate-200">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-              <div className="font-bold text-sm text-slate-800 flex items-center gap-2">
-                <span>⌨️</span>
-                <span>{t('Caractères français & Conditions')}</span>
+      )}
+      <div className={`writer-grid ${isExam ? "exam-mode" : ""}`}>
+        <div className="writer-main">
+          <section className="prompt-card">
+            <div className="row between">
+              <span className="eyebrow">
+                {en ? "YOUR WRITING PROMPT" : "VOTRE CONSIGNE"}
+              </span>
+              <span className="badge neutral">
+                {requirement.minWords}–{requirement.maxWords}{" "}
+                {en ? "words" : "mots"}
+              </span>
+            </div>
+            <p>{normalizeParagraphText(requirement.instruction)}</p>
+            {task === "task3" && (
+              <div className="source-documents">
+                {[requirement.document1, requirement.document2].map(
+                  (doc, i) => (
+                    <details open key={i}>
+                      <summary>
+                        Document {i + 1}
+                        <ChevronDown size={15} />
+                      </summary>
+                      <p>
+                        {doc
+                          ? cleanDocumentText(doc)
+                          : en
+                            ? "This source document is missing. Source comparison cannot be graded."
+                            : "Document manquant : la comparaison des sources ne peut pas être évaluée."}
+                      </p>
+                    </details>
+                  ),
+                )}
               </div>
-              <button
-                type="button"
-                onClick={() => setIsMobileAccentsOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+            )}
+          </section>
+          {session.revisionOf && (
+            <details className="revision-reference">
+              <summary>
+                {en
+                  ? "Original response & revision priorities"
+                  : "Texte initial et priorités de réécriture"}
+              </summary>
+              {session.priorities?.length ? (
+                <ul>
+                  {session.priorities.map((p, i) => (
+                    <li key={i}>{p}</li>
+                  ))}
+                </ul>
+              ) : null}
+              <p>{session.previousAnswer}</p>
+            </details>
+          )}
+          <section className="editor-paper">
+            <div className="editor-toolbar">
+              <span>
+                <FeatherIcon />
+                {en ? "YOUR RESPONSE" : "VOTRE RÉDACTION"}
+              </span>
+              <span className="muted text-small">
+                {en ? "Write in French" : "Rédigez en français"}
+              </span>
+            </div>
+            <textarea
+              ref={textRef}
+              aria-label={
+                en
+                  ? `Task ${info.number} response`
+                  : `Votre réponse à la tâche ${info.number}`
+              }
+              value={session.answers[task]}
+              onChange={(e) =>
+                update({
+                  answers: { ...session.answers, [task]: e.target.value },
+                })
+              }
+              onPaste={isExam ? (e) => e.preventDefault() : undefined}
+              spellCheck={!isExam}
+              lang="fr"
+              placeholder={
+                en
+                  ? "Your ideas belong here. Take a breath, then begin…"
+                  : "Vos idées ont leur place ici. Prenez une respiration, puis commencez…"
+              }
+            />
+            <div className="accent-toolbar">
+              <span className="muted text-small">
+                {en ? "French accents" : "Accents"}
+              </span>
+              {[
+                "é",
+                "è",
+                "ê",
+                "ë",
+                "à",
+                "â",
+                "ç",
+                "î",
+                "ï",
+                "ô",
+                "ù",
+                "û",
+                "œ",
+                "«",
+                "»",
+              ].map((c) => (
+                <button
+                  key={c}
+                  onClick={() => insert(c)}
+                  aria-label={`${en ? "Insert" : "Insérer"} ${c}`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+            <div className="editor-footer">
+              <div
+                className={`word-count ${inRange ? "valid" : words > requirement.maxWords ? "over" : ""}`}
               >
-                ✕
+                <strong>{words}</strong> {en ? "words" : "mots"}
+                <span>
+                  {inRange ? (
+                    <>
+                      <Check size={13} />
+                      {en ? "Within range" : "Dans la plage"}
+                    </>
+                  ) : words > requirement.maxWords ? (
+                    en ? (
+                      "Over word limit"
+                    ) : (
+                      "Plage dépassée"
+                    )
+                  ) : (
+                    `${requirement.minWords}–${requirement.maxWords} ${en ? "expected" : "attendus"}`
+                  )}
+                </span>
+              </div>
+              <span className="muted text-small">
+                {en ? "Counted by spaces" : "Comptage par espaces"}
+              </span>
+            </div>
+            <div className="word-progress">
+              <span
+                style={{
+                  width: `${Math.min(100, (words / requirement.maxWords) * 100)}%`,
+                  background:
+                    words > requirement.maxWords ? "var(--rust)" : undefined,
+                }}
+              />
+            </div>
+          </section>
+          <div className="writer-submit">
+            <span className="muted text-small">
+              {en
+                ? "Feedback starts only when you ask for it."
+                : "La correction IA démarre uniquement à votre demande."}
+            </span>
+            <button
+              ref={finishButtonRef}
+              className="button primary"
+              onClick={() => setFinish(true)}
+            >
+              <FileCheck2 size={17} />
+              {isExam
+                ? en
+                  ? "Finish mock exam"
+                  : "Terminer l’examen blanc"
+                : en
+                  ? "Finish & review"
+                  : "Terminer et faire le bilan"}
+              <ArrowRight size={16} />
+            </button>
+          </div>
+        </div>
+        {!isExam && (
+          <aside ref={coachRef} className="writer-coach">
+            <div className="coach-card">
+              <span className="eyebrow">
+                {en ? "YOUR WRITING COMPANION" : "VOTRE COMPAGNON DE RÉDACTION"}
+              </span>
+              <h2>
+                {en
+                  ? "A thought before a sentence."
+                  : "Une idée avant une phrase."}
+              </h2>
+              <div className="segmented">
+                <button
+                  aria-pressed={panel === "plan"}
+                  onClick={() => setPanel("plan")}
+                >
+                  {en ? "Plan" : "Préparer"}
+                </button>
+                <button
+                  aria-pressed={panel === "check"}
+                  onClick={() => setPanel("check")}
+                >
+                  {en ? "Check" : "Vérifier"}
+                </button>
+              </div>
+              {panel === "plan" ? (
+                <div className="coach-plan">
+                  {(task === "task1"
+                    ? en
+                      ? [
+                          [
+                            "01",
+                            "Who am I writing to?",
+                            "Choose the tone before you start.",
+                          ],
+                          [
+                            "02",
+                            "What must they know?",
+                            "List every requested detail.",
+                          ],
+                          [
+                            "03",
+                            "What happens next?",
+                            "End with a clear action or closing.",
+                          ],
+                        ]
+                      : [
+                          [
+                            "01",
+                            "À qui est-ce que j’écris ?",
+                            "Choisissez le ton avant de commencer.",
+                          ],
+                          [
+                            "02",
+                            "Que doit savoir cette personne ?",
+                            "Repérez chaque détail demandé.",
+                          ],
+                          [
+                            "03",
+                            "Et ensuite ?",
+                            "Terminez avec une action ou une formule adaptée.",
+                          ],
+                        ]
+                    : task === "task2"
+                      ? en
+                        ? [
+                            [
+                              "01",
+                              "Set the scene",
+                              "Who, where, when, and why?",
+                            ],
+                            [
+                              "02",
+                              "Tell the story",
+                              "Connect the main events in order.",
+                            ],
+                            [
+                              "03",
+                              "Give your perspective",
+                              "Explain why the experience matters.",
+                            ],
+                          ]
+                        : [
+                            [
+                              "01",
+                              "Plantez le décor",
+                              "Qui, où, quand et pourquoi ?",
+                            ],
+                            [
+                              "02",
+                              "Racontez l’expérience",
+                              "Reliez les événements dans un ordre clair.",
+                            ],
+                            [
+                              "03",
+                              "Donnez votre avis",
+                              "Expliquez ce que cette expérience vous a apporté.",
+                            ],
+                          ]
+                      : en
+                        ? [
+                            [
+                              "01",
+                              "Understand both views",
+                              "One short note for each document.",
+                            ],
+                            [
+                              "02",
+                              "Compare in your own words",
+                              "Show agreement, differences or nuance.",
+                            ],
+                            [
+                              "03",
+                              "Defend your position",
+                              "Give a reason and a concrete example.",
+                            ],
+                          ]
+                        : [
+                            [
+                              "01",
+                              "Comprenez les deux avis",
+                              "Une idée clé pour chaque document.",
+                            ],
+                            [
+                              "02",
+                              "Comparez avec vos mots",
+                              "Rapprochez ou opposez les points de vue.",
+                            ],
+                            [
+                              "03",
+                              "Défendez votre position",
+                              "Une raison et un exemple concret.",
+                            ],
+                          ]
+                  ).map(([n, title, detail]) => (
+                    <div key={n}>
+                      <span>{n}</span>
+                      <p>
+                        <strong>{title}</strong>
+                        <small>{detail}</small>
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="coach-checks">
+                  {(en ? CHECKS_EN : CHECKS)[task].map((text, i) => (
+                    <label key={`${task}-${i}`}>
+                      <input
+                        type="checkbox"
+                        checked={!!checked[`${task}-${i}`]}
+                        onChange={(e) =>
+                          setChecked({
+                            ...checked,
+                            [`${task}-${i}`]: e.target.checked,
+                          })
+                        }
+                      />
+                      <span>{text}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              <button
+                className="button secondary full-width"
+                onClick={() => setTemplates(true)}
+              >
+                <BookOpen size={16} />
+                {en ? "Open writing templates" : "Ouvrir les modèles"}
+                <ArrowRight size={15} />
               </button>
             </div>
-
-            <CharacterPanel onInsertCharacter={handleInsertCharacter} />
-
-            {/* Word count condition list */}
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs space-y-2">
-              <div className="font-bold text-slate-700 uppercase tracking-wide text-[11px]">
-                {t('Conditions de soumission')}
-              </div>
-              {activeTaskKeys.map((k) => {
-                const req = combination.tasks[k];
-                const count = wordCounts[k];
-                const isWithin = count >= req.minWords && count <= req.maxWords;
+            <div className="coach-small">
+              <span className="badge sand">Objectif NCLC 7</span>
+              <p>
+                {en
+                  ? "Make your message clear before making it complex. Support your ideas, and leave a moment to reread."
+                  : "Cherchez la clarté avant la complexité. Développez vos idées et gardez un moment pour vous relire."}
+              </p>
+            </div>
+          </aside>
+        )}
+      </div>
+      {templates && !isExam && (
+        <WritingTemplatePanel
+          activeTask={task}
+          isPracticeMode
+          onClose={() => setTemplates(false)}
+        />
+      )}
+      {finish && (
+        <div className="modal-overlay" onClick={() => setFinish(false)}>
+          <section
+            ref={modalRef}
+            className="lab-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="finish-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="modal-icon">
+              <FileCheck2 size={25} />
+            </span>
+            <h2 id="finish-title">
+              {en
+                ? "Ready to put down your pen?"
+                : "Prêt à poser votre stylo ?"}
+            </h2>
+            <p>
+              {en
+                ? "Your writing will be saved. You can request feedback, then start a new revision."
+                : "Votre rédaction sera enregistrée. Vous pourrez demander une correction, puis commencer une réécriture."}
+            </p>
+            {saveFailure && (
+              <p className="notice warning" role="alert">
+                {en
+                  ? "The browser could not save your writing. Keep the editor open and copy your response before freeing storage."
+                  : "Le navigateur n’a pas pu enregistrer votre texte. Gardez l’éditeur ouvert et copiez votre réponse avant de libérer du stockage."}
+              </p>
+            )}
+            <div className="finish-counts">
+              {session.keys.map((k) => {
+                const n = countFrenchWords(session.answers[k]);
+                const r = session.combination.tasks[k];
                 return (
-                  <div key={k} className="flex items-center justify-between py-1 border-b border-slate-200 last:border-b-0">
-                    <span className="font-semibold text-slate-700">{t(`Tâche ${k.slice(-1)}`)}:</span>
-                    <span className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold ${
-                      isWithin ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
-                    }`}>
-                      {count} / {req.minWords}-{req.maxWords} {t('mots')}
+                  <div key={k}>
+                    <strong>Tâche {TASK_INFO[k].number}</strong>
+                    <span>
+                      {n} {en ? "words" : "mots"}
+                    </span>
+                    <span
+                      className={`badge ${n >= r.minWords && n <= r.maxWords ? "sage" : "sand"}`}
+                    >
+                      {n >= r.minWords && n <= r.maxWords
+                        ? en
+                          ? "Within range"
+                          : "Dans la plage"
+                        : `${r.minWords}–${r.maxWords} ${en ? "expected" : "attendus"}`}
                     </span>
                   </div>
                 );
               })}
             </div>
-
-            <button
-              type="button"
-              onClick={() => setIsMobileAccentsOpen(false)}
-              className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-sm cursor-pointer"
-            >
-              {t('Fermer et continuer')}
-            </button>
-          </div>
+            <div className="modal-actions">
+              <button
+                autoFocus
+                className="button secondary"
+                onClick={() => setFinish(false)}
+              >
+                {en ? "Keep writing" : "Continuer à écrire"}
+              </button>
+              <button className="button primary" onClick={complete}>
+                {en ? "Save my writing" : "Enregistrer mon texte"}
+                <ArrowRight size={16} />
+              </button>
+            </div>
+          </section>
         </div>
       )}
-
-      {/* Finish Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={isFinishModalOpen}
-        title={isPracticeMode ? "Terminer cet entraînement ?" : "Voulez-vous vraiment terminer l'examen ?"}
-        message={
-          isPracticeMode
-            ? "Vous ne pourrez plus modifier votre réponse pour cette tâche."
-            : "Vous ne pourrez plus modifier vos réponses une fois la soumission validée."
-        }
-        confirmLabel={isPracticeMode ? "Terminer l'entraînement" : "Terminer"}
-        cancelLabel="Annuler"
-        onConfirm={confirmFinish}
-        onCancel={() => setIsFinishModalOpen(false)}
-        isDanger={true}
-      />
     </div>
   );
-};
+}
+function FeatherIcon() {
+  return (
+    <span aria-hidden="true" className="pen-dot">
+      ✎
+    </span>
+  );
+}

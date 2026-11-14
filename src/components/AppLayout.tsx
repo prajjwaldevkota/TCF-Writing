@@ -1,48 +1,213 @@
-import React, { useState } from 'react';
-import { BookOpen, BarChart3, NotebookPen, Settings2, LogOut, ArrowUpRight, PenLine, X, Menu } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { useLanguage } from '../context/LanguageContext';
-import { UserProfileModal } from './UserProfileModal';
-
-export type AppView = 'home' | 'dashboard' | 'simulator' | 'results' | 'feedback';
-interface AppLayoutProps {
- currentView: AppView; title?: string; subtitle?: string; combinationTitle?: string;
- onNavigateHome: () => void; onNavigateDashboard: () => void; onNavigateMistakes?: () => void;
- mistakesCount?: number; isMistakesTabActive?: boolean; onNavigateFeedback: () => void;
- onStartNewExam?: () => void; onSignOut: () => void; submissionsCount?: number; children: React.ReactNode;
-}
-export const AppLayout: React.FC<AppLayoutProps> = (props) => {
- const { user, userName } = useAuth();
- const { language, setLanguage } = useLanguage();
- const [profile, setProfile] = useState(false);
- const [mobile, setMobile] = useState(false);
- const en = language === 'en';
- const name = userName || user?.email?.split('@')[0] || 'Étudiant';
- const go = (action: () => void) => {
-  if (props.currentView === 'simulator' && !window.confirm(en ? 'Leave this session? Unsaved writing may be lost.' : 'Quitter la session ? Votre rédaction non enregistrée pourrait être perdue.')) return;
-  setMobile(false); action();
- };
- const links = [
-  {label: en ? 'Overview' : 'Vue d’ensemble', icon: BarChart3, active: props.currentView === 'dashboard' && !props.isMistakesTabActive, action: props.onNavigateDashboard, count: props.submissionsCount},
-  {label: en ? 'Practice library' : 'Bibliothèque', icon: BookOpen, active: props.currentView === 'home' || props.currentView === 'simulator', action: props.onNavigateHome},
-  {label: en ? 'Learning notebook' : 'Carnet de progrès', icon: NotebookPen, active: !!props.isMistakesTabActive, action: props.onNavigateMistakes || props.onNavigateDashboard, count: props.mistakesCount},
- ];
- const title = props.title || (props.currentView === 'home' ? (en ? 'Your next practice starts here.' : 'Votre prochaine étape commence ici.') : props.currentView === 'dashboard' ? (en ? 'A little progress, every day.' : 'Un peu de progrès, chaque jour.') : props.currentView === 'simulator' ? (en ? 'Make room for your words.' : 'Place à vos mots.') : props.currentView === 'results' ? (en ? 'Reflect. Refine. Repeat.' : 'Relire. Affiner. Progresser.') : (en ? 'Your private workspace' : 'Votre espace personnel'));
- return <div className="studio-shell">
-  {mobile && <button className="studio-scrim" aria-label="Close navigation" onClick={()=>setMobile(false)}/>}
-  <aside className={`studio-sidebar ${mobile ? 'is-open' : ''}`}>
-   <button className="studio-brand" onClick={()=>go(props.onNavigateHome)}><span className="studio-mark"><PenLine size={22}/></span><span>Écriture<span className="studio-brand-sub">TCF PRACTICE STUDIO</span></span></button>
-   <button className="studio-mobile-close" aria-label="Close navigation" onClick={()=>setMobile(false)}><X size={20}/></button>
-   <p className="studio-nav-label">{en ? 'YOUR WORKSPACE' : 'VOTRE ESPACE'}</p>
-   <nav className="studio-navigation" aria-label={en ? 'Main navigation' : 'Navigation principale'}>{links.map(({label,icon:Icon,active,action,count})=><button key={label} onClick={()=>go(action)} className={`studio-nav-item ${active ? 'is-active' : ''}`} aria-current={active ? 'page' : undefined}><Icon size={19}/><span>{label}</span>{count !== undefined && <small>{count}</small>}</button>)}</nav>
-   <div className="studio-tip"><span className="studio-eyebrow">{en ? 'A MOMENT FOR FRENCH' : 'UN MOMENT POUR LE FRANÇAIS'}</span><p>{en ? 'Small sessions. Lasting confidence.' : 'De petites séances. Une confiance durable.'}</p><button onClick={()=>go(props.onNavigateHome)}>{en ? 'Start writing' : 'Commencer à écrire'}<ArrowUpRight size={17}/></button></div>
-   <div className="studio-account"><button onClick={()=>setProfile(true)} className="studio-profile"><span className="studio-avatar">{name.charAt(0).toUpperCase()}</span><span><strong>{name}</strong><small>{en ? 'Personal workspace' : 'Espace personnel'}</small></span><Settings2 size={16}/></button><button className="studio-signout" onClick={()=>go(props.onSignOut)}><LogOut size={16}/>{en ? 'Sign out' : 'Déconnexion'}</button></div>
-  </aside>
-  <div className="studio-body">
-   <header className="studio-topbar"><div className="flex items-center gap-3"><button className="studio-mobile-toggle" onClick={()=>setMobile(true)} aria-label="Open navigation"><Menu size={21}/></button><span className="studio-breadcrumb">{en ? 'Workspace' : 'Espace personnel'}<span>/</span>{en ? (props.currentView === 'home' ? 'Practice' : props.currentView) : ({home:'Entraînement',dashboard:'Progression',simulator:'Rédaction',results:'Bilan',feedback:'Notes'}[props.currentView])}</span></div><div className="studio-languages" aria-label="Language">{(['fr','en'] as const).map(l=><button key={l} aria-pressed={language===l} onClick={()=>setLanguage(l)} className={language===l?'is-active':''}>{l.toUpperCase()}</button>)}</div></header>
-   <div className="studio-page-heading"><div><p className="studio-eyebrow">EXPRESSION ÉCRITE · TCF CANADA</p><h1>{title}</h1>{props.combinationTitle && <p>{props.combinationTitle}</p>}{props.subtitle && <p>{props.subtitle}</p>}</div>{props.currentView !== 'home' && props.currentView !== 'simulator' && <button className="studio-primary" onClick={()=>go(props.onStartNewExam || props.onNavigateHome)}><PenLine size={17}/>{en?'New session':'Nouvelle séance'}</button>}</div>
-   <main className="studio-main">{props.children}</main>
-  </div>
-  {profile && <UserProfileModal isOpen={profile} onClose={()=>setProfile(false)}/>}
- </div>;
+import React, { useState } from "react";
+import {
+  ArrowUpRight,
+  BookOpen,
+  BarChart3,
+  Feather,
+  Home,
+  Library,
+  Menu,
+  NotebookPen,
+  Settings2,
+  X,
+} from "lucide-react";
+import { useLanguage } from "../context/LanguageContext";
+export type AppView =
+  | "home"
+  | "library"
+  | "templates"
+  | "simulator"
+  | "results"
+  | "dashboard"
+  | "notebook"
+  | "settings"
+  | "login";
+export const AppLayout: React.FC<{
+  view: AppView;
+  onNavigate: (view: AppView) => void;
+  children: React.ReactNode;
+  name: string;
+  hasDraft: boolean;
+}> = ({ view, onNavigate, children, name, hasDraft }) => {
+  const { language, setLanguage } = useLanguage();
+  const en = language === "en";
+  const [mobile, setMobile] = useState(false);
+  const go = (next: AppView) => {
+    onNavigate(next);
+    setMobile(false);
+  };
+  const links = [
+    { view: "home", icon: Home, label: en ? "Today" : "Aujourd’hui" },
+    {
+      view: "library",
+      icon: Library,
+      label: en ? "Practice library" : "S’entraîner",
+    },
+    {
+      view: "templates",
+      icon: BookOpen,
+      label: en ? "Writing templates" : "Les modèles",
+    },
+    {
+      view: "dashboard",
+      icon: BarChart3,
+      label: en ? "My progress" : "Ma progression",
+    },
+    {
+      view: "notebook",
+      icon: NotebookPen,
+      label: en ? "My corrections" : "Mes corrections",
+    },
+  ] as const;
+  const current =
+    links.find((l) => l.view === view)?.label ||
+    (view === "simulator"
+      ? en
+        ? "Writing workspace"
+        : "Atelier de rédaction"
+      : view === "results"
+        ? en
+          ? "Your review"
+          : "Votre bilan"
+        : en
+          ? "Settings"
+          : "Réglages");
+  return (
+    <div className="lab-shell">
+      <a href="#main-content" className="skip-link">
+        {en ? "Skip to content" : "Aller au contenu"}
+      </a>
+      {mobile && (
+        <button
+          className="lab-scrim"
+          aria-label={en ? "Close menu" : "Fermer le menu"}
+          onClick={() => setMobile(false)}
+        />
+      )}
+      <aside className={`lab-sidebar ${mobile ? "open" : ""}`}>
+        <button className="lab-brand" onClick={() => go("home")}>
+          <span className="lab-brand-icon">
+            <Feather size={24} />
+          </span>
+          <span>
+            écriture<span>L’ATELIER TCF CANADA</span>
+          </span>
+        </button>
+        <button
+          className="lab-close-menu icon-button"
+          onClick={() => setMobile(false)}
+          aria-label={en ? "Close navigation" : "Fermer la navigation"}
+        >
+          <X size={20} />
+        </button>
+        <p className="nav-caption">{en ? "YOUR PRACTICE" : "VOTRE PRATIQUE"}</p>
+        <nav aria-label={en ? "Main navigation" : "Navigation principale"}>
+          {links.map(({ view: next, icon: Icon, label }) => (
+            <button
+              key={next}
+              className={`lab-nav ${view === next || (view === "simulator" && next === "library") ? "active" : ""}`}
+              onClick={() => go(next)}
+              aria-current={view === next ? "page" : undefined}
+            >
+              <Icon size={19} />
+              <span>{label}</span>
+              {next === "library" && hasDraft && (
+                <i aria-label={en ? "Draft saved" : "Brouillon sauvegardé"} />
+              )}
+            </button>
+          ))}
+        </nav>
+        <div className="goal-note">
+          <span className="eyebrow">
+            {en ? "YOUR NORTH STAR" : "VOTRE OBJECTIF"}
+          </span>
+          <div>
+            NCLC <em>7</em>
+            <ArrowUpRight size={23} />
+          </div>
+          <p>
+            {en
+              ? "Clear ideas. Precise French. One practice at a time."
+              : "Des idées claires. Un français précis. Une séance à la fois."}
+          </p>
+          <span className="goal-note-rule" />
+        </div>
+        <div className="lab-sidebar-bottom">
+          <button
+            className={`lab-nav ${view === "settings" ? "active" : ""}`}
+            onClick={() => go("settings")}
+          >
+            <Settings2 size={19} />
+            <span>{en ? "Settings & AI" : "Réglages et IA"}</span>
+          </button>
+          <div className="lab-person">
+            <span className="lab-avatar">{name.charAt(0).toUpperCase()}</span>
+            <div>
+              <strong>{name}</strong>
+              <small>
+                {en ? "Personal writing space" : "Votre espace de rédaction"}
+              </small>
+            </div>
+          </div>
+        </div>
+      </aside>
+      <div className="lab-body">
+        <header className="lab-topbar">
+          <div className="row">
+            <button
+              className="lab-menu icon-button"
+              aria-label={en ? "Open navigation" : "Ouvrir la navigation"}
+              onClick={() => setMobile(true)}
+            >
+              <Menu size={21} />
+            </button>
+            <span className="breadcrumb">
+              {en ? "My workspace" : "Mon espace"}
+              <span>/</span>
+              <strong>{current}</strong>
+            </span>
+          </div>
+          <div className="row">
+            <span className="top-goal">
+              <span /> Objectif NCLC 7
+            </span>
+            <div
+              className="language-switch"
+              aria-label={en ? "Interface language" : "Langue de l’interface"}
+            >
+              {(["fr", "en"] as const).map((l) => (
+                <button
+                  key={l}
+                  onClick={() => setLanguage(l)}
+                  aria-pressed={language === l}
+                >
+                  {l.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+        </header>
+        <main
+          id="main-content"
+          className={`lab-main ${view === "simulator" ? "lab-main-editor" : ""}`}
+          tabIndex={-1}
+        >
+          {children}
+        </main>
+        <footer className="lab-footer">
+          <span>
+            Écriture ·{" "}
+            {en
+              ? "A little French, every day."
+              : "Un peu de français, chaque jour."}
+          </span>
+          <span>
+            {en
+              ? "Practice estimates. Official results come from the TCF."
+              : "Estimations de pratique. Seul le TCF délivre un résultat officiel."}
+          </span>
+        </footer>
+      </div>
+    </div>
+  );
 };

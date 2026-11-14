@@ -9,17 +9,16 @@ import { countFrenchWords } from '../utils/wordCount';
 const GEMINI_API_KEY_STORAGE = 'tcf_gemini_api_key';
 
 export function getGeminiApiKey(): string {
-  // 1. Check Vite env variable
+  // A key entered in this browser overrides the deployment default.
+  const localKey = localStorage.getItem(GEMINI_API_KEY_STORAGE);
+  if (localKey && localKey.trim().length > 0) {
+    return localKey.trim();
+  }
   const envKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
   if (envKey && typeof envKey === 'string' && envKey.trim().length > 0) {
     return envKey.trim();
   }
   // 2. Check LocalStorage
-  const localKey = localStorage.getItem(GEMINI_API_KEY_STORAGE);
-  if (localKey && localKey.trim().length > 0) {
-    return localKey.trim();
-  }
-  // 3. Built-in default key
   return '';
 }
 

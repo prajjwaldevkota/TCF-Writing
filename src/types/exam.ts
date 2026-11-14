@@ -41,6 +41,9 @@ export interface DualAiEvaluation {
 }
 
 export interface ExamResult {
+  createdAt?: string;
+  revisionOf?: string;
+  cloudId?: string;
   id?: string;
   date?: string;
   combination: ExamCombination;
