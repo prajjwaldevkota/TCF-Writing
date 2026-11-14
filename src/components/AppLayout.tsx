@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-  ArrowUpRight,
   BookOpen,
   BarChart3,
   Feather,
@@ -37,11 +36,11 @@ export const AppLayout: React.FC<{
     setMobile(false);
   };
   const links = [
-    { view: "home", icon: Home, label: en ? "Today" : "Aujourd’hui" },
+    { view: "home", icon: Home, label: en ? "Home" : "Accueil" },
     {
       view: "library",
       icon: Library,
-      label: en ? "Practice library" : "S’entraîner",
+      label: en ? "All topics" : "Tous les sujets",
     },
     {
       view: "templates",
@@ -73,7 +72,7 @@ export const AppLayout: React.FC<{
           ? "Settings"
           : "Réglages");
   return (
-    <div className="lab-shell">
+    <div className={`lab-shell ${view === "simulator" ? "is-writing" : ""}`}>
       <a href="#main-content" className="skip-link">
         {en ? "Skip to content" : "Aller au contenu"}
       </a>
@@ -117,21 +116,6 @@ export const AppLayout: React.FC<{
             </button>
           ))}
         </nav>
-        <div className="goal-note">
-          <span className="eyebrow">
-            {en ? "YOUR NORTH STAR" : "VOTRE OBJECTIF"}
-          </span>
-          <div>
-            NCLC <em>7</em>
-            <ArrowUpRight size={23} />
-          </div>
-          <p>
-            {en
-              ? "Clear ideas. Precise French. One practice at a time."
-              : "Des idées claires. Un français précis. Une séance à la fois."}
-          </p>
-          <span className="goal-note-rule" />
-        </div>
         <div className="lab-sidebar-bottom">
           <button
             className={`lab-nav ${view === "settings" ? "active" : ""}`}

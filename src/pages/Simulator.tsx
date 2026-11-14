@@ -10,6 +10,8 @@ import {
   Pause,
   Play,
   Save,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import type { ExamResult, TaskKey } from "../types/exam";
 import {
@@ -79,7 +81,8 @@ export function Simulator({
   const [session, setSession] = useState(initialSession);
   const [now, setNow] = useState(Date.now());
   const [saved, setSaved] = useState(true);
-  const [panel, setPanel] = useState<"plan" | "check">("plan");
+  const [focusWriting, setFocusWriting] = useState(false);
+  const [accentsOpen, setAccentsOpen] = useState(false);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [templates, setTemplates] = useState(false);
   const [finish, setFinish] = useState(false);
@@ -88,7 +91,7 @@ export function Simulator({
   const finishButtonRef = useRef<HTMLButtonElement>(null);
   const finished = useRef(false);
   const textRef = useRef<HTMLTextAreaElement>(null);
-  const coachRef = useRef<HTMLElement>(null);
+
   const task = session.activeTask;
   const info = TASK_INFO[task];
   const requirement = session.combination.tasks[task];
@@ -200,62 +203,55 @@ export function Simulator({
     });
   };
   return (
-    <div className="page-enter writing-workspace">
-      <div className="workspace-heading">
-        <button className="text-button" onClick={onCancelExam}>
-          <ArrowLeft size={16} />
-          {en ? "Save & leave" : "Enregistrer et quitter"}
-        </button>
-        <div className="row">
-          <span className={`badge ${isExam ? "sand" : "sage"}`}>
-            {isExam
-              ? en
-                ? "FULL MOCK · 60 MIN"
-                : "EXAMEN BLANC · 60 MIN"
-              : en
-                ? "GUIDED PRACTICE"
-                : "PRATIQUE GUIDÉE"}
-          </span>
-          <span className="muted text-small desktop-only">
-            {session.month} {session.year} · Série{" "}
-            {session.combination.combinationNumber}
-          </span>
-        </div>
-      </div>
-      <div className="writer-top">
-        <div>
-          <p className="eyebrow">
-            {session.revisionOf
-              ? en
-                ? "MAKE THIS VERSION BETTER"
-                : "AMÉLIOREZ CETTE VERSION"
-              : "EXPRESSION ÉCRITE"}
-          </p>
-          <h1>
-            {en ? info.en : info.fr}
-            <span className="heading-dot">.</span>
-          </h1>
-        </div>
-        <div
-          className={`writer-timer ${isExam && timeLeft < 300 ? "urgent" : ""}`}
-        >
-          <Clock3 size={20} />
+    <div
+      className={`writing-workspace focused-workspace ${focusWriting ? "writing-only" : ""}`}
+    >
+      <header className="writing-session-header">
+        <div className="writing-session-title">
+          <button
+            className="writing-back icon-button"
+            onClick={onCancelExam}
+            aria-label={
+              en
+                ? "Save and leave writing"
+                : "Enregistrer et quitter la rédaction"
+            }
+            title={en ? "Save and leave" : "Enregistrer et quitter"}
+          >
+            <ArrowLeft size={20} />
+          </button>
           <div>
-            <strong>{formatTime(isExam ? timeLeft : elapsed)}</strong>
-            <small>
+            <h1>{en ? info.en : info.fr}</h1>
+            <p>
               {isExam
                 ? en
-                  ? "remaining"
-                  : "restantes"
-                : session.runningSince
+                  ? "Full mock exam"
+                  : "Examen blanc"
+                : session.revisionOf
                   ? en
-                    ? "writing time"
-                    : "temps de rédaction"
+                    ? "Revision"
+                    : "Réécriture"
                   : en
-                    ? "timer optional"
-                    : "chrono facultatif"}
-            </small>
+                    ? "Guided practice"
+                    : "Pratique guidée"}{" "}
+              · {session.month} {session.year}
+            </p>
           </div>
+        </div>
+        <div
+          className={`writing-clock ${isExam && timeLeft < 300 ? "urgent" : ""}`}
+        >
+          <Clock3 size={17} />
+          <span>{formatTime(isExam ? timeLeft : elapsed)}</span>
+          <small>
+            {isExam
+              ? en
+                ? "left"
+                : "restantes"
+              : en
+                ? "optional timer"
+                : "chrono facultatif"}
+          </small>
           {!isExam && (
             <button
               className="icon-button"
@@ -270,160 +266,222 @@ export function Simulator({
                     : "Démarrer le chrono"
               }
             >
-              {session.runningSince ? <Pause size={18} /> : <Play size={18} />}
+              {session.runningSince ? <Pause size={16} /> : <Play size={16} />}
             </button>
           )}
         </div>
-      </div>
-      <div
-        className="writer-task-tabs"
-        role="tablist"
-        aria-label={en ? "Writing tasks" : "Tâches de rédaction"}
-      >
-        {session.keys.map((key) => (
-          <button
-            key={key}
-            role="tab"
-            aria-selected={task === key}
-            onClick={() => {
-              update({ activeTask: key });
-              setPanel("plan");
-            }}
+      </header>
+      <div className="writing-session-bar">
+        {session.keys.length > 1 ? (
+          <div
+            className="writing-task-switch"
+            aria-label={en ? "Writing tasks" : "Tâches de rédaction"}
           >
-            <span className={`task-dot ${TASK_INFO[key].color}`}>
-              {TASK_INFO[key].number}
+            {session.keys.map((key) => (
+              <button
+                key={key}
+                aria-pressed={task === key}
+                onClick={() => update({ activeTask: key })}
+              >
+                Tâche {TASK_INFO[key].number}
+                <small>
+                  {countFrenchWords(session.answers[key])}{" "}
+                  {en ? "words" : "mots"}
+                </small>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <span className="writing-task-label">
+            Tâche {info.number}
+            <span>
+              {" "}
+              {requirement.minWords}–{requirement.maxWords}{" "}
+              {en ? "words" : "mots"}
             </span>
-            Tâche {TASK_INFO[key].number}
-            <small>
-              {countFrenchWords(session.answers[key])} {en ? "words" : "mots"}
-            </small>
-          </button>
-        ))}
-        <span className={`autosave ${saved ? "" : "error-text"}`} role="status">
+          </span>
+        )}
+        <span
+          className={`writing-save-status ${saved ? "" : "error-text"}`}
+          role="status"
+        >
           {saved ? <Check size={14} /> : <Save size={14} />}{" "}
           {saved
             ? en
-              ? "Draft saved"
-              : "Brouillon sauvegardé"
+              ? "Saved"
+              : "Sauvegardé"
             : en
               ? "Storage full — copy your text"
               : "Stockage plein — copiez votre texte"}
         </span>
       </div>
-      {!isExam && (
-        <div className="writer-mobile-tools">
-          <button
-            className="button secondary"
-            onClick={() => setTemplates(true)}
+      <div className="writing-layout">
+        {!focusWriting && (
+          <aside
+            className="writing-reference"
+            aria-label={
+              en ? "Prompt and source documents" : "Consigne et documents"
+            }
           >
-            <BookOpen size={15} />
-            {en ? "Writing templates" : "Modèles de rédaction"}
-          </button>
-          <button
-            className="text-button"
-            onClick={() => {
-              setPanel("check");
-              requestAnimationFrame(() =>
-                coachRef.current?.scrollIntoView({
-                  behavior: "smooth",
-                  block: "start",
-                }),
-              );
-            }}
-          >
-            <Check size={15} />
-            {en ? "My checklist" : "Ma liste de vérification"}
-          </button>
-        </div>
-      )}
-      <div className={`writer-grid ${isExam ? "exam-mode" : ""}`}>
-        <div className="writer-main">
-          <section className="prompt-card">
-            <div className="row between">
-              <span className="eyebrow">
-                {en ? "YOUR WRITING PROMPT" : "VOTRE CONSIGNE"}
-              </span>
-              <span className="badge neutral">
-                {requirement.minWords}–{requirement.maxWords}{" "}
-                {en ? "words" : "mots"}
-              </span>
+            <div className="writing-reference-header">
+              <h2>
+                {task === "task3"
+                  ? en
+                    ? "Prompt & documents"
+                    : "Consigne et documents"
+                  : en
+                    ? "Your prompt"
+                    : "La consigne"}
+              </h2>
+              {!isExam && (
+                <button
+                  className="text-button"
+                  onClick={() => setTemplates(true)}
+                >
+                  <BookOpen size={15} />
+                  {en ? "Templates" : "Modèles"}
+                </button>
+              )}
             </div>
-            <p>{normalizeParagraphText(requirement.instruction)}</p>
-            {task === "task3" && (
-              <div className="source-documents">
-                {[requirement.document1, requirement.document2].map(
-                  (doc, i) => (
-                    <details open key={i}>
-                      <summary>
-                        Document {i + 1}
-                        <ChevronDown size={15} />
-                      </summary>
-                      <p>
-                        {doc
-                          ? cleanDocumentText(doc)
-                          : en
-                            ? "This source document is missing. Source comparison cannot be graded."
-                            : "Document manquant : la comparaison des sources ne peut pas être évaluée."}
-                      </p>
-                    </details>
-                  ),
+            <div className="writing-reference-scroll">
+              <section className="writing-prompt">
+                <p>{normalizeParagraphText(requirement.instruction)}</p>
+              </section>
+              {task === "task3" && (
+                <div className="writing-source-documents">
+                  {[requirement.document1, requirement.document2].map(
+                    (doc, i) => (
+                      <section key={i}>
+                        <h3>
+                          <span>{i + 1}</span>Document {i + 1}
+                        </h3>
+                        <p>
+                          {doc
+                            ? cleanDocumentText(doc)
+                            : en
+                              ? "This source document is missing. Source comparison cannot be graded."
+                              : "Document manquant : la comparaison des sources ne peut pas être évaluée."}
+                        </p>
+                      </section>
+                    ),
+                  )}
+                </div>
+              )}
+              {!isExam && (
+                <details className="writing-help">
+                  <summary>
+                    {en ? "Need a little guidance?" : "Besoin d’un repère ?"}
+                    <ChevronDown size={15} />
+                  </summary>
+                  <p>
+                    {en
+                      ? task === "task3"
+                        ? "Reformulate both viewpoints, compare them, then defend your position with a reason or example."
+                        : task === "task2"
+                          ? "Set the scene, recount the experience, then explain what you think about it."
+                          : "Identify the reader, include every requested detail, and finish with a suitable closing."
+                      : task === "task3"
+                        ? "Reformulez les deux points de vue, comparez-les, puis défendez votre position avec une raison ou un exemple."
+                        : task === "task2"
+                          ? "Plantez le décor, racontez l’expérience, puis expliquez ce que vous en pensez."
+                          : "Identifiez le destinataire, incluez chaque détail demandé et terminez avec une formule adaptée."}
+                  </p>
+                  <div className="writing-checklist">
+                    {(en ? CHECKS_EN : CHECKS)[task].map((text, i) => (
+                      <label key={`${task}-${i}`}>
+                        <input
+                          type="checkbox"
+                          checked={!!checked[`${task}-${i}`]}
+                          onChange={(e) =>
+                            setChecked({
+                              ...checked,
+                              [`${task}-${i}`]: e.target.checked,
+                            })
+                          }
+                        />
+                        <span>{text}</span>
+                      </label>
+                    ))}
+                  </div>
+                </details>
+              )}
+              {session.revisionOf && (
+                <details className="writing-help revision-reference">
+                  <summary>
+                    {en
+                      ? "Previous version & priorities"
+                      : "Version précédente et priorités"}
+                    <ChevronDown size={15} />
+                  </summary>
+                  {!!session.priorities?.length && (
+                    <ul>
+                      {session.priorities.map((priority, i) => (
+                        <li key={i}>{priority}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <p>{session.previousAnswer}</p>
+                </details>
+              )}
+            </div>
+          </aside>
+        )}
+        <section
+          className="writing-desk"
+          aria-label={en ? "Your writing" : "Votre rédaction"}
+        >
+          <div className="writing-editor-header">
+            <h2>{en ? "Your text" : "Votre texte"}</h2>
+            <div className="row">
+              <button
+                className="writing-tool-button"
+                aria-expanded={accentsOpen}
+                aria-controls="writing-accents"
+                onClick={() => setAccentsOpen(!accentsOpen)}
+              >
+                é<span>{en ? "Accents" : "Accents"}</span>
+              </button>
+              <button
+                className="writing-tool-button"
+                aria-pressed={focusWriting}
+                onClick={() => setFocusWriting(!focusWriting)}
+                title={
+                  focusWriting
+                    ? en
+                      ? "Show the prompt and documents"
+                      : "Afficher la consigne et les documents"
+                    : en
+                      ? "Give all the space to writing"
+                      : "Donner toute la place à la rédaction"
+                }
+              >
+                {focusWriting ? (
+                  <Minimize2 size={16} />
+                ) : (
+                  <Maximize2 size={16} />
                 )}
-              </div>
-            )}
-          </section>
-          {session.revisionOf && (
-            <details className="revision-reference">
-              <summary>
-                {en
-                  ? "Original response & revision priorities"
-                  : "Texte initial et priorités de réécriture"}
-              </summary>
-              {session.priorities?.length ? (
-                <ul>
-                  {session.priorities.map((p, i) => (
-                    <li key={i}>{p}</li>
-                  ))}
-                </ul>
-              ) : null}
-              <p>{session.previousAnswer}</p>
-            </details>
-          )}
-          <section className="editor-paper">
-            <div className="editor-toolbar">
-              <span>
-                <FeatherIcon />
-                {en ? "YOUR RESPONSE" : "VOTRE RÉDACTION"}
-              </span>
-              <span className="muted text-small">
-                {en ? "Write in French" : "Rédigez en français"}
-              </span>
+                <span>
+                  {focusWriting
+                    ? task === "task3"
+                      ? en
+                        ? "Show documents"
+                        : "Afficher les documents"
+                      : en
+                        ? "Show prompt"
+                        : "Afficher la consigne"
+                    : en
+                      ? "Expand"
+                      : "Agrandir"}
+                </span>
+              </button>
             </div>
-            <textarea
-              ref={textRef}
-              aria-label={
-                en
-                  ? `Task ${info.number} response`
-                  : `Votre réponse à la tâche ${info.number}`
-              }
-              value={session.answers[task]}
-              onChange={(e) =>
-                update({
-                  answers: { ...session.answers, [task]: e.target.value },
-                })
-              }
-              onPaste={isExam ? (e) => e.preventDefault() : undefined}
-              spellCheck={!isExam}
-              lang="fr"
-              placeholder={
-                en
-                  ? "Your ideas belong here. Take a breath, then begin…"
-                  : "Vos idées ont leur place ici. Prenez une respiration, puis commencez…"
-              }
-            />
-            <div className="accent-toolbar">
-              <span className="muted text-small">
-                {en ? "French accents" : "Accents"}
-              </span>
+          </div>
+          {accentsOpen && (
+            <div
+              className="writing-accents"
+              id="writing-accents"
+              aria-label={en ? "French accents" : "Accents français"}
+            >
               {[
                 "é",
                 "è",
@@ -450,247 +508,60 @@ export function Simulator({
                 </button>
               ))}
             </div>
-            <div className="editor-footer">
-              <div
-                className={`word-count ${inRange ? "valid" : words > requirement.maxWords ? "over" : ""}`}
-              >
-                <strong>{words}</strong> {en ? "words" : "mots"}
-                <span>
-                  {inRange ? (
-                    <>
-                      <Check size={13} />
-                      {en ? "Within range" : "Dans la plage"}
-                    </>
-                  ) : words > requirement.maxWords ? (
-                    en ? (
-                      "Over word limit"
-                    ) : (
-                      "Plage dépassée"
-                    )
-                  ) : (
-                    `${requirement.minWords}–${requirement.maxWords} ${en ? "expected" : "attendus"}`
-                  )}
-                </span>
-              </div>
-              <span className="muted text-small">
-                {en ? "Counted by spaces" : "Comptage par espaces"}
-              </span>
+          )}
+          <textarea
+            ref={textRef}
+            aria-label={
+              en
+                ? `Task ${info.number} response`
+                : `Votre réponse à la tâche ${info.number}`
+            }
+            value={session.answers[task]}
+            onChange={(e) =>
+              update({
+                answers: { ...session.answers, [task]: e.target.value },
+              })
+            }
+            onPaste={isExam ? (e) => e.preventDefault() : undefined}
+            spellCheck={!isExam}
+            lang="fr"
+            placeholder={
+              en ? "Write your response here…" : "Rédigez votre réponse ici…"
+            }
+          />
+          <div className="writing-editor-footer">
+            <div
+              className={`writing-word-count ${inRange ? "valid" : words > requirement.maxWords ? "over" : ""}`}
+            >
+              <strong>{words}</strong>
+              <span>{en ? "words" : "mots"}</span>
+              <small>
+                {inRange ? (
+                  <>
+                    <Check size={12} />
+                    {en ? "Within range" : "Dans la plage"}
+                  </>
+                ) : (
+                  `${requirement.minWords}–${requirement.maxWords} ${en ? "expected" : "attendus"}`
+                )}
+              </small>
             </div>
-            <div className="word-progress">
-              <span
-                style={{
-                  width: `${Math.min(100, (words / requirement.maxWords) * 100)}%`,
-                  background:
-                    words > requirement.maxWords ? "var(--rust)" : undefined,
-                }}
-              />
-            </div>
-          </section>
-          <div className="writer-submit">
-            <span className="muted text-small">
-              {en
-                ? "Feedback starts only when you ask for it."
-                : "La correction IA démarre uniquement à votre demande."}
-            </span>
             <button
               ref={finishButtonRef}
               className="button primary"
               onClick={() => setFinish(true)}
             >
-              <FileCheck2 size={17} />
               {isExam
                 ? en
-                  ? "Finish mock exam"
-                  : "Terminer l’examen blanc"
+                  ? "Finish mock"
+                  : "Terminer l’examen"
                 : en
-                  ? "Finish & review"
-                  : "Terminer et faire le bilan"}
+                  ? "Finish writing"
+                  : "Terminer la rédaction"}
               <ArrowRight size={16} />
             </button>
           </div>
-        </div>
-        {!isExam && (
-          <aside ref={coachRef} className="writer-coach">
-            <div className="coach-card">
-              <span className="eyebrow">
-                {en ? "YOUR WRITING COMPANION" : "VOTRE COMPAGNON DE RÉDACTION"}
-              </span>
-              <h2>
-                {en
-                  ? "A thought before a sentence."
-                  : "Une idée avant une phrase."}
-              </h2>
-              <div className="segmented">
-                <button
-                  aria-pressed={panel === "plan"}
-                  onClick={() => setPanel("plan")}
-                >
-                  {en ? "Plan" : "Préparer"}
-                </button>
-                <button
-                  aria-pressed={panel === "check"}
-                  onClick={() => setPanel("check")}
-                >
-                  {en ? "Check" : "Vérifier"}
-                </button>
-              </div>
-              {panel === "plan" ? (
-                <div className="coach-plan">
-                  {(task === "task1"
-                    ? en
-                      ? [
-                          [
-                            "01",
-                            "Who am I writing to?",
-                            "Choose the tone before you start.",
-                          ],
-                          [
-                            "02",
-                            "What must they know?",
-                            "List every requested detail.",
-                          ],
-                          [
-                            "03",
-                            "What happens next?",
-                            "End with a clear action or closing.",
-                          ],
-                        ]
-                      : [
-                          [
-                            "01",
-                            "À qui est-ce que j’écris ?",
-                            "Choisissez le ton avant de commencer.",
-                          ],
-                          [
-                            "02",
-                            "Que doit savoir cette personne ?",
-                            "Repérez chaque détail demandé.",
-                          ],
-                          [
-                            "03",
-                            "Et ensuite ?",
-                            "Terminez avec une action ou une formule adaptée.",
-                          ],
-                        ]
-                    : task === "task2"
-                      ? en
-                        ? [
-                            [
-                              "01",
-                              "Set the scene",
-                              "Who, where, when, and why?",
-                            ],
-                            [
-                              "02",
-                              "Tell the story",
-                              "Connect the main events in order.",
-                            ],
-                            [
-                              "03",
-                              "Give your perspective",
-                              "Explain why the experience matters.",
-                            ],
-                          ]
-                        : [
-                            [
-                              "01",
-                              "Plantez le décor",
-                              "Qui, où, quand et pourquoi ?",
-                            ],
-                            [
-                              "02",
-                              "Racontez l’expérience",
-                              "Reliez les événements dans un ordre clair.",
-                            ],
-                            [
-                              "03",
-                              "Donnez votre avis",
-                              "Expliquez ce que cette expérience vous a apporté.",
-                            ],
-                          ]
-                      : en
-                        ? [
-                            [
-                              "01",
-                              "Understand both views",
-                              "One short note for each document.",
-                            ],
-                            [
-                              "02",
-                              "Compare in your own words",
-                              "Show agreement, differences or nuance.",
-                            ],
-                            [
-                              "03",
-                              "Defend your position",
-                              "Give a reason and a concrete example.",
-                            ],
-                          ]
-                        : [
-                            [
-                              "01",
-                              "Comprenez les deux avis",
-                              "Une idée clé pour chaque document.",
-                            ],
-                            [
-                              "02",
-                              "Comparez avec vos mots",
-                              "Rapprochez ou opposez les points de vue.",
-                            ],
-                            [
-                              "03",
-                              "Défendez votre position",
-                              "Une raison et un exemple concret.",
-                            ],
-                          ]
-                  ).map(([n, title, detail]) => (
-                    <div key={n}>
-                      <span>{n}</span>
-                      <p>
-                        <strong>{title}</strong>
-                        <small>{detail}</small>
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="coach-checks">
-                  {(en ? CHECKS_EN : CHECKS)[task].map((text, i) => (
-                    <label key={`${task}-${i}`}>
-                      <input
-                        type="checkbox"
-                        checked={!!checked[`${task}-${i}`]}
-                        onChange={(e) =>
-                          setChecked({
-                            ...checked,
-                            [`${task}-${i}`]: e.target.checked,
-                          })
-                        }
-                      />
-                      <span>{text}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-              <button
-                className="button secondary full-width"
-                onClick={() => setTemplates(true)}
-              >
-                <BookOpen size={16} />
-                {en ? "Open writing templates" : "Ouvrir les modèles"}
-                <ArrowRight size={15} />
-              </button>
-            </div>
-            <div className="coach-small">
-              <span className="badge sand">Objectif NCLC 7</span>
-              <p>
-                {en
-                  ? "Make your message clear before making it complex. Support your ideas, and leave a moment to reread."
-                  : "Cherchez la clarté avant la complexité. Développez vos idées et gardez un moment pour vous relire."}
-              </p>
-            </div>
-          </aside>
-        )}
+        </section>
       </div>
       {templates && !isExam && (
         <WritingTemplatePanel
@@ -769,12 +640,5 @@ export function Simulator({
         </div>
       )}
     </div>
-  );
-}
-function FeatherIcon() {
-  return (
-    <span aria-hidden="true" className="pen-dot">
-      ✎
-    </span>
   );
 }

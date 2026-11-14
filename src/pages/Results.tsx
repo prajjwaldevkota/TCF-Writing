@@ -234,56 +234,71 @@ export function Results({
           </button>
         </section>
       )}
-      <div className="review-nclc panel">
-        <div className="nclc-heading">
-          <span className="eyebrow">
-            {en ? "FULL-MOCK WRITING ESTIMATE" : "ESTIMATION DE L’EXAMEN BLANC"}
-          </span>
-          <span className="badge sand">
-            {en ? "NON-OFFICIAL" : "NON OFFICIEL"}
-          </span>
-        </div>
-        <div className="nclc-body">
-          <h2>
-            {projection ? (
-              <>
-                NCLC{" "}
-                <em>
-                  {projection.lower === 3 ? "<4" : projection.lower}–
-                  {projection.upper === 10 ? "10+" : projection.upper}
-                </em>
-              </>
-            ) : en ? (
-              "Your NCLC estimate"
-            ) : (
-              "Votre estimation NCLC"
-            )}
-          </h2>
-          <p>
-            {projection
-              ? projection.rationale
-              : !eligibility.eligible
-                ? en
-                  ? eligibility.reason_en
-                  : eligibility.reason_fr
-                : result.aiEvaluation?.pedagogical
-                    ?.projection_withholding_reason ||
-                  (en
-                    ? "Complete all three tasks. Then request one holistic review of the full mock. Gemini can provide an estimate without Groq."
-                    : "Complétez les trois tâches, puis demandez un bilan de l’ensemble. Gemini peut fournir une estimation sans Groq.")}
-          </p>
-        </div>
-        {result.aiEvaluation?.nclc_crosscheck &&
-          result.dualAiEvaluation?.gemini &&
-          result.dualAiEvaluation?.groq && (
-            <NclcCrosscheck comparison={result.aiEvaluation.nclc_crosscheck} />
-          )}
-        <p className="footnote">
+      {!result.isPracticeMode && (
+        <>
+          <div className="review-nclc panel">
+            <div className="nclc-heading">
+              <span className="eyebrow">
+                {en
+                  ? "FULL-MOCK WRITING ESTIMATE"
+                  : "ESTIMATION DE L’EXAMEN BLANC"}
+              </span>
+              <span className="badge sand">
+                {en ? "NON-OFFICIAL" : "NON OFFICIEL"}
+              </span>
+            </div>
+            <div className="nclc-body">
+              <h2>
+                {projection ? (
+                  <>
+                    NCLC{" "}
+                    <em>
+                      {projection.lower === 3 ? "<4" : projection.lower}–
+                      {projection.upper === 10 ? "10+" : projection.upper}
+                    </em>
+                  </>
+                ) : en ? (
+                  "Your NCLC estimate"
+                ) : (
+                  "Votre estimation NCLC"
+                )}
+              </h2>
+              <p>
+                {projection
+                  ? projection.rationale
+                  : !eligibility.eligible
+                    ? en
+                      ? eligibility.reason_en
+                      : eligibility.reason_fr
+                    : result.aiEvaluation?.pedagogical
+                        ?.projection_withholding_reason ||
+                      (en
+                        ? "Complete all three tasks. Then request one holistic review of the full mock. Gemini can provide an estimate without Groq."
+                        : "Complétez les trois tâches, puis demandez un bilan de l’ensemble. Gemini peut fournir une estimation sans Groq.")}
+              </p>
+            </div>
+            {result.aiEvaluation?.nclc_crosscheck &&
+              result.dualAiEvaluation?.gemini &&
+              result.dualAiEvaluation?.groq && (
+                <NclcCrosscheck
+                  comparison={result.aiEvaluation.nclc_crosscheck}
+                />
+              )}
+            <p className="footnote">
+              {en
+                ? "An uncalibrated practice range, not an official result. One isolated task cannot determine a final /20 score or NCLC level."
+                : "Plage de pratique non calibrée, sans valeur officielle. Une tâche isolée ne détermine ni la note finale sur 20 ni le niveau NCLC."}
+            </p>
+          </div>
+        </>
+      )}
+      {result.isPracticeMode && (
+        <p className="footnote task-review-note">
           {en
-            ? "An uncalibrated practice range, not an official result. One isolated task cannot determine a final /20 score or NCLC level."
-            : "Plage de pratique non calibrée, sans valeur officielle. Une tâche isolée ne détermine ni la note finale sur 20 ni le niveau NCLC."}
+            ? "This task review is non-official. One isolated task cannot determine a final /20 score or NCLC level."
+            : "Ce bilan de tâche est non officiel. Une tâche isolée ne détermine ni la note finale sur 20 ni le niveau NCLC."}
         </p>
-      </div>
+      )}
       <div className="review-controls">
         <div className="segmented">
           {(keys.length ? keys : (["task1"] as TaskKey[])).map((k) => (

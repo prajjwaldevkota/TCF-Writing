@@ -337,9 +337,7 @@ function MainRouter() {
         onResume={() => navigate("simulator")}
         onPractice={quickStart}
         onLibrary={() => navigate("library")}
-        onTemplates={() => navigate("templates")}
         onOpen={(s) => navigate("results", s)}
-        onNotebook={() => navigate("notebook")}
       />
     );
   };

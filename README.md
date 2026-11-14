@@ -6,12 +6,13 @@ target.
 
 ## Use the app
 
-- **Today:** resume an unfinished draft, start the least-practised task, or take a
-  full mock. Weekly counts come from saved sessions.
+- **Today:** choose a task, resume an unfinished draft, or take a full mock.
 - **Practice library:** search the existing question collection, filter by year,
   bookmark topics, and choose a guided task or a 60-minute mock.
-- **Writing workspace:** automatic local draft saving, French accents, live word
-  counts, planning prompts, a self-checklist, and TCFFormation templates. Guided
+- **Writing workspace:** a large editor beside the prompt and source documents, automatic
+  local draft saving, French accents, live word counts, and optional help. The
+  Expand control hides the references for more writing space. A self-checklist
+  and TCFFormation templates remain available on demand. Guided
   practice has an optional timer; full mocks hide the writing aids and finish at
   60 minutes. The timer survives reloads.
 - **Review:** request Gemini feedback explicitly. Read evidence, corrections and
