@@ -64,3 +64,35 @@ GEMINI_MODEL=gemini-3.8-flash
 The current UI and practice flow are documented in [README.md](README.md).
 The limits of AI grading and outstanding calibration work are documented in
 [docs/GRADING-ACCURACY.md](docs/GRADING-ACCURACY.md).
+
+## Error logs
+
+1. Run `supabase/error-logs.sql` in your own Supabase project's SQL editor.
+2. Set `SUPABASE_SERVICE_ROLE_KEY` in Vercel's server environment. The logger uses
+   `SUPABASE_URL`, or the existing `VITE_SUPABASE_URL`. Never put the service-role
+   key in a `VITE_` variable. Redeploy after changing deployment variables.
+3. Sign in with an administrator account (`app_metadata.role = "admin"`) and open
+   **Settings → Error logs**. Set this role through trusted Supabase admin tools,
+   not user-editable metadata. Sign in again after a role change to refresh the JWT.
+   You can also inspect `public.error_logs` in the Supabase dashboard.
+
+The migration enables RLS, grants admins read-only access, and allows writes only
+through the server's service role. No browser users can insert, update or delete
+rows directly. Unauthenticated learners can report narrowly validated technical
+failures through `/api/error-logs`; those rows are explicitly marked `client`.
+See [Supabase's RLS guidance](https://supabase.com/docs/guides/database/postgres/row-level-security)
+for the distinction between trusted app metadata and editable user metadata.
+
+Logs include a shared request reference, timestamp, failure stage, model,
+primary/backup attempt, HTTP status, provider status code, elapsed time, retry
+interval, deployment/region, and coarse browser/platform/viewport information.
+The reference is shown with failed reviews, and the viewer can filter by it or
+by server/browser source, with 50 rows per page. A failed attempt can be logged
+although a later fallback succeeds; match the reference to follow the chain.
+
+API keys, tokens, student writing, prompts, raw provider messages, exception
+messages and stack traces are never persisted. Logging uses a separate bounded
+request and does not retry generation. If database logging is unconfigured or
+fails, the server emits the sanitized entry to Vercel logs instead. A completely
+offline browser cannot deliver its report. Log entries remain until removed by
+the database owner; there is no automatic deletion or retention job.

@@ -20,6 +20,7 @@ globalThis.localStorage = {
   removeItem: (key) => stored.delete(key),
 };
 globalThis.__geminiEnv = {};
+globalThis.__reviewErrors = [];
 const settingsUrl = url(
   compile("src/utils/geminiSettings.ts").replaceAll(
     "import.meta.env",
@@ -53,6 +54,9 @@ const setup = `import {safeParseGeminiJson} from ${JSON.stringify(parserUrl)};
 import {getRateLimitDeadline,recordRateLimit,rateLimitMessage} from ${JSON.stringify(rateUrl)};
 import {getGeminiModel,getGeminiModelChain} from ${JSON.stringify(settingsUrl)};
 const {buildEvaluationInstructions,instructionFingerprint,validatePedagogicalAssessment}=globalThis.__geminiFixture;
+const createLogRequestId=()=>crypto.randomUUID();
+const getClientDiagnostics=()=>({browser:"chrome",platform:"windows",viewport_width:1536,viewport_height:740,online:true});
+const reportReviewError=entry=>globalThis.__reviewErrors.push(entry);
 `;
 const { evaluateTcfSubmissionWithGemini: evaluate } = await import(
   url(setup + source)
@@ -196,6 +200,17 @@ try {
   arrange("", "", [new Error("Network interruption")]);
   await assert.rejects(evaluate(input), /Connexion Gemini/);
   assert.equal(calls.length, 1);
+  assert(
+    globalThis.__reviewErrors.some(
+      (entry) =>
+        entry.stage === "client_network" && entry.code === "network_error",
+    ),
+  );
+  assert(
+    globalThis.__reviewErrors.every(
+      (entry) => !JSON.stringify(entry).includes("obsolete"),
+    ),
+  );
   arrange("", "", [success("bad-json")]);
   const oldError = console.error;
   console.error = () => {};
@@ -237,4 +252,5 @@ try {
   globalThis.fetch = oldFetch;
   delete globalThis.__geminiFixture;
   delete globalThis.__geminiEnv;
+  delete globalThis.__reviewErrors;
 }

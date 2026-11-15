@@ -1,3 +1,4 @@
+import { ErrorLogPanel } from "../components/ErrorLogPanel";
 import React, { useRef, useState } from "react";
 import {
   ArrowRight,
@@ -23,7 +24,7 @@ export function Settings({
   syncStatus: string;
 }) {
   const { language, setLanguage } = useLanguage();
-  const { user, isConfigured, signOut } = useAuth();
+  const { user, isConfigured, signOut, isAdmin } = useAuth();
   const en = language === "en";
   const [notice, setNotice] = useState("");
   const [error, setError] = useState(false);
@@ -133,6 +134,7 @@ export function Settings({
             : "Les quotas dépendent du projet Google, pas de la clé. Une seconde clé du même projet n’ajoute pas de quota gratuit. La clé de secours est essayée une seule fois par modèle après une erreur HTTP prise en charge ; les délais dépassés et les bilans invalides ne déclenchent pas de nouvel appel automatique."}
         </p>
       </section>
+      {isAdmin && <ErrorLogPanel />}
       <section className="panel settings-section">
         <div className="section-head">
           <h2>{en ? "Your practice data" : "Vos données de pratique"}</h2>

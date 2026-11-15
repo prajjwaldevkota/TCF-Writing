@@ -1,12 +1,18 @@
+import { errorLogsUrl } from "./helpers/error-log-modules.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import ts from "typescript";
-const source = ts.transpileModule(fs.readFileSync("api/gemini.ts", "utf8"), {
-  compilerOptions: {
-    module: ts.ModuleKind.ESNext,
-    target: ts.ScriptTarget.ES2022,
-  },
-}).outputText;
+const source = ts
+  .transpileModule(fs.readFileSync("api/gemini.ts", "utf8"), {
+    compilerOptions: {
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ES2022,
+    },
+  })
+  .outputText.replace(
+    /(["'])\.\.\/server\/errorLogs\1/,
+    JSON.stringify(errorLogsUrl),
+  );
 const { default: handler } = await import(
   "data:text/javascript;base64," + Buffer.from(source).toString("base64")
 );
@@ -20,6 +26,11 @@ const saved = Object.fromEntries(
   names.map((name) => [name, process.env[name]]),
 );
 const oldFetch = globalThis.fetch;
+const oldWarn = console.warn;
+const oldLogKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+let logged = [];
+console.warn = (_label, row) => logged.push(JSON.parse(row));
 const body = {
   model: "gemini-3.8-flash",
   request: { contents: [{ role: "user", parts: [{ text: "Test" }] }] },
@@ -37,6 +48,7 @@ function arrange(primary, backup, responses, legacy = "") {
   if (backup) process.env.GEMINI_BACKUP_KEY = backup;
   if (legacy) process.env.VITE_GEMINI_API_KEY = legacy;
   calls = [];
+  logged = [];
   globalThis.fetch = async (url, options) => {
     calls.push({ url, options });
     const response = responses.shift();
@@ -93,6 +105,14 @@ try {
       ["primary-sentinel", "backup-sentinel"],
     );
     assert.equal(calls[0].url, calls[1].url);
+    assert.equal(logged.length, 1);
+    assert.equal(logged[0].stage, "provider_http");
+    assert.equal(logged[0].http_status, status);
+    assert.equal(logged[0].key_source, "primary");
+    assert.equal(
+      logged[0].request_id,
+      response.headers.get("X-TCF-Request-ID"),
+    );
   }
   arrange("same-sentinel", "same-sentinel", [
     new Response("same-sentinel", { status: 403 }),
@@ -163,6 +183,9 @@ try {
   );
 } finally {
   globalThis.fetch = oldFetch;
+  console.warn = oldWarn;
+  if (oldLogKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  else process.env.SUPABASE_SERVICE_ROLE_KEY = oldLogKey;
   for (const name of names) {
     if (saved[name] === undefined) delete process.env[name];
     else process.env[name] = saved[name];

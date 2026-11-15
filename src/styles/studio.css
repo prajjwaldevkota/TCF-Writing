@@ -776,3 +776,68 @@ progress::-moz-progress-bar {
 .gemini-model-setting .footnote {
   margin: 10px 0;
 }
+
+/* Technical diagnostics stay in the administrator's settings. */
+.error-log-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin: 20px 0;
+}
+.error-log-filters .field-label {
+  flex: 1;
+  min-width: 160px;
+}
+.error-log-scroll {
+  overflow-x: auto;
+  margin: 16px 0;
+}
+.error-log-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+.error-log-table th,
+.error-log-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.error-log-table th {
+  background: var(--surface-raised);
+  font-weight: 650;
+  white-space: nowrap;
+}
+.error-log-table small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+}
+.error-log-table time {
+  white-space: nowrap;
+}
+.error-log-table summary {
+  cursor: pointer;
+  color: var(--teal);
+}
+.error-log-table dl {
+  min-width: 240px;
+  max-width: 420px;
+  margin-top: 12px;
+}
+.error-log-table dt {
+  font-weight: 600;
+  margin-top: 8px;
+}
+.error-log-table dd {
+  margin: 3px 0 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 540px) {
+  .error-log-filters .field-label {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+}

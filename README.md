@@ -56,6 +56,15 @@ values are excluded from browser builds. Existing browser-entered keys are ignor
 
 See [LOCAL-SETUP.md](LOCAL-SETUP.md) for optional account storage and Vercel setup.
 
+## Error diagnostics
+
+`supabase/error-logs.sql` adds the admin-only `error_logs` table. Configure
+`SUPABASE_SERVICE_ROLE_KEY` on Vercel and use **Settings → Error logs** while
+signed in with `app_metadata.role = "admin"`. Logs record server failures,
+primary/backup attempts, browser connection failures and invalid assessments,
+linked by the reference displayed with an error. Writing, prompts and credentials
+are excluded. See [setup details](LOCAL-SETUP.md#error-logs).
+
 ## Grading and reliability
 
 Gemini uses `src/services/evaluationInstructions.ts`, the supplied
