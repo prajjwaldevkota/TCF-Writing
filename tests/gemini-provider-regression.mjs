@@ -192,6 +192,25 @@ try {
     calls.map((call) => call.body.model),
     ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"],
   );
+  const providerTimeout = () => new Response("{}", {
+    status: 504,
+    headers: { "X-TCF-Error-Source": "provider", "X-TCF-Model-Unavailable": "1" },
+  });
+  arrange("", "", [providerTimeout(), success()]);
+  assert.equal((await evaluate(input)).model, "gemini-3.6-flash");
+  assert.equal(calls.length, 2);
+  arrange("", "", Array.from({ length: 3 }, providerTimeout));
+  await assert.rejects(evaluate(input), /gemini-3.5-flash-lite.*HTTP 504/);
+  assert.equal(calls.length, 3, "Provider deadline fallback is bounded");
+  for (const headers of [{}, { "Content-Type": "text/html" }]) {
+    arrange("", "", [new Response("Gateway timeout", { status: 504, headers })]);
+    await assert.rejects(evaluate(input), /délai dépassé.*aucun autre modèle/);
+    assert.equal(calls.length, 1, "Hosting timeouts must not replay accepted work");
+    assert.equal(globalThis.__reviewErrors.at(-1).code, "timeout");
+  }
+  arrange("", "", [providerTimeout(), success()]);
+  assert.equal((await evaluate(input, "explicit-diagnostic-key")).model, "gemini-3.6-flash");
+  assert.equal(calls.length, 2, "Direct provider deadlines can advance models");
   arrange("", "", [
     new Response("{}", { status: 502, headers: { "X-TCF-No-Retry": "1" } }),
   ]);

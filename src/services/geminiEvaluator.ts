@@ -209,12 +209,26 @@ async function evaluateGeminiRequest(
               : "Le service de correction n’est pas configuré sur le serveur. L’administrateur doit configurer la clé Gemini du déploiement. Aucune clé personnelle n’est nécessaire. Votre rédaction est sauvegardée.",
           );
         }
-        // A proxy timeout is ambiguous: the upstream job may already be running.
-        if (response.headers.get("X-TCF-No-Retry") === "1") {
+        // Only a 504 relayed by our handler is a confirmed provider response.
+        // A hosting gateway may time out while accepted work is still running.
+        const gatewayTimeout =
+          server &&
+          response.status === 504 &&
+          response.headers.get("X-TCF-Error-Source") !== "provider";
+        if (gatewayTimeout) {
+          reportReviewError({
+            request_id: requestId,
+            stage: "client_network",
+            code: "timeout",
+            model: modelName,
+            duration_ms: Date.now() - started,
+          });
+        }
+        if (gatewayTimeout || response.headers.get("X-TCF-No-Retry") === "1") {
           throw new Error(
             feedbackLanguage === "en"
-              ? "Gemini server connection interrupted. Your writing is saved; no further model was tried."
-              : "Connexion au serveur Gemini interrompue. Votre rédaction est sauvegardée ; aucun autre modèle n’a été essayé.",
+              ? "Gemini server connection interrupted or timed out. Your writing is saved; no further model was tried. You can request a new review."
+              : "Connexion au serveur Gemini interrompue ou délai dépassé. Votre rédaction est sauvegardée ; aucun autre modèle n’a été essayé. Vous pouvez demander un nouveau bilan.",
           );
         }
         if (response.headers.get("X-TCF-Model-Unavailable") === "1")
@@ -240,14 +254,14 @@ async function evaluateGeminiRequest(
         lastError = new Error(
           `Gemini ${modelName}: HTTP ${response.status}. ${hint}`,
         );
-        if ([404, 429, 503].includes(response.status)) modelUnavailable = true;
+        if ([404, 429, 503, 504].includes(response.status)) modelUnavailable = true;
         if (
           [401, 403, 404, 429, 500, 502, 503, 504].includes(response.status) &&
           index + 1 < keys.length
         )
           continue;
         if (
-          [404, 429, 503].includes(response.status) ||
+          [404, 429, 503, 504].includes(response.status) ||
           (modelUnavailable && [401, 403, 409].includes(response.status))
         )
           continue modelAttempts;

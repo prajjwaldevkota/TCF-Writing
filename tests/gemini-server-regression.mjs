@@ -92,7 +92,7 @@ try {
     calls[0].options.headers["x-goog-api-key"],
     "alternate-backup-sentinel",
   );
-  for (const status of [401, 403, 404, 429, 500, 502, 503, 504]) {
+  for (const status of [401, 403, 404, 429, 500, 502, 503]) {
     arrange("primary-sentinel", "backup-sentinel", [
       new Response("primary-sentinel", { status }),
       success(),
@@ -114,6 +114,16 @@ try {
       response.headers.get("X-TCF-Request-ID"),
     );
   }
+  arrange("primary-sentinel", "backup-sentinel", [
+    new Response("primary-sentinel", { status: 504 }),
+  ]);
+  const timeout = await handler(request());
+  assert.equal(timeout.status, 504);
+  assert.equal(timeout.headers.get("X-TCF-Error-Source"), "provider");
+  assert.equal(timeout.headers.get("X-TCF-Model-Unavailable"), "1");
+  assert.equal(calls.length, 1, "Advance models instead of repeating a slow model with another key");
+  assert.equal(logged[0].http_status, 504);
+  assert(!(await timeout.text()).includes("sentinel"));
   arrange("same-sentinel", "same-sentinel", [
     new Response("same-sentinel", { status: 403 }),
   ]);

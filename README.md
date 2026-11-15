@@ -81,7 +81,10 @@ model and original requested model are saved separately and shown with the revie
 requests share one in-flight call. For each model, the optional backup key is tried at most once after a supported
 HTTP error. The model chain runs automatically: **3.8 Flash → 3.6 Flash →
 3.5 Flash-Lite**. HTTP 404 (model unavailable), 429 (quota), and 503 (temporary
-unavailability) move to the next model after available keys are exhausted. There
+unavailability) move to the next model after available keys are exhausted. A confirmed
+provider HTTP 504 (deadline exceeded) moves directly to the next model without
+repeating the slow request with a backup key. Hosting gateway 504 responses are
+logged as timeouts and stop with a saved-writing message. There
 are at most three models and two keys per model. It stops on the first successful
 response; invalid assessments and ambiguous timeouts do not trigger more calls.
 The Vercel function reads both keys at request time and tries the backup on the
