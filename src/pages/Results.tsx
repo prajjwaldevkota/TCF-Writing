@@ -16,16 +16,12 @@ import { useLanguage } from "../context/LanguageContext";
 import { getStoredSubmissions } from "../utils/storage";
 import { countFrenchWords, formatTime } from "../utils/wordCount";
 import { practicedKeys, TASK_INFO, TASK_KEYS } from "../utils/practice";
-import {
-  providerReview,
-  ReviewProvider,
-  withProviderReview,
-} from "../utils/reviewState";
+import { withGeminiReview } from "../utils/reviewState";
 import { reviewSubmission } from "../services/reviewWorkflow";
-import { getAvailableProviders } from "../services/dualEvaluator";
+import { hasGeminiKey, getGeminiModel } from "../utils/geminiSettings";
 import { mockProjectionEligibility } from "../services/pedagogicalAssessment";
-import { NclcCrosscheck } from "../components/NclcCrosscheck";
 import { AIEvaluationView } from "../components/AIEvaluationView";
+import { SubmissionExport } from "../components/SubmissionExport";
 export function Results({
   result,
   onSave,
@@ -45,8 +41,7 @@ export function Results({
   const en = language === "en";
   const keys = result.isPracticeMode ? practicedKeys(result) : TASK_KEYS;
   const [active, setActive] = useState<TaskKey>(keys[0] || "task1");
-  const [provider, setProvider] = useState<ReviewProvider>("gemini");
-  const [busy, setBusy] = useState<ReviewProvider | null>(null);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const locked = useRef(false);
   const errorRef = useRef<HTMLDivElement>(null);
@@ -57,8 +52,8 @@ export function Results({
   const original = result.revisionOf
     ? getStoredSubmissions().find((s) => s.id === result.revisionOf)
     : null;
-  const available = getAvailableProviders();
-  const chosen = providerReview(result, provider) || result.aiEvaluation;
+  const available = hasGeminiKey();
+  const chosen = result.aiEvaluation;
   const assessment = chosen?.pedagogical;
   const feedback = assessment?.tasks[active];
   const projection = result.aiEvaluation?.pedagogical?.mock_projection;
@@ -66,15 +61,14 @@ export function Results({
     result,
     result.isPracticeMode ? keys : ["task1", "task2", "task3"],
   );
-  const review = async (next: ReviewProvider, force = false) => {
+  const review = async (force = false) => {
     if (locked.current) return;
     locked.current = true;
-    setBusy(next);
+    setBusy(true);
     setError("");
     try {
-      const data = await reviewSubmission(result, next, force);
-      onSave(withProviderReview(result, next, data));
-      setProvider(next);
+      const data = await reviewSubmission(result, force);
+      onSave(withGeminiReview(result, data));
     } catch (e) {
       setError(
         e instanceof Error
@@ -85,10 +79,9 @@ export function Results({
       );
     } finally {
       locked.current = false;
-      setBusy(null);
+      setBusy(false);
     }
   };
-  const startProvider = available.gemini ? "gemini" : "groq";
   const words = countFrenchWords(result.answers[active]);
   const requirement = result.combination.tasks[active];
   return (
@@ -118,6 +111,7 @@ export function Results({
           {en ? "Saved in this browser" : "Enregistré dans ce navigateur"}
         </span>
       </div>
+      <SubmissionExport key={result.id} result={result} />
       <div className="review-summary">
         <div>
           <span className="eyebrow">{en ? "SESSION" : "SÉANCE"}</span>
@@ -206,32 +200,31 @@ export function Results({
                 : "Obtenez une plage de niveau, des preuves tirées de votre texte, des corrections vérifiées et quelques priorités claires. Aucun appel IA automatique."}
             </p>
           </div>
-          <button
-            className="button primary"
-            disabled={!!busy}
-            onClick={() =>
-              available.gemini || available.groq
-                ? void review(startProvider)
-                : onSettings()
-            }
-          >
-            {busy ? (
-              <Loader2 className="spin" size={17} />
-            ) : (
-              <Sparkles size={17} />
-            )}{" "}
-            {busy
-              ? en
-                ? "Reviewing…"
-                : "Analyse en cours…"
-              : available.gemini || available.groq
+          <div className="review-provider-actions">
+            <span className="muted text-small">{getGeminiModel()}</span>
+            <button
+              className="button primary"
+              disabled={!!busy}
+              onClick={() => (available ? void review() : onSettings())}
+            >
+              {busy ? (
+                <Loader2 className="spin" size={17} />
+              ) : (
+                <Sparkles size={17} />
+              )}{" "}
+              {busy
                 ? en
-                  ? "Get my feedback"
-                  : "Obtenir mon bilan"
-                : en
-                  ? "Connect AI"
-                  : "Configurer l’IA"}
-          </button>
+                  ? "Reviewing…"
+                  : "Analyse en cours…"
+                : available
+                  ? en
+                    ? "Get my feedback"
+                    : "Obtenir mon bilan"
+                  : en
+                    ? "Connect AI"
+                    : "Configurer l’IA"}
+            </button>
+          </div>
         </section>
       )}
       {!result.isPracticeMode && (
@@ -273,17 +266,10 @@ export function Results({
                     : result.aiEvaluation?.pedagogical
                         ?.projection_withholding_reason ||
                       (en
-                        ? "Complete all three tasks. Then request one holistic review of the full mock. Gemini can provide an estimate without Groq."
-                        : "Complétez les trois tâches, puis demandez un bilan de l’ensemble. Gemini peut fournir une estimation sans Groq.")}
+                        ? "Complete all three tasks, then request one Gemini review of the full mock."
+                        : "Complétez les trois tâches, puis demandez un bilan Gemini de l’ensemble.")}
               </p>
             </div>
-            {result.aiEvaluation?.nclc_crosscheck &&
-              result.dualAiEvaluation?.gemini &&
-              result.dualAiEvaluation?.groq && (
-                <NclcCrosscheck
-                  comparison={result.aiEvaluation.nclc_crosscheck}
-                />
-              )}
             <p className="footnote">
               {en
                 ? "An uncalibrated practice range, not an official result. One isolated task cannot determine a final /20 score or NCLC level."
@@ -312,16 +298,6 @@ export function Results({
           ))}
         </div>
         <div className="row">
-          {result.dualAiEvaluation?.gemini && result.dualAiEvaluation?.groq && (
-            <select
-              aria-label={en ? "Choose reviewer" : "Choisir le bilan"}
-              value={provider}
-              onChange={(e) => setProvider(e.target.value as ReviewProvider)}
-            >
-              <option value="gemini">Gemini</option>
-              <option value="groq">Groq</option>
-            </select>
-          )}
           <button
             className="button primary"
             onClick={() => onRevise(result, active)}
@@ -409,6 +385,40 @@ export function Results({
                 {feedback.withholding_reason && (
                   <p className="notice warning">
                     {feedback.withholding_reason}
+                  </p>
+                )}
+                {!feedback.range && !!chosen && (
+                  <div className="feedback-retry">
+                    <p>
+                      {en
+                        ? "A withheld level is not a low grade. You can request a fresh review or copy your work for another AI or tutor. A new review uses API quota."
+                        : "Un niveau suspendu n’est pas une mauvaise note. Demandez un nouveau bilan ou copiez votre travail pour une autre IA ou un tuteur. Un nouveau bilan consomme du quota API."}
+                    </p>
+                    <button
+                      className="button secondary"
+                      disabled={busy || !available}
+                      onClick={() => void review(true)}
+                    >
+                      <RotateCcw size={15} />
+                      {en
+                        ? "Request a new review"
+                        : "Demander un nouveau bilan"}
+                    </button>
+                  </div>
+                )}
+                {chosen?.requested_model &&
+                  chosen.model !== chosen.requested_model && (
+                    <p className="notice">
+                      {en
+                        ? `Automatic fallback: ${chosen.model} produced this review.`
+                        : `Relais automatique : ce bilan a été réalisé par ${chosen.model}.`}
+                    </p>
+                  )}
+                {chosen?.key_source === "backup" && (
+                  <p className="notice">
+                    {en
+                      ? "The backup Gemini key was used for this review."
+                      : "La clé Gemini de secours a été utilisée pour ce bilan."}
                   </p>
                 )}
                 <span className="feedback-model">
@@ -620,28 +630,14 @@ export function Results({
           </summary>
           <p>
             {en
-              ? "A second model is optional and does not guarantee accuracy. Reusing a matching review consumes no additional quota."
-              : "Un second modèle est facultatif et ne garantit pas l’exactitude. Réutiliser un bilan identique ne consomme pas de quota supplémentaire."}
+              ? "A new Gemini review uses the model selected in Settings & AI and consumes API quota. Your saved feedback stays available if the request fails."
+              : "Un nouveau bilan Gemini utilise le modèle choisi dans Réglages et IA et consomme du quota API. Votre bilan enregistré reste disponible si la demande échoue."}
           </p>
           <div className="row wrap">
             <button
               className="button secondary"
-              disabled={!!busy || !available.groq}
-              onClick={() => void review("groq")}
-            >
-              {busy === "groq" ? <Loader2 className="spin" size={14} /> : null}
-              {busy === "groq"
-                ? en
-                  ? "Reviewing…"
-                  : "Analyse en cours…"
-                : en
-                  ? "Groq second opinion"
-                  : "Second avis Groq"}
-            </button>
-            <button
-              className="button secondary"
-              disabled={!!busy || !available.gemini}
-              onClick={() => void review("gemini", true)}
+              disabled={!!busy || !available}
+              onClick={() => void review(true)}
             >
               <RotateCcw size={14} />
               {en ? "New Gemini review" : "Nouvelle correction Gemini"}

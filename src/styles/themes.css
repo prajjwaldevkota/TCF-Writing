@@ -1,0 +1,800 @@
+:root {
+  color-scheme: light;
+  --canvas: #f3f5fa;
+  --surface: #ffffff;
+  --surface-muted: #edf1f8;
+  --surface-raised: #f8faff;
+  --ink: #192844;
+  --text: #273650;
+  --muted: #52617a;
+  --line: #d8dfeb;
+  --teal: #304fbd;
+  --primary-hover: #243e99;
+  --primary-contrast: #ffffff;
+  --accent: #304fbd;
+  --rust: #ad4051;
+  --sage-surface: #eaf0ff;
+  --sage-text: #304c9f;
+  --sage-border: #c6d3f5;
+  --warning-surface: #f7eedc;
+  --warning-text: #76551f;
+  --warning-border: #e5d1ab;
+  --lavender-surface: #efeaf5;
+  --lavender-text: #654c7c;
+  --lavender-border: #d7c8e3;
+  --rose-surface: #f6e8e2;
+  --rose-text: #884b35;
+  --rose-border: #e4c8bb;
+  --danger-text: #9d3f30;
+  --brand-background: #253f99;
+  --brand-text: #ffffff;
+  --overlay: rgba(16, 28, 52, 0.48);
+  --scrollbar: #a2afc6;
+  --shadow-color: rgba(25, 40, 68, 0.08);
+  --reading-font:
+    Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: #111827;
+  --surface: #192337;
+  --surface-muted: #222f46;
+  --surface-raised: #1d2940;
+  --ink: #f0f4ff;
+  --text: #e2e9f7;
+  --muted: #b0bfd7;
+  --line: #3a4963;
+  --teal: #a9bfff;
+  --primary-hover: #cad7ff;
+  --primary-contrast: #142145;
+  --accent: #adc2ff;
+  --rust: #ffb2bd;
+  --sage-surface: #24365b;
+  --sage-text: #c4d4ff;
+  --sage-border: #465f94;
+  --warning-surface: #3a3325;
+  --warning-text: #e5cf9d;
+  --warning-border: #655638;
+  --lavender-surface: #342e40;
+  --lavender-text: #d9c6eb;
+  --lavender-border: #5c4c71;
+  --rose-surface: #3e2e29;
+  --rose-text: #eabfa9;
+  --rose-border: #6c4c3e;
+  --danger-text: #f2b2a0;
+  --brand-background: #304fbd;
+  --brand-text: #ffffff;
+  --overlay: rgba(0, 0, 0, 0.64);
+  --scrollbar: #617394;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+}
+html,
+body {
+  background: var(--canvas);
+  color: var(--text);
+}
+body {
+  font-size: 16px;
+  line-height: 1.65;
+}
+button,
+input,
+select,
+textarea {
+  color: inherit;
+}
+input,
+select,
+textarea {
+  color-scheme: inherit;
+}
+::selection {
+  background: var(--sage-border);
+  color: var(--ink);
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+}
+::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.4;
+  flex: none;
+}
+.theme-toggle:hover {
+  background: var(--surface-muted);
+}
+.lab-topbar > .row {
+  min-width: 0;
+}
+.breadcrumb {
+  font-size: 13px;
+  line-height: 1.5;
+  min-width: 0;
+}
+.breadcrumb strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lab-nav {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.lab-nav-label,
+.nav-caption {
+  font-size: 11px;
+}
+.lab-person strong {
+  font-size: 14px;
+}
+.lab-person small {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.lab-footer {
+  font-size: 12px;
+  line-height: 1.8;
+}
+.lab-topbar .language-switch button {
+  font-size: 12px;
+}
+.top-goal {
+  font-size: 12px;
+}
+.page-heading p:not(.eyebrow) {
+  font-size: 16px;
+  line-height: 1.8;
+  max-width: 780px;
+}
+.text-small {
+  font-size: 14px;
+  line-height: 1.75;
+}
+.text-button {
+  font-size: 14px;
+}
+.button {
+  font-size: 14px;
+}
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 1.1px;
+}
+.footnote {
+  font-size: 13px;
+  line-height: 1.8;
+}
+.simple-task-card > p,
+.simple-task-meta {
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--text);
+}
+.simple-task-card > .eyebrow {
+  font-size: 12px;
+}
+.simple-task-action {
+  font-size: 14px;
+}
+.simple-mock-card small {
+  font-size: 14px;
+  line-height: 1.8;
+}
+.simple-mock-action {
+  font-size: 14px;
+}
+.simple-practice-heading > .text-button {
+  font-size: 14px;
+}
+.random-combination-bar {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 20px 23px;
+  margin: 0 0 28px;
+}
+.random-combination-button {
+  flex-shrink: 0;
+  font-size: 14px;
+  min-height: 45px;
+  gap: 9px;
+}
+.random-selection-status {
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--muted);
+}
+.random-selection-status strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.random-selection-status span {
+  display: block;
+  margin-top: 4px;
+}
+.library-random-selection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 15px 19px;
+  border: 1px solid var(--sage-border);
+  border-radius: 8px;
+  background: var(--sage-surface);
+  margin-bottom: 20px;
+  font-size: 14px;
+  color: var(--sage-text);
+}
+/* Long French passages use a clear reading face, with the same contrast in both modes. */
+.writing-prompt > p {
+  font-family: var(--reading-font);
+  font-size: 17px;
+  line-height: 1.85;
+  color: var(--text);
+}
+.writing-source-documents p {
+  font-family: var(--reading-font);
+  font-size: 16px;
+  line-height: 1.85;
+  color: var(--text);
+}
+.writing-desk > textarea {
+  font-family: var(--reading-font);
+  font-size: 20px;
+  line-height: 1.8;
+  color: var(--text);
+  font-weight: 400;
+  letter-spacing: 0.1px;
+}
+.writing-desk > textarea::placeholder {
+  font-size: 18px;
+  color: var(--muted);
+}
+.writing-source-documents h3,
+.writing-reference-header h2 {
+  font-size: 14px;
+  color: var(--text);
+}
+.writing-reference-header .text-button {
+  font-size: 14px;
+}
+.writing-tool-button > span {
+  font-size: 13px;
+  color: var(--text);
+}
+.writing-editor-header h2 {
+  color: var(--ink);
+}
+.writing-session-title p {
+  font-size: 13px;
+}
+.writing-session-title h1 {
+  color: var(--ink);
+}
+.writing-task-label {
+  font-size: 14px;
+}
+.writing-task-label > span {
+  font-size: 13px;
+}
+.writing-task-switch > button {
+  font-size: 14px;
+}
+.writing-task-switch small {
+  font-size: 12px;
+}
+.writing-save-status {
+  font-size: 12px;
+}
+.writing-clock > small {
+  font-size: 12px;
+}
+.writing-help > p,
+.writing-checklist label {
+  font-size: 14px;
+  line-height: 1.85;
+  color: var(--text);
+}
+.writing-help summary {
+  font-size: 14px;
+  color: var(--text);
+}
+.writing-word-count {
+  font-size: 14px;
+}
+.writing-word-count > small {
+  font-size: 12px;
+}
+.writing-editor-footer > .button {
+  font-size: 14px;
+}
+.original-writing,
+.revision-card blockquote,
+.after-text,
+.before-text,
+.model-answer > p:last-child,
+.template-code pre {
+  font-family: var(--reading-font);
+  font-size: 18px;
+  line-height: 1.9;
+}
+.original-writing,
+.model-answer > p:last-child {
+  color: var(--text);
+}
+.template-prose p,
+.template-panel-content p,
+.template-panel-controls > p,
+.template-panel-footer,
+.template-table td,
+.template-table th {
+  font-size: 14px;
+  line-height: 1.85;
+  color: var(--text);
+}
+.template-prose strong,
+.template-panel-content h3 {
+  color: var(--ink);
+}
+.template-code pre {
+  color: var(--text);
+  font-size: 16px;
+}
+.template-library nav button {
+  font-size: 14px;
+  line-height: 1.7;
+}
+.template-code button {
+  font-size: 13px;
+}
+.template-panel-controls .flex button {
+  font-size: 13px;
+}
+.topic-card > p,
+.topic-meta,
+.topic-start {
+  font-size: 14px;
+  line-height: 1.75;
+}
+.topic-origin {
+  font-size: 12px;
+}
+.topic-card h3 {
+  font-family: var(--reading-font);
+  font-size: 20px;
+  line-height: 1.5;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.search-field input,
+.select-field select,
+select {
+  font-size: 14px;
+}
+.segmented button {
+  font-size: 14px;
+}
+.session-row strong {
+  font-size: 15px;
+}
+.session-row small {
+  font-size: 13px;
+}
+.session-row > .badge {
+  font-size: 12px;
+  max-width: 130px;
+}
+.badge {
+  font-size: 12px;
+}
+.feedback-level > p,
+.feedback-box > p,
+.priorities li,
+.evidence-item p,
+.feedback-evidence details p,
+.feedback-evidence details li,
+.correction-card > p:last-child,
+.review-intro p,
+.nclc-body p,
+.notice,
+.notice p {
+  font-size: 15px;
+  line-height: 1.85;
+  color: var(--text);
+}
+.evidence-item blockquote {
+  font-family: var(--reading-font);
+  font-size: 17px;
+  line-height: 1.8;
+  color: var(--text);
+}
+.evidence-item small {
+  font-size: 12px;
+}
+.feedback-model {
+  font-size: 12px;
+}
+.review-prompt p {
+  font-size: 14px;
+  line-height: 1.85;
+  color: var(--text);
+}
+.review-summary strong {
+  font-size: 14px;
+}
+.review-summary .eyebrow {
+  font-size: 11px;
+}
+.notice.warning {
+  color: var(--warning-text);
+}
+.notice.success {
+  color: var(--sage-text);
+}
+.settings-section > p,
+.settings-section > .footnote,
+.account-settings > p,
+.field-label,
+.key-fields .footnote {
+  font-size: 14px;
+  line-height: 1.85;
+}
+.field-label > input,
+.field-label > textarea,
+.field-label > select {
+  font-size: 15px;
+}
+.key-fields h3 {
+  font-size: 16px;
+}
+.settings-section .button {
+  font-size: 14px;
+}
+.stat-card > span:last-child,
+.task-balance > p,
+.task-balance .row > span,
+.nclc-progress > p:not(.big-nclc) {
+  font-size: 14px;
+  line-height: 1.8;
+}
+.revision-label {
+  font-size: 12px;
+}
+.revealed-correction > p:not(.after-text) {
+  font-size: 15px;
+}
+.checkbox-inline {
+  font-size: 14px;
+}
+/* Historical feedback and the optional sign-in form still use Tailwind surfaces. */
+[data-theme="dark"]
+  :is(
+    .bg-white,
+    .bg-slate-50,
+    .bg-slate-100,
+    .bg-gray-50,
+    .bg-gray-100,
+    .bg-white\/95
+  ) {
+  background-color: var(--surface);
+}
+[data-theme="dark"]
+  :is(
+    .text-slate-900,
+    .text-slate-800,
+    .text-slate-700,
+    .text-gray-900,
+    .text-gray-800,
+    .text-gray-700
+  ) {
+  color: var(--text);
+}
+[data-theme="dark"]
+  :is(.text-slate-600, .text-slate-500, .text-gray-600, .text-gray-500) {
+  color: var(--muted);
+}
+[data-theme="dark"]
+  :is(
+    .border-slate-200,
+    .border-slate-300,
+    .border-gray-200,
+    .border-gray-300
+  ) {
+  border-color: var(--line);
+}
+[data-theme="dark"]
+  :is(.bg-blue-50, .bg-indigo-50, .bg-emerald-50, .bg-green-50) {
+  background-color: var(--sage-surface);
+}
+[data-theme="dark"]
+  :is(
+    .text-blue-600,
+    .text-blue-700,
+    .text-blue-800,
+    .text-indigo-700,
+    .text-emerald-700,
+    .text-emerald-800
+  ) {
+  color: var(--sage-text);
+}
+[data-theme="dark"] :is(.bg-amber-50, .bg-orange-50) {
+  background-color: var(--warning-surface);
+}
+[data-theme="dark"]
+  :is(.text-amber-700, .text-amber-800, .text-orange-700, .text-orange-800) {
+  color: var(--warning-text);
+}
+[data-theme="dark"] :is(.bg-red-50, .bg-red-100) {
+  background-color: var(--rose-surface);
+}
+[data-theme="dark"] :is(.text-red-600, .text-red-700, .text-red-800) {
+  color: var(--danger-text);
+}
+[data-theme="dark"] .studio-login-form input {
+  background: var(--surface-muted);
+  color: var(--text);
+  border-color: var(--line);
+}
+@media (max-width: 1050px) {
+  .random-combination-bar {
+    gap: 17px;
+    align-items: flex-start;
+  }
+  .writing-session-title p {
+    font-size: 12px;
+  }
+  .writing-save-status {
+    font-size: 12px;
+  }
+  .writing-task-switch small {
+    display: none;
+  }
+  .session-row > .badge {
+    font-size: 11px;
+    max-width: 105px;
+  }
+}
+@media (max-width: 760px) {
+  .random-combination-bar {
+    flex-direction: column;
+    gap: 13px;
+    padding: 20px;
+  }
+  .random-selection-status {
+    font-size: 14px;
+  }
+  .simple-task-card h3 {
+    font-size: 27px;
+  }
+  .simple-task-card > p {
+    font-size: 15px;
+  }
+  .simple-task-meta {
+    font-size: 14px;
+  }
+  .writing-prompt > p {
+    font-size: 17px;
+  }
+  .writing-source-documents p {
+    font-size: 16px;
+  }
+  .writing-desk > textarea {
+    font-size: 19px;
+  }
+  .writing-editor-footer > .button {
+    font-size: 13px;
+  }
+  .writing-reference-header h2 {
+    font-size: 14px;
+  }
+  .writing-reference-header .text-button {
+    font-size: 13px;
+  }
+  .writing-session-title h1 {
+    font-size: 24px;
+  }
+  .writing-session-title p {
+    font-size: 12px;
+  }
+  .writing-save-status {
+    font-size: 11px;
+  }
+  .library-random-selection {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .simple-mock-card small {
+    font-size: 14px;
+  }
+  .simple-mock-action {
+    font-size: 14px;
+  }
+}
+@media (max-width: 540px) {
+  .theme-toggle {
+    width: 36px;
+    min-height: 34px;
+    padding: 7px;
+  }
+  .theme-toggle > span,
+  .breadcrumb-root,
+  .breadcrumb-separator {
+    display: none;
+  }
+  .lab-topbar,
+  .lab-shell.is-writing .lab-topbar {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .lab-topbar > .row {
+    gap: 7px;
+  }
+  .breadcrumb {
+    font-size: 12px;
+  }
+  .lab-topbar .language-switch button {
+    font-size: 11px;
+    padding: 5px 6px;
+  }
+  .page-heading p:not(.eyebrow) {
+    font-size: 15px;
+  }
+  .eyebrow {
+    font-size: 11px;
+  }
+  .simple-task-card > .eyebrow {
+    font-size: 11px;
+  }
+  .simple-task-card > p {
+    font-size: 15px;
+  }
+  .simple-task-meta {
+    font-size: 13px;
+  }
+  .simple-task-action {
+    font-size: 14px;
+  }
+  .simple-practice-heading > .text-button {
+    font-size: 14px;
+  }
+  .random-combination-button {
+    width: 100%;
+    font-size: 15px;
+  }
+  .random-selection-status strong {
+    font-size: 15px;
+  }
+  .simple-mock-card > span:nth-child(2) {
+    min-width: 0;
+    flex-basis: calc(100% - 60px);
+  }
+  .simple-mock-action {
+    margin-left: 0;
+    margin-top: 12px;
+  }
+  .simple-recent .section-head .text-small {
+    font-size: 14px;
+  }
+  .writing-session-title {
+    gap: 6px;
+  }
+  .writing-session-title h1 {
+    font-size: 23px;
+    max-width: 215px;
+  }
+  .writing-session-title p {
+    font-size: 11px;
+  }
+  .writing-clock > span {
+    font-size: 18px;
+  }
+  .writing-task-label {
+    font-size: 13px;
+    gap: 9px;
+  }
+  .writing-task-label > span {
+    font-size: 12px;
+  }
+  .writing-task-switch > button {
+    font-size: 13px;
+    padding: 10px 7px;
+  }
+  .writing-save-status {
+    font-size: 11px;
+  }
+  .writing-tool-button > span {
+    font-size: 12px;
+  }
+  .writing-tool-button {
+    gap: 4px;
+    padding: 5px 4px;
+  }
+  .writing-editor-header {
+    padding-left: 15px;
+    padding-right: 15px;
+    gap: 7px;
+  }
+  .writing-editor-header h2 {
+    font-size: 21px;
+  }
+  .writing-word-count {
+    font-size: 13px;
+  }
+  .writing-word-count > small {
+    font-size: 11px;
+  }
+  .writing-editor-footer > .button {
+    font-size: 13px;
+    padding: 11px 12px;
+    max-width: 190px;
+  }
+  .template-library > article {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  .template-library nav button {
+    font-size: 14px;
+  }
+  .template-code pre {
+    font-size: 16px;
+    padding: 18px;
+  }
+  .session-row strong {
+    font-size: 14px;
+  }
+  .session-row small {
+    font-size: 12px;
+  }
+  .session-row > .badge {
+    font-size: 11px;
+    max-width: 105px;
+  }
+  .session-row {
+    gap: 10px;
+  }
+  .review-summary strong {
+    font-size: 14px;
+  }
+  .review-summary .eyebrow {
+    font-size: 11px;
+  }
+  .settings-section > p,
+  .account-settings > p {
+    font-size: 14px;
+  }
+  .lab-footer {
+    font-size: 12px;
+  }
+}
+.language-switch button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--ink);
+}
+.writing-task-switch > button[aria-pressed="true"] {
+  border-bottom-color: var(--teal);
+  color: var(--ink);
+}
+.button.cream {
+  background: var(--surface);
+  color: var(--text);
+}

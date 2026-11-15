@@ -20,6 +20,7 @@ const state = url(
 let calls = 0,
   release;
 let hash = "same";
+let model = "gemini-test";
 const review = {
   id: "review",
   model: "gemini-test",
@@ -34,7 +35,8 @@ globalThis.__reviewFixture = {
   }),
   instructionFingerprint: async () => hash,
   getActiveEvaluatedTasks: () => ["task1"],
-  evaluateWithProvider: () => {
+  getGeminiModel: () => model,
+  evaluateTcfSubmissionWithGemini: () => {
     calls++;
     return new Promise((resolve) => {
       release = () => resolve(review);
@@ -47,31 +49,49 @@ const source = compile("src/services/reviewWorkflow.ts").replace(
   /^import .*;\n/gm,
   "",
 );
-const setup = `import {providerReview} from ${JSON.stringify(state)};
-const {buildEvaluationInstructions,instructionFingerprint,getActiveEvaluatedTasks,evaluateWithProvider}=globalThis.__reviewFixture;
+const setup = `import {savedGeminiReview} from ${JSON.stringify(state)};
+const {buildEvaluationInstructions,instructionFingerprint,getActiveEvaluatedTasks,evaluateTcfSubmissionWithGemini,getGeminiModel}=globalThis.__reviewFixture;
 `;
 try {
   const { reviewSubmission } = await import(url(setup + source));
   const result = { aiEvaluation: review };
-  assert.equal(await reviewSubmission(result, "gemini"), review);
+  assert.equal(await reviewSubmission(result), review);
   assert.equal(calls, 0, "Matching saved review must not spend quota");
-  const first = reviewSubmission({}, "gemini");
-  const duplicate = reviewSubmission({}, "gemini");
+  const fallbackReview = {
+    ...review,
+    model: "gemini-fallback",
+    requested_model: model,
+  };
+  assert.equal(
+    await reviewSubmission({ aiEvaluation: fallbackReview }),
+    fallbackReview,
+    "Reuse a matching fallback assessment without starting the chain again",
+  );
+  assert.equal(calls, 0);
+  const first = reviewSubmission({});
+  const duplicate = reviewSubmission({});
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(calls, 1);
   release();
   assert.equal(await first, await duplicate);
-  const force = reviewSubmission(result, "gemini", true);
+  const force = reviewSubmission(result, true);
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(calls, 2);
   release();
   await force;
   hash = "changed";
-  const changed = reviewSubmission(result, "gemini");
+  const changed = reviewSubmission(result);
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(calls, 3);
   release();
   await changed;
+  hash = "same";
+  model = "gemini-other";
+  const newModel = reviewSubmission(result);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(calls, 4, "Changing model must not reuse an older model review");
+  release();
+  await newModel;
 } finally {
   globalThis.localStorage = storage;
   delete globalThis.__reviewFixture;

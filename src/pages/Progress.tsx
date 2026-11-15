@@ -18,6 +18,7 @@ import {
   formatSessionDate,
 } from "../utils/practice";
 import { SessionList } from "../components/SessionList";
+import { PracticeTracker } from "../components/PracticeTracker";
 export function Progress({
   submissions,
   onOpen,
@@ -70,6 +71,7 @@ export function Progress({
           {en ? "New practice" : "Nouvelle séance"}
         </button>
       </div>
+      <PracticeTracker submissions={submissions} />
       <div className="stat-grid">
         {[
           {

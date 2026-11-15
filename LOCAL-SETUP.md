@@ -5,21 +5,22 @@
 1. Run `npm ci`, then `npm run dev -- --host 127.0.0.1`.
 2. Open the printed URL. No account or database is required to practise.
 3. Open **Settings & AI / Réglages et IA** and save your own Gemini API key.
-   Groq is optional. Never reuse someone else's embedded API key.
+   The model chain is automatic: 3.8 Flash → 3.6 Flash → 3.5 Flash-Lite. Set GEMINI_BACKUP_KEY in Vercel for an optional backup.
 4. Write a guided task or a full mock. Request feedback only when ready.
 5. Export your writing from Settings regularly. Clearing browser data removes
    local submissions, correction review status, and drafts.
 
 Copy `.env.example` to `.env.local` only if you need build defaults or optional
-account storage. `VITE_GEMINI_MODEL` and `VITE_GROQ_MODEL` pin the chosen model;
-model accessibility must match your own provider account. These identifiers are
+account storage. `GEMINI_MODEL` optionally overrides the chain starting point (default: gemini-3.8-flash).
+Model accessibility must match your own provider account. These identifiers are
 public configuration and do not establish grading accuracy.
 
 Browser-entered API keys are stored in localStorage and override build defaults.
 Build variables prefixed with VITE are embedded in browser code. Keep actual
 server secrets unprefixed and behind a server endpoint if you later extend the
-architecture. The app retains the browser-to-Gemini evaluation path; the Groq
-endpoint proxies requests and forwards rate-limit cooldown headers.
+architecture. The app uses the browser-to-Gemini evaluation path.
+`GEMINI_BACKUP_KEY` stays on the server; `/api/gemini` uses it only for backup requests. Keys in the same
+Google project share quota; a backup key does not multiply the free quota.
 
 ## Optional Supabase accounts
 
@@ -48,6 +49,16 @@ serves `dist`. Keep the existing GitHub/Vercel project. Configure model IDs and 
 optional build defaults in that project's environment, then redeploy after
 changing them. A successful Git push alone is not verification of a completed
 Vercel deployment or its provider credentials.
+
+Set `VITE_GEMINI_API_KEY` and optionally `GEMINI_BACKUP_KEY` in your
+hosting project's build environment, then rebuild/redeploy. For example:
+
+```env
+VITE_GEMINI_API_KEY=your-primary-gemini-key
+GEMINI_BACKUP_KEY=your-backup-gemini-key
+# Optional: omit to use gemini-3.8-flash automatically
+GEMINI_MODEL=gemini-3.8-flash
+```
 
 The current UI and practice flow are documented in [README.md](README.md).
 The limits of AI grading and outstanding calibration work are documented in

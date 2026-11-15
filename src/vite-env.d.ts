@@ -1,6 +1,9 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  readonly VITE_GEMINI_API_KEY?: string;
+  readonly VITE_GEMINI_SERVER_BACKUP?: boolean;
+  readonly VITE_GEMINI_MODEL?: string;
   readonly VITE_SUPABASE_URL: string;
   readonly VITE_SUPABASE_ANON_KEY: string;
 }

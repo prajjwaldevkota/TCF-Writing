@@ -1,5 +1,13 @@
 # Measuring grading accuracy
 
+Current implementation (November 14, 2026): Gemini is the sole active provider.
+Groq execution and its proxy have been removed. Settings selects the Gemini model
+and optional backup key; the same model is retained across one bounded backup
+attempt. New reviews are never combined with historical secondary-provider reviews.
+The provider-comparison experiments below are historical. See [README](../README.md)
+for current request behavior and free-tier references.
+
+
 The guide is an assessment method, not evidence that the current model is calibrated.
 
 1. Build a held-out set of approximately 30–50 anonymized responses across all three

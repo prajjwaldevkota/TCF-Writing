@@ -41,7 +41,7 @@ export function findOriginalExcerpt(original:string,quote:string):string|null {
     let normalized='';const starts:number[]=[];const ends:number[]=[];
     for(const match of text.matchAll(/(?:\P{M}\p{M}*|\p{M}+)/gu)) {
       const char=match[0];const start=match.index!;
-      const c=/\s/u.test(char)?' ':char.normalize('NFC').replace(/[’‘]/g,"'").replace(/[‐‑‒–]/g,'-');
+      const c=/\s/u.test(char)?' ':char.normalize('NFC').replace(/[’‘ʼ＇]/g,"'").replace(/[“”„‟«»]/g,'"').replace(/[‐‑‒–]/g,'-');
       if(c===' ' && normalized.endsWith(' ')) {ends[ends.length-1]=start+char.length;continue;}
       normalized+=c;for(let i=0;i<c.length;i++){starts.push(start);ends.push(start+char.length);}
     }
@@ -101,7 +101,7 @@ export function validatePedagogicalAssessment(raw: any, keys: TaskKey[], result:
         return quote ? [{...evidence,quote}] : [];
       });
       const seen=new Set<string>();
-      task.level_evidence=verifiedEvidence.filter((e:any)=>{const identity=JSON.stringify([e.domain,e.quote]);if(seen.has(identity))return false;seen.add(identity);return true;});
+      task.level_evidence=verifiedEvidence.filter((e:any)=>{const identity=e.quote;if(seen.has(identity))return false;seen.add(identity);return true;});
       if (task.level_evidence.length < 2) {
         task.range=null;
         task.withholding_reason=raw.feedback_language==='en' ? 'Level withheld: fewer than two supporting excerpts could be verified in your response.' : 'Niveau suspendu : moins de deux citations justificatives ont pu être vérifiées dans votre réponse.';

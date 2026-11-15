@@ -1,2 +1,33 @@
 <!doctype html>
-<html lang="fr"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="theme-color" content="#234f4c"/><meta name="description" content="Écriture : pratique guidée, modèles de rédaction, corrections et réécritures pour préparer le TCF Canada."/><title>Écriture — Votre atelier TCF Canada</title><link rel="icon" type="image/svg+xml" href="/brand-mark.svg"/></head><body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body></html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#234f4c" />
+    <meta
+      name="description"
+      content="Écriture : pratique guidée, modèles de rédaction, corrections et réécritures pour préparer le TCF Canada."
+    />
+    <title>Écriture — Votre atelier TCF Canada</title>
+    <link rel="icon" type="image/svg+xml" href="/brand-mark.svg" />
+    <script>
+      try {
+        var savedMode = localStorage.getItem("tcf_color_mode_v1");
+        var colorMode =
+          savedMode === "dark" || savedMode === "light"
+            ? savedMode
+            : window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+        document.documentElement.dataset.theme = colorMode;
+        document.documentElement.style.colorScheme = colorMode;
+      } catch {
+        document.documentElement.dataset.theme = "light";
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

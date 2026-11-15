@@ -34,9 +34,11 @@ export interface TaskEvaluation {
 }
 
 export interface AIEvaluation {
+  key_source?: 'primary' | 'backup';
   nclc_crosscheck?: NclcComparison;
   pedagogical?: PedagogicalAssessment;
   model?: string;
+  requested_model?: string;
   prompt_hash?: string;
   rubric_version?: string;
   id: string;

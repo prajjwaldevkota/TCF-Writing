@@ -1,41 +1,26 @@
 import type { AIEvaluation } from "../types/aiEvaluation";
 import type { ExamResult } from "../types/exam";
-import { crosscheckedPrimary } from "./nclcComparison";
-export type ReviewProvider = "gemini" | "groq";
-export function providerReview(
-  result: ExamResult,
-  provider: ReviewProvider,
-): AIEvaluation | null {
-  const dual = result.dualAiEvaluation?.[provider];
-  if (dual) return dual;
-  const review = result.aiEvaluation;
-  return review &&
-    (provider === "groq"
-      ? review.model?.startsWith("groq/")
-      : review.model?.startsWith("gemini"))
-    ? review
-    : null;
+export function savedGeminiReview(result: ExamResult): AIEvaluation | null {
+  return (
+    result.dualAiEvaluation?.gemini ||
+    (result.aiEvaluation?.model?.startsWith("gemini")
+      ? result.aiEvaluation
+      : null)
+  );
 }
-/** Only compare judgments made against the same answer and instruction contract. */
-export function withProviderReview(
+/** Retain historical reviews, but never combine a new Gemini assessment with them. */
+export function withGeminiReview(
   result: ExamResult,
-  provider: ReviewProvider,
   review: AIEvaluation,
 ): ExamResult {
-  const other = provider === "gemini" ? "groq" : "gemini";
-  const previous = providerReview(result, other);
-  const compatible =
-    previous?.prompt_hash &&
-    previous.prompt_hash === review.prompt_hash &&
-    previous.rubric_version === review.rubric_version
-      ? previous
-      : null;
-  const gemini = provider === "gemini" ? review : compatible;
-  const groq = provider === "groq" ? review : compatible;
   return {
     ...result,
-    aiEvaluation: crosscheckedPrimary(gemini, groq) || review,
-    dualAiEvaluation: { gemini, groq },
+    aiEvaluation: review,
+    dualAiEvaluation: {
+      ...result.dualAiEvaluation,
+      gemini: review,
+      groq: result.dualAiEvaluation?.groq || null,
+    },
   };
 }
 

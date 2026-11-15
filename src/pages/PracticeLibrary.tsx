@@ -6,11 +6,13 @@ import {
   Clock3,
   Search,
   SlidersHorizontal,
+  Shuffle,
 } from "lucide-react";
 import data from "../data/questions.json";
 import type { ExamResult, QuestionsDB, TaskKey } from "../types/exam";
 import { QuestionEntry, questionEntries, TASK_INFO } from "../utils/practice";
 import { useLanguage } from "../context/LanguageContext";
+import { selectRandomCombination } from "../utils/randomCombination";
 import { normalizeParagraphText } from "../utils/cleanText";
 export const allQuestions = questionEntries(data as QuestionsDB);
 export const PracticeLibrary: React.FC<{
@@ -37,6 +39,9 @@ export const PracticeLibrary: React.FC<{
     }
   });
   const [notice, setNotice] = useState("");
+  const [randomSelection, setRandomSelection] = useState<QuestionEntry | null>(
+    null,
+  );
   const filtered = useMemo(
     () =>
       allQuestions.filter(
@@ -55,7 +60,21 @@ export const PracticeLibrary: React.FC<{
       ),
     [year, savedOnly, saved, query, task],
   );
+  const displayed = randomSelection ? [randomSelection] : filtered;
+  const drawRandom = () => {
+    const entry = selectRandomCombination(filtered, randomSelection?.id);
+    setRandomSelection(entry);
+    setPage(1);
+    setNotice(
+      entry
+        ? ""
+        : en
+          ? "No complete combination matches these filters."
+          : "Aucune combinaison complète ne correspond à ces filtres.",
+    );
+  };
   const update = (action: () => void) => {
+    setRandomSelection(null);
     action();
     setPage(1);
   };
@@ -104,7 +123,10 @@ export const PracticeLibrary: React.FC<{
             <button
               key={k}
               aria-pressed={task === k}
-              onClick={() => update(() => setTask(k))}
+              onClick={() => {
+                setTask(k);
+                setPage(1);
+              }}
             >
               {k === "exam" ? (
                 <>
@@ -128,6 +150,14 @@ export const PracticeLibrary: React.FC<{
         </p>
       </div>
       <div className="filter-bar">
+        <button
+          type="button"
+          className="button secondary random-combination-button"
+          onClick={drawRandom}
+        >
+          <Shuffle size={17} />
+          {en ? "Random combination" : "Combinaison au hasard"}
+        </button>
         <label className="search-field">
           <Search size={18} />
           <input
@@ -167,7 +197,7 @@ export const PracticeLibrary: React.FC<{
       </div>
       <div className="row between library-count">
         <span className="muted text-small">
-          {filtered.length} {en ? "sets found" : "séries disponibles"}
+          {displayed.length} {en ? "sets found" : "séries disponibles"}
         </span>
         <span className="muted text-small">
           {en
@@ -175,15 +205,36 @@ export const PracticeLibrary: React.FC<{
             : "Votre collection de sujets de pratique"}
         </span>
       </div>
+      {randomSelection && (
+        <div
+          className="library-random-selection"
+          role="status"
+          data-combination-id={randomSelection.id}
+        >
+          <span>
+            {en ? "One combination selected" : "Une combinaison sélectionnée"} ·{" "}
+            {randomSelection.month} {randomSelection.year} ·{" "}
+            {en ? "Set" : "Série"}{" "}
+            {randomSelection.combination.combinationNumber}
+          </span>
+          <button
+            type="button"
+            className="text-button"
+            onClick={() => setRandomSelection(null)}
+          >
+            {en ? "Show all topics" : "Afficher tous les sujets"}
+          </button>
+        </div>
+      )}
       {notice && (
         <p className="notice warning" role="status">
           {notice}
         </p>
       )}
-      {filtered.length ? (
+      {displayed.length ? (
         <>
           <div className="topic-grid">
-            {filtered.slice((page - 1) * 12, page * 12).map((entry) => {
+            {displayed.slice((page - 1) * 12, page * 12).map((entry) => {
               const key = task === "exam" ? "task1" : task;
               const requirement = entry.combination.tasks[key];
               const completed = submissions.some(
@@ -300,11 +351,11 @@ export const PracticeLibrary: React.FC<{
               {en ? "Previous" : "Précédent"}
             </button>
             <span>
-              {page} / {Math.ceil(filtered.length / 12)}
+              {page} / {Math.ceil(displayed.length / 12)}
             </span>
             <button
               className="button secondary"
-              disabled={page >= Math.ceil(filtered.length / 12)}
+              disabled={page >= Math.ceil(displayed.length / 12)}
               onClick={() => setPage(page + 1)}
             >
               {en ? "Next" : "Suivant"}

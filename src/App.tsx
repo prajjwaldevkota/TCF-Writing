@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { ThemeProvider } from "./context/ThemeContext";
 import { Home } from "./pages/Home";
 import { PracticeLibrary, allQuestions } from "./pages/PracticeLibrary";
 import { Simulator } from "./pages/Simulator";
@@ -336,6 +337,9 @@ function MainRouter() {
         draft={draft}
         onResume={() => navigate("simulator")}
         onPractice={quickStart}
+        questions={allQuestions}
+        onProgress={() => navigate("dashboard")}
+        onStart={start}
         onLibrary={() => navigate("library")}
         onOpen={(s) => navigate("results", s)}
       />
@@ -358,9 +362,11 @@ function MainRouter() {
 export function App() {
   return (
     <LanguageProvider>
-      <AuthProvider>
-        <MainRouter />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <MainRouter />
+        </AuthProvider>
+      </ThemeProvider>
     </LanguageProvider>
   );
 }

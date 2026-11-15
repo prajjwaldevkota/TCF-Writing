@@ -112,6 +112,7 @@ storage.saveSubmission(result);
 storage.saveSubmission(result);
 assert.equal(storage.getStoredSubmissions().length, 1);
 localStorage.setItem("tcf_gemini_api_key", "secret-fixture");
+localStorage.setItem("tcf_gemini_backup_api_key", "backup-secret-fixture");
 localStorage.setItem(
   "tcf_reviewed_corrections",
   JSON.stringify(["correction1"]),
@@ -197,22 +198,13 @@ const savedReview = {
     mock_projection: { lower: 6, upper: 8, rationale: "Fixture evidence." },
   },
 };
-const first = reviews.withProviderReview(result, "gemini", savedReview);
+const oldGroq = {...savedReview, model: "groq/legacy", id: "historical"};
+const first = reviews.withGeminiReview({...result, dualAiEvaluation: {gemini: null, groq: oldGroq}}, savedReview);
 assert.equal(first.aiEvaluation.pedagogical.mock_projection.lower, 6);
-const same = reviews.withProviderReview(first, "groq", {
-  ...savedReview,
-  id: "groq",
-  model: "groq/fixture",
-});
-assert.equal(same.aiEvaluation.nclc_crosscheck.status, "matching");
-assert.equal(same.dualAiEvaluation.gemini.id, "review");
-const different = reviews.withProviderReview(first, "groq", {
-  ...savedReview,
-  model: "groq/fixture",
-  prompt_hash: "changed",
-});
-assert.equal(different.dualAiEvaluation.gemini, null);
-assert.equal(different.aiEvaluation.nclc_crosscheck.status, "single");
+assert.equal(first.aiEvaluation.nclc_crosscheck, undefined, "New Gemini reviews are never crosschecked against historical models");
+assert.equal(first.dualAiEvaluation.groq.id, "historical", "Keep historical feedback readable");
+assert.equal(reviews.savedGeminiReview(first).id, "review");
+assert.equal(reviews.savedGeminiReview({...result, aiEvaluation: oldGroq}), null);
 const local = {
   ...result,
   revisionOf: "parent",

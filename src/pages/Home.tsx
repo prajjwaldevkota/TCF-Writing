@@ -1,9 +1,23 @@
-import React from "react";
-import { ArrowRight, ArrowUpRight, Clock3, RotateCcw } from "lucide-react";
+import React, { useState } from "react";
+import {
+  ArrowRight,
+  ArrowUpRight,
+  Clock3,
+  RotateCcw,
+  Shuffle,
+} from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 import type { ExamResult, TaskKey } from "../types/exam";
-import { PracticeSession, TASK_INFO, TASK_KEYS } from "../utils/practice";
+import {
+  PracticeSession,
+  QuestionEntry,
+  TASK_INFO,
+  TASK_KEYS,
+} from "../utils/practice";
+import { selectRandomCombination } from "../utils/randomCombination";
+import { normalizeParagraphText } from "../utils/cleanText";
 import { SessionList } from "../components/SessionList";
+import { PracticeTracker } from "../components/PracticeTracker";
 export const Home: React.FC<{
   name: string;
   submissions: ExamResult[];
@@ -11,6 +25,9 @@ export const Home: React.FC<{
   onResume: () => void;
   onPractice: (task: TaskKey | "exam") => void;
   onLibrary: () => void;
+  onProgress: () => void;
+  questions: QuestionEntry[];
+  onStart: (entry: QuestionEntry, task: TaskKey | "exam") => void;
   onOpen: (s: ExamResult) => void;
 }> = ({
   name,
@@ -19,18 +36,24 @@ export const Home: React.FC<{
   onResume,
   onPractice,
   onLibrary,
+  onProgress,
+  questions,
+  onStart,
   onOpen,
 }) => {
   const { language } = useLanguage();
   const en = language === "en";
+  const [selected, setSelected] = useState<QuestionEntry | null>(null);
+  const draw = () =>
+    setSelected(selectRandomCombination(questions, selected?.id));
   return (
     <div className="page-enter simple-home">
       <div className="page-heading">
         <div>
           <p className="eyebrow">
             {name
-              ? `${en ? "HELLO" : "BONJOUR"}, ${name.split(" ")[0]}`
-              : "EXPRESSION ÉCRITE · TCF CANADA"}
+              ? `${en ? "Hello" : "Bonjour"}, ${name.split(" ")[0]}`
+              : "Expression écrite · TCF Canada"}
           </p>
           <h1>
             {en
@@ -68,6 +91,46 @@ export const Home: React.FC<{
           </button>
         </div>
       )}
+      <section
+        className="random-combination-bar"
+        aria-label={en ? "Random combination" : "Combinaison au hasard"}
+      >
+        <button
+          type="button"
+          className="button secondary random-combination-button"
+          onClick={draw}
+        >
+          <Shuffle size={18} />
+          {en ? "Random combination" : "Combinaison au hasard"}
+        </button>
+        <div
+          className="random-selection-status"
+          role="status"
+          aria-live="polite"
+          data-combination-id={selected?.id || ""}
+        >
+          {selected ? (
+            <>
+              <strong>
+                {en ? "Selected combination" : "Combinaison sélectionnée"}{" "}
+                {selected.combination.combinationNumber} · {selected.month}{" "}
+                {selected.year}
+              </strong>
+              <span>
+                {en
+                  ? "All three tasks below belong to this set. Choose a task or start the full mock."
+                  : "Les trois tâches ci-dessous viennent de cette série. Choisissez une tâche ou l’examen complet."}
+              </span>
+            </>
+          ) : (
+            <p>
+              {en
+                ? "Draw one complete set of three tasks. You choose when to begin."
+                : "Tirez une seule série de trois tâches. Vous choisissez quand commencer."}
+            </p>
+          )}
+        </div>
+      </section>
       <div className="section-head simple-practice-heading">
         <h2>{en ? "One task at a time" : "Une tâche à la fois"}</h2>
         <button className="text-button" onClick={onLibrary}>
@@ -82,19 +145,30 @@ export const Home: React.FC<{
             <button
               key={key}
               className="simple-task-card"
-              onClick={() => onPractice(key)}
+              onClick={() =>
+                selected ? onStart(selected, key) : onPractice(key)
+              }
             >
               <span className={`task-token ${info.color}`}>{info.number}</span>
-              <span className="eyebrow">TÂCHE {info.number}</span>
+              <span className="eyebrow">
+                {en ? "Task" : "Tâche"} {info.number}
+              </span>
               <h3>{en ? info.en : info.fr}</h3>
               <p>
-                {en
-                  ? [
-                      "A message with clear details and the right tone.",
-                      "An experience, concrete details and your opinion.",
-                      "Two documents, a comparison and your position.",
-                    ][info.number - 1]
-                  : info.description}
+                {selected
+                  ? normalizeParagraphText(
+                      selected.combination.tasks[key].instruction,
+                    ).slice(0, 180) +
+                    (selected.combination.tasks[key].instruction.length > 180
+                      ? "…"
+                      : "")
+                  : en
+                    ? [
+                        "A message with clear details and the right tone.",
+                        "An experience, concrete details and your opinion.",
+                        "Two documents, a comparison and your position.",
+                      ][info.number - 1]
+                    : info.description}
               </p>
               <div className="simple-task-meta">
                 <span>
@@ -110,7 +184,12 @@ export const Home: React.FC<{
           );
         })}
       </div>
-      <button className="simple-mock-card" onClick={() => onPractice("exam")}>
+      <button
+        className="simple-mock-card"
+        onClick={() =>
+          selected ? onStart(selected, "exam") : onPractice("exam")
+        }
+      >
         <span className="simple-mock-icon">
           <Clock3 size={24} />
         </span>
@@ -129,6 +208,7 @@ export const Home: React.FC<{
           <ArrowRight size={17} />
         </span>
       </button>
+      <PracticeTracker submissions={submissions} onProgress={onProgress} />
       {!!submissions.length && (
         <section className="panel simple-recent">
           <div className="section-head">

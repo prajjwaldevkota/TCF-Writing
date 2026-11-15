@@ -11,8 +11,14 @@ import {
 } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
-import { getGeminiApiKey, setGeminiApiKey } from "../services/geminiEvaluator";
-import { getGroqApiKey, setGroqApiKey } from "../services/groqEvaluator";
+import {
+  getGeminiApiKey,
+  setGeminiApiKey,
+  getGeminiBackupApiKey,
+  setGeminiBackupApiKey,
+  getGeminiModel,
+  hasServerGeminiBackup,
+} from "../utils/geminiSettings";
 import { createBackup, importBackup } from "../utils/backup";
 export function Settings({
   onLogin,
@@ -31,8 +37,8 @@ export function Settings({
   const [gemini, setGemini] = useState(
     () => localStorage.getItem("tcf_gemini_api_key") || "",
   );
-  const [groq, setGroq] = useState(
-    () => localStorage.getItem("tcf_groq_api_key") || "",
+  const [backup, setBackup] = useState(
+    () => localStorage.getItem("tcf_gemini_backup_api_key") || "",
   );
   const [show, setShow] = useState(false);
   const [notice, setNotice] = useState("");
@@ -42,7 +48,7 @@ export function Settings({
   const save = () => {
     try {
       setGeminiApiKey(gemini);
-      setGroqApiKey(groq);
+      setGeminiBackupApiKey(backup);
       setError(false);
       setNotice(
         en
@@ -133,13 +139,13 @@ export function Settings({
         </div>
         <p>
           {en
-            ? "Gemini is the default reviewer. Groq is optional and runs only when you ask for a second opinion. Practising and reviewing saved corrections always work without an API key."
-            : "Gemini est le correcteur par défaut. Groq est facultatif et s’exécute seulement si vous demandez un second avis. La rédaction et la révision de vos corrections enregistrées fonctionnent sans clé API."}
+            ? "Gemini reviews your writing only when you request feedback. Add an optional backup key for access, quota or temporary server errors. The app automatically tries 3.8 Flash, then 3.6 Flash, then 3.5 Flash-Lite when a model is unavailable."
+            : "Gemini corrige votre rédaction seulement à votre demande. Ajoutez une clé de secours facultative en cas d’erreur d’accès, de quota ou de serveur. L’application essaie automatiquement 3.8 Flash, puis 3.6 Flash, puis 3.5 Flash-Lite si un modèle est indisponible."}
         </p>
         <div className="key-fields">
           <div>
             <div className="row between">
-              <h3>Google Gemini</h3>
+              <h3>{en ? "Primary Gemini key" : "Clé Gemini principale"}</h3>
               <span
                 className={`badge ${getGeminiApiKey() ? "sage" : "neutral"}`}
               >
@@ -152,9 +158,6 @@ export function Settings({
                     : "Non configurée"}
               </span>
             </div>
-            <p className="footnote">
-              {import.meta.env.VITE_GEMINI_MODEL || "gemini-3.1-flash-lite"}
-            </p>
             <label className="field-label">
               {en ? "Your Gemini API key" : "Votre clé API Gemini"}
               <input
@@ -184,48 +187,79 @@ export function Settings({
           <div>
             <div className="row between">
               <h3>
-                Groq <small>{en ? "optional" : "facultatif"}</small>
+                {en ? "Backup Gemini key" : "Clé Gemini de secours"}{" "}
+                <small>{en ? "optional" : "facultative"}</small>
               </h3>
-              <span className={`badge ${getGroqApiKey() ? "sage" : "neutral"}`}>
-                {getGroqApiKey()
+              <span
+                className={`badge ${getGeminiBackupApiKey() || hasServerGeminiBackup() ? "sage" : "neutral"}`}
+              >
+                {hasServerGeminiBackup()
                   ? en
-                    ? "Key configured"
-                    : "Clé configurée"
-                  : en
-                    ? "Not configured"
-                    : "Non configurée"}
+                    ? "Server key configured"
+                    : "Clé serveur configurée"
+                  : getGeminiBackupApiKey()
+                    ? en
+                      ? "Key configured"
+                      : "Clé configurée"
+                    : en
+                      ? "Not configured"
+                      : "Non configurée"}
               </span>
             </div>
-            <p className="footnote">
-              {import.meta.env.VITE_GROQ_MODEL || "openai/gpt-oss-120b"}
-            </p>
             <label className="field-label">
-              {en ? "Your Groq API key" : "Votre clé API Groq"}
+              {en
+                ? "Your backup Gemini API key"
+                : "Votre clé API Gemini de secours"}
               <input
                 autoComplete="off"
                 type={show ? "text" : "password"}
-                value={groq}
-                onChange={(e) => setGroq(e.target.value)}
+                value={backup}
+                onChange={(event) => setBackup(event.target.value)}
                 placeholder={
-                  import.meta.env.VITE_GROQ_API_KEY
+                  hasServerGeminiBackup()
                     ? en
-                      ? "Deployment key configured"
-                      : "Clé du déploiement configurée"
-                    : "gsk_…"
+                      ? "Deployment backup configured"
+                      : "Clé de secours du déploiement configurée"
+                    : "AIza…"
                 }
               />
             </label>
             <a
               className="text-button"
-              href="https://console.groq.com/keys"
+              href="https://aistudio.google.com/apikey"
               target="_blank"
               rel="noreferrer"
             >
-              {en ? "Get a Groq key" : "Obtenir une clé Groq"}
+              {en ? "Get a backup key" : "Obtenir une clé de secours"}
               <ArrowRight size={13} />
             </a>
           </div>
         </div>
+        <div className="gemini-model-setting">
+          <strong>
+            {en ? "Automatic Gemini model" : "Modèle Gemini automatique"}
+          </strong>
+          <p>{getGeminiModel()}</p>
+          <p className="footnote">
+            {en
+              ? "Automatic order: Gemini 3.8 Flash → 3.6 Flash → 3.5 Flash-Lite. A model availability error, quota error or temporary unavailability triggers the next model. No manual selection is needed. The model used is shown on your review."
+              : "Ordre automatique : Gemini 3.8 Flash → 3.6 Flash → 3.5 Flash-Lite. Une erreur d’accès au modèle, de quota ou d’indisponibilité temporaire déclenche le modèle suivant. Aucun choix manuel n’est nécessaire. Le modèle utilisé figure sur votre bilan."}
+          </p>
+          <a
+            className="text-button"
+            href="https://ai.google.dev/gemini-api/docs/pricing"
+            target="_blank"
+            rel="noreferrer"
+          >
+            {en ? "Check free tiers" : "Consulter les quotas gratuits"}
+            <ArrowRight size={13} />
+          </a>
+        </div>
+        <p className="notice">
+          {en
+            ? "Quotas belong to Google projects, not API keys. A second key from the same project does not add free quota. The backup is tried at most once per model after a supported HTTP error; timeouts and invalid assessments are not retried automatically."
+            : "Les quotas dépendent du projet Google, pas de la clé. Une seconde clé du même projet n’ajoute pas de quota gratuit. La clé de secours est essayée une seule fois par modèle après une erreur HTTP prise en charge ; les délais dépassés et les bilans invalides ne déclenchent pas de nouvel appel automatique."}
+        </p>
         <div className="row between wrap">
           <button className="text-button" onClick={() => setShow(!show)}>
             {show ? <EyeOff size={15} /> : <Eye size={15} />}{" "}
@@ -243,8 +277,8 @@ export function Settings({
         </div>
         <p className="footnote">
           {en
-            ? "Keys you enter are stored in this browser. Your response and prompt are sent to the selected provider when you request a review. Keep this browser profile private."
-            : "Les clés saisies sont conservées dans ce navigateur. Votre réponse et la consigne sont envoyées au fournisseur choisi quand vous demandez un bilan. Gardez ce profil de navigateur privé."}
+            ? "Keys you enter are stored in this browser. Your response and prompt are sent to Google Gemini when you request a review. Keep this browser profile private."
+            : "Les clés saisies sont conservées dans ce navigateur. Votre réponse et la consigne sont envoyées à Google Gemini quand vous demandez un bilan. Gardez ce profil de navigateur privé."}
         </p>
       </section>
       <section className="panel settings-section">

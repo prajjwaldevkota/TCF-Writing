@@ -82,6 +82,7 @@ export function Simulator({
   const [now, setNow] = useState(Date.now());
   const [saved, setSaved] = useState(true);
   const [focusWriting, setFocusWriting] = useState(false);
+  const [mobilePromptOpen, setMobilePromptOpen] = useState(true);
   const [accentsOpen, setAccentsOpen] = useState(false);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [templates, setTemplates] = useState(false);
@@ -101,6 +102,28 @@ export function Simulator({
   const words = countFrenchWords(session.answers[task]);
   const inRange =
     words >= requirement.minWords && words <= requirement.maxWords;
+  const withinRangeCount = session.keys.filter((key) => {
+    const count = countFrenchWords(session.answers[key]);
+    const target = session.combination.tasks[key];
+    return count >= target.minWords && count <= target.maxWords;
+  }).length;
+  const responseHint = en
+    ? {
+        task1:
+          "Write the message requested in the prompt. Adapt your greeting, details and closing to the reader.",
+        task2:
+          "Write the text requested in the prompt. Describe the experience in a clear order and include your impressions.",
+        task3:
+          "Compare the two documents in your own words, then explain and support your opinion. Write one connected response.",
+      }[task]
+    : {
+        task1:
+          "Rédigez le message demandé. Adaptez votre formule d’appel, vos détails et votre conclusion au destinataire.",
+        task2:
+          "Rédigez le texte demandé. Racontez l’expérience dans un ordre clair et donnez vos impressions.",
+        task3:
+          "Comparez les deux documents avec vos propres mots, puis expliquez et justifiez votre opinion. Rédigez un seul texte structuré.",
+      }[task];
   const update = (patch: Partial<PracticeSession>) => {
     const next = { ...session, ...patch, savedAt: new Date().toISOString() };
     setSaved(savePracticeSession(next));
@@ -235,6 +258,9 @@ export function Simulator({
                     ? "Guided practice"
                     : "Pratique guidée"}{" "}
               · {session.month} {session.year}
+              {" · "}
+              {en ? "Set" : "Combinaison"}{" "}
+              {session.combination.combinationNumber}
             </p>
           </div>
         </div>
@@ -288,6 +314,18 @@ export function Simulator({
                   {countFrenchWords(session.answers[key])}{" "}
                   {en ? "words" : "mots"}
                 </small>
+                {(() => {
+                  const n = countFrenchWords(session.answers[key]);
+                  const r = session.combination.tasks[key];
+                  return n >= r.minWords && n <= r.maxWords ? (
+                    <Check
+                      size={14}
+                      aria-label={
+                        en ? "Word target reached" : "Nombre de mots respecté"
+                      }
+                    />
+                  ) : null;
+                })()}
               </button>
             ))}
           </div>
@@ -315,10 +353,34 @@ export function Simulator({
               : "Stockage plein — copiez votre texte"}
         </span>
       </div>
+      {isExam && (
+        <div className="session-progress">
+          <span>
+            {en ? "Word targets" : "Objectifs de longueur"}:{" "}
+            <strong>
+              {withinRangeCount}/{session.keys.length}
+            </strong>
+          </span>
+          <progress
+            max={session.keys.length}
+            value={withinRangeCount}
+            aria-label={
+              en
+                ? "Tasks within the word range"
+                : "Tâches respectant la plage de mots"
+            }
+          />
+          <small>
+            {en
+              ? "Remember to review your content too."
+              : "Pensez aussi à relire le contenu."}
+          </small>
+        </div>
+      )}
       <div className="writing-layout">
         {!focusWriting && (
           <aside
-            className="writing-reference"
+            className={`writing-reference ${mobilePromptOpen ? "" : "prompt-collapsed"}`}
             aria-label={
               en ? "Prompt and source documents" : "Consigne et documents"
             }
@@ -343,19 +405,74 @@ export function Simulator({
                 </button>
               )}
             </div>
-            <div className="writing-reference-scroll">
+            <div className="mobile-prompt-tools">
+              <button
+                aria-expanded={mobilePromptOpen}
+                aria-controls="task-prompt-content"
+                onClick={() => setMobilePromptOpen(!mobilePromptOpen)}
+              >
+                {mobilePromptOpen
+                  ? en
+                    ? "Collapse prompt"
+                    : "Réduire la consigne"
+                  : en
+                    ? "Read the prompt"
+                    : "Lire la consigne"}
+                <ChevronDown size={15} />
+              </button>
+              <button
+                onClick={() => {
+                  textRef.current?.focus({ preventScroll: true });
+                  textRef.current?.scrollIntoView({ block: "center" });
+                }}
+              >
+                {en ? "Write" : "Écrire"}
+                <ArrowRight size={15} />
+              </button>
+            </div>
+            <div className="writing-reference-scroll" id="task-prompt-content">
+              {!isExam && (
+                <section className="task-brief">
+                  <h3>
+                    {en ? "What you need to write" : "Ce que vous devez écrire"}
+                  </h3>
+                  <p>{responseHint}</p>
+                  <span>
+                    {requirement.minWords}–{requirement.maxWords}{" "}
+                    {en ? "words in French" : "mots en français"}
+                  </span>
+                </section>
+              )}
               <section className="writing-prompt">
-                <p>{normalizeParagraphText(requirement.instruction)}</p>
+                <h3>
+                  {task === "task3"
+                    ? en
+                      ? "Topic"
+                      : "Le sujet"
+                    : en
+                      ? "Read the prompt"
+                      : "Lisez la consigne"}
+                </h3>
+                <p lang="fr">
+                  {normalizeParagraphText(
+                    requirement.instruction || requirement.title,
+                  )}
+                </p>
               </section>
               {task === "task3" && (
                 <div className="writing-source-documents">
+                  <p className="source-intro">
+                    {en
+                      ? "Read both documents. Use them to compare the viewpoints in your response."
+                      : "Lisez les deux documents pour comparer leurs points de vue dans votre réponse."}
+                  </p>
                   {[requirement.document1, requirement.document2].map(
                     (doc, i) => (
                       <section key={i}>
                         <h3>
                           <span>{i + 1}</span>Document {i + 1}
                         </h3>
-                        <p>
+                        <p lang="fr">
                           {doc
                             ? cleanDocumentText(doc)
                             : en
@@ -431,7 +548,11 @@ export function Simulator({
           aria-label={en ? "Your writing" : "Votre rédaction"}
         >
           <div className="writing-editor-header">
-            <h2>{en ? "Your text" : "Votre texte"}</h2>
+            <h2>
+              <label htmlFor="task-response">
+                {en ? "Write your response" : "Rédigez votre réponse"}
+              </label>
+            </h2>
             <div className="row">
               <button
                 className="writing-tool-button"
@@ -464,11 +585,11 @@ export function Simulator({
                   {focusWriting
                     ? task === "task3"
                       ? en
-                        ? "Show documents"
-                        : "Afficher les documents"
+                        ? "Documents"
+                        : "Documents"
                       : en
-                        ? "Show prompt"
-                        : "Afficher la consigne"
+                        ? "Prompt"
+                        : "Consigne"
                     : en
                       ? "Expand"
                       : "Agrandir"}
@@ -476,6 +597,11 @@ export function Simulator({
               </button>
             </div>
           </div>
+          <p className="response-instructions" id="response-instructions">
+            {en
+              ? `Task ${info.number} · ${requirement.minWords}–${requirement.maxWords} words in French. Your response is saved as you type.`
+              : `Tâche ${info.number} · ${requirement.minWords}–${requirement.maxWords} mots en français. Votre réponse est enregistrée au fil de la saisie.`}
+          </p>
           {accentsOpen && (
             <div
               className="writing-accents"
@@ -510,6 +636,8 @@ export function Simulator({
             </div>
           )}
           <textarea
+            id="task-response"
+            aria-describedby="response-instructions word-target-status"
             ref={textRef}
             aria-label={
               en
@@ -526,9 +654,44 @@ export function Simulator({
             spellCheck={!isExam}
             lang="fr"
             placeholder={
-              en ? "Write your response here…" : "Rédigez votre réponse ici…"
+              en
+                ? [
+                    "Start your message here…",
+                    "Tell your experience here…",
+                    "Compare the viewpoints, then develop your opinion here…",
+                  ][info.number - 1]
+                : [
+                    "Commencez votre message ici…",
+                    "Racontez votre expérience ici…",
+                    "Comparez les points de vue, puis développez votre opinion ici…",
+                  ][info.number - 1]
             }
           />
+          <div
+            className={`word-target ${words > requirement.maxWords ? "is-over" : ""}`}
+            id="word-target-status"
+          >
+            <progress
+              max={requirement.maxWords}
+              value={Math.min(words, requirement.maxWords)}
+              aria-label={
+                en ? "Response word count" : "Nombre de mots de la réponse"
+              }
+            />
+            <span>
+              {words > requirement.maxWords
+                ? en
+                  ? `Remove at least ${words - requirement.maxWords} ${words - requirement.maxWords === 1 ? "word" : "words"} to stay within the limit.`
+                  : `Retirez au moins ${words - requirement.maxWords} ${words - requirement.maxWords === 1 ? "mot" : "mots"} pour respecter la limite.`
+                : inRange
+                  ? en
+                    ? "Word target reached. Review your response before finishing."
+                    : "Longueur respectée. Relisez votre texte avant de terminer."
+                  : en
+                    ? `${requirement.minWords - words} more words to reach the minimum.`
+                    : `Encore ${requirement.minWords - words} mots pour atteindre le minimum.`}
+            </span>
+          </div>
           <div className="writing-editor-footer">
             <div
               className={`writing-word-count ${inRange ? "valid" : words > requirement.maxWords ? "over" : ""}`}

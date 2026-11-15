@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client'
 import { App } from './App'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import './index.css'
+import './styles/themes.css'
+import './styles/studio.css'
 
 // Protection against Google Translate / browser extensions modifying DOM text nodes
 // and causing React's removeChild & insertBefore to throw NotFoundError crashes

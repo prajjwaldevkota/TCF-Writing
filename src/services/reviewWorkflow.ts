@@ -1,16 +1,18 @@
 import type { ExamResult } from "../types/exam";
 import type { AIEvaluation } from "../types/aiEvaluation";
-import { providerReview, ReviewProvider } from "../utils/reviewState";
+import { savedGeminiReview } from "../utils/reviewState";
 import {
   buildEvaluationInstructions,
   instructionFingerprint,
 } from "./evaluationInstructions";
-import { getActiveEvaluatedTasks } from "./geminiEvaluator";
-import { evaluateWithProvider } from "./dualEvaluator";
+import {
+  getActiveEvaluatedTasks,
+  evaluateTcfSubmissionWithGemini,
+} from "./geminiEvaluator";
+import { getGeminiModel } from "../utils/geminiSettings";
 const pending = new Map<string, Promise<AIEvaluation>>();
 export async function reviewSubmission(
   result: ExamResult,
-  provider: ReviewProvider,
   force = false,
 ): Promise<AIEvaluation> {
   const language = localStorage.getItem("tcf_language") === "en" ? "en" : "fr";
@@ -22,17 +24,19 @@ export async function reviewSubmission(
   const hash = await instructionFingerprint(
     instructions.systemPrompt + "\n" + instructions.userPrompt,
   );
-  const saved = providerReview(result, provider);
+  const model = getGeminiModel();
+  const saved = savedGeminiReview(result);
   if (
     !force &&
+    (saved?.requested_model || saved?.model) === model &&
     saved?.prompt_hash === hash &&
     saved.rubric_version === instructions.rubricVersion
   )
     return saved;
-  const key = provider + ":" + hash;
+  const key = model + ":" + hash;
   const running = pending.get(key);
   if (running) return running;
-  const request = evaluateWithProvider(provider, result);
+  const request = evaluateTcfSubmissionWithGemini(result, undefined, model);
   pending.set(key, request);
   try {
     return await request;

@@ -9,7 +9,10 @@ import {
   NotebookPen,
   Settings2,
   X,
+  Moon,
+  Sun,
 } from "lucide-react";
+import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
 export type AppView =
   | "home"
@@ -30,6 +33,7 @@ export const AppLayout: React.FC<{
 }> = ({ view, onNavigate, children, name, hasDraft }) => {
   const { language, setLanguage } = useLanguage();
   const en = language === "en";
+  const { theme, toggleTheme } = useTheme();
   const [mobile, setMobile] = useState(false);
   const go = (next: AppView) => {
     onNavigate(next);
@@ -73,7 +77,14 @@ export const AppLayout: React.FC<{
           : "Réglages");
   return (
     <div className={`lab-shell ${view === "simulator" ? "is-writing" : ""}`}>
-      <a href="#main-content" className="skip-link">
+      <a
+        href="#main-content"
+        className="skip-link"
+        onClick={(event) => {
+          event.preventDefault();
+          document.getElementById("main-content")?.focus();
+        }}
+      >
         {en ? "Skip to content" : "Aller au contenu"}
       </a>
       {mobile && (
@@ -99,7 +110,7 @@ export const AppLayout: React.FC<{
         >
           <X size={20} />
         </button>
-        <p className="nav-caption">{en ? "YOUR PRACTICE" : "VOTRE PRATIQUE"}</p>
+        <p className="nav-caption">{en ? "Your practice" : "Votre pratique"}</p>
         <nav aria-label={en ? "Main navigation" : "Navigation principale"}>
           {links.map(({ view: next, icon: Icon, label }) => (
             <button
@@ -146,8 +157,10 @@ export const AppLayout: React.FC<{
               <Menu size={21} />
             </button>
             <span className="breadcrumb">
-              {en ? "My workspace" : "Mon espace"}
-              <span>/</span>
+              <span className="breadcrumb-root">
+                {en ? "My workspace" : "Mon espace"}
+              </span>
+              <span className="breadcrumb-separator">/</span>
               <strong>{current}</strong>
             </span>
           </div>
@@ -155,6 +168,41 @@ export const AppLayout: React.FC<{
             <span className="top-goal">
               <span /> Objectif NCLC 7
             </span>
+            <button
+              type="button"
+              className="theme-toggle"
+              onClick={toggleTheme}
+              aria-pressed={theme === "dark"}
+              aria-label={
+                theme === "dark"
+                  ? en
+                    ? "Switch to light mode"
+                    : "Activer le mode clair"
+                  : en
+                    ? "Switch to dark mode"
+                    : "Activer le mode sombre"
+              }
+              title={
+                theme === "dark"
+                  ? en
+                    ? "Light mode"
+                    : "Mode clair"
+                  : en
+                    ? "Dark mode"
+                    : "Mode sombre"
+              }
+            >
+              {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
+              <span>
+                {theme === "dark"
+                  ? en
+                    ? "Light"
+                    : "Clair"
+                  : en
+                    ? "Dark"
+                    : "Sombre"}
+              </span>
+            </button>
             <div
               className="language-switch"
               aria-label={en ? "Interface language" : "Langue de l’interface"}

@@ -7,23 +7,33 @@ target.
 ## Use the app
 
 - **Today:** choose a task, resume an unfinished draft, or take a full mock.
+  **Combinaison au hasard** selects one complete combination with all three tasks;
+  drawing a combination does not start the session or timer.
 - **Practice library:** search the existing question collection, filter by year,
-  bookmark topics, and choose a guided task or a 60-minute mock.
+  bookmark topics, and choose a guided task or a 60-minute mock. The random picker
+  shows exactly one matching combination and keeps that set when switching tasks.
 - **Writing workspace:** a large editor beside the prompt and source documents, automatic
   local draft saving, French accents, live word counts, and optional help. The
   Expand control hides the references for more writing space. A self-checklist
   and TCFFormation templates remain available on demand. Guided
   practice has an optional timer; full mocks hide the writing aids and finish at
   60 minutes. The timer survives reloads.
-- **Review:** request Gemini feedback explicitly. Read evidence, corrections and
+- **Review:** request Gemini feedback explicitly. **Copier tout**
+  exports the prompts, source documents and original answers for another AI or tutor,
+  with a manual copy fallback when clipboard access is blocked. Read evidence, corrections and
   revision priorities alongside the original text, then rewrite the same task.
-  Both versions remain in your journal. Groq is an optional second opinion.
+  Both versions remain in your journal. Gemini 3.8 Flash is selected automatically; an optional backup key is read on the Vercel server.
 - **My corrections:** practise correcting your own sentences before revealing
   saved corrections. The reviewed status is self-reported, not a mastery score.
 - **My progress:** session counts, revisions, task balance, and supported full-mock
-  NCLC ranges. Missing estimates are not displayed as zero.
+  NCLC ranges, plus a seven-day activity tracker shared with the home page. Missing estimates are not displayed as zero.
 - **Settings:** configure your own keys, choose English or French feedback,
   export/import a practice backup, or use the optional existing Supabase account.
+
+The moon/sun control in the top bar switches between light and dark mode. The
+choice is saved in this browser and applied before the app paints on a later
+visit; the system preference supplies the initial default. Both themes use larger
+reading text, neutral foreground colours and shared contrast-tested surface tokens.
 
 ## Run locally
 
@@ -37,10 +47,10 @@ Gemini key under **Settings & AI** to request feedback. Your writing and saved
 corrections remain usable without AI. Drafts and local-mode work belong to this
 browser profile; use a backup to move them to another device.
 
-The supported model IDs are pinned through `VITE_GEMINI_MODEL` and
-`VITE_GROQ_MODEL` (see `.env.example`). They are model configuration, not private
+The model is selected automatically: `GEMINI_MODEL` in the deployment, or
+`gemini-3.8-flash` when it is unset. Browser model selections are ignored. They are model configuration, not private
 values or claims of grading accuracy. Browser-entered keys take precedence over
-build defaults. They are stored in that browser; backups exclude keys and auth
+build defaults. `GEMINI_BACKUP_KEY` supplies the server-only backup used by `/api/gemini`. They are stored in that browser; backups exclude keys and auth
 state. VITE-prefixed keys are exposed in the browser build and must not be treated
 as server secrets.
 
@@ -48,18 +58,38 @@ See [LOCAL-SETUP.md](LOCAL-SETUP.md) for optional account storage and Vercel set
 
 ## Grading and reliability
 
-Both providers use `src/services/evaluationInstructions.ts`, the supplied
-[assessment guide](docs/tcf-writing-evaluation-guide.md), and the same evidence
-validator. A task receives a pedagogical CEFR range only when supporting excerpts
-can be verified against the learner's original text. Full-mock NCLC projections
-remain broad, optional, uncalibrated AI estimates, with reasons when withheld.
-An isolated task does not determine final /20 or NCLC. Agreement between two
-models does not establish accuracy; human-labelled calibration is still missing.
+Gemini uses `src/services/evaluationInstructions.ts`, the supplied
+[assessment guide](docs/tcf-writing-evaluation-guide.md), and the evidence validator.
+A task receives a pedagogical CEFR range only when supporting excerpts can be
+verified against the learner's original text. Full-mock NCLC projections remain
+broad, optional and non-official. An isolated task does not determine final /20
+or NCLC. Historical reviews remain readable; new reviews do not combine models.
 
-There are no automatic evaluation requests, provider switches or Groq generation
-retries. Matching saved reviews are reused; concurrent identical review requests
-share one in-flight call. Groq 429 responses establish a cooldown using Retry-After.
-A failed optional second opinion preserves the successful primary review.
+There are no automatic evaluation requests. Matching saved reviews are reused
+only when the requested starting model, answer fingerprint and rubric match.
+A successful fallback review is reused rather than restarting the chain. The actual
+model and original requested model are saved separately and shown with the review. Concurrent identical
+requests share one in-flight call. For each model, the optional backup key is tried at most once after a supported
+HTTP error. The model chain runs automatically: **3.8 Flash → 3.6 Flash →
+3.5 Flash-Lite**. HTTP 404 (model unavailable), 429 (quota), and 503 (temporary
+unavailability) move to the next model after available keys are exhausted. There
+are at most three models and two keys per model. It stops on the first successful
+response; invalid assessments and ambiguous timeouts do not trigger more calls.
+The Vercel function reads `process.env.GEMINI_BACKUP_KEY`; Vite exposes only a
+boolean indicating that a server backup is configured, never that key value.
+Timeouts, network interruptions and invalid output do not trigger another request. Failed reviews preserve existing saved feedback.
+Rate-limit cooldowns use hashed key/model identifiers, never stored raw keys.
+
+The automatic default chain is Gemini 3.8 Flash, 3.6 Flash, then 3.5 Flash-Lite.
+`GEMINI_MODEL` may override its starting point; no browser selection is needed. These have published [free API tiers](https://ai.google.dev/gemini-api/docs/pricing),
+checked November 14, 2026. Project access and limits vary; a model selection does
+not change billing settings. [Google quotas](https://ai.google.dev/gemini-api/docs/rate-limits)
+are per project, not per API key: another key in the same project adds no quota.
+
+Assessors receive short verbatim excerpts to reduce quotation mismatches. A level
+still requires two distinct verified quotations; a withheld level can be reassessed
+explicitly. Existing saved reviews are not silently regenerated. **Copier tout**
+includes source documents and original answers, with a manual copy fallback.
 
 ## Validate
 
@@ -72,9 +102,7 @@ The regression files cover evidence validation, JSON parsing, quota handling,
 request deduplication, review caching, NCLC comparisons, draft recovery, revision
 lineage, backup safety, persistence and cloud/local metadata merging.
 
-The rebuilt flow was also exercised in isolated Brave browser sessions at desktop
-and mobile sizes: draft reload, template reference, finishing a task, mocked
-feedback, revision, full-mock NCLC display, and preserving a Gemini review after a
-mocked Groq 429. Browser tests used synthetic AI fixtures, not live grading.
-Account sync and deployed API configuration require verification in your own
+The practice flow is checked in isolated Brave browser sessions, using synthetic
+AI fixtures for retry and failure paths. Live grading is not a calibration study.
+Account sync and deployed configuration require verification in your own
 Supabase/Vercel environment.
