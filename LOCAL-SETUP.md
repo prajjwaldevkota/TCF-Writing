@@ -90,6 +90,14 @@ The reference is shown with failed reviews, and the viewer can filter by it or
 by server/browser source, with 50 rows per page. A failed attempt can be logged
 although a later fallback succeeds; match the reference to follow the chain.
 
+Loading the Error logs panel also checks `/api/error-logs` for server storage
+readiness. Missing server keys, a missing table, denied database access, and
+connection failures appear as warnings instead of looking like an empty journal.
+The check reads no log rows and does not generate a Gemini request. A browser
+error report returns HTTP 201 only after a successful database insert; failed
+inserts return HTTP 503. The Vercel console fallback includes a fixed storage
+failure code and database HTTP status, without raw database error messages.
+
 API keys, tokens, student writing, prompts, raw provider messages, exception
 messages and stack traces are never persisted. Logging uses a separate bounded
 request and does not retry generation. If database logging is unconfigured or

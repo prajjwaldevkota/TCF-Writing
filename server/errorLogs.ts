@@ -120,6 +120,34 @@ export function retrySeconds(value: string | null): number | null {
     ? Math.min(86400, Math.max(0, Math.ceil((until - Date.now()) / 1000)))
     : null;
 }
+function storageConfig() {
+  return {
+    url: (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "").trim(),
+    key: (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim(),
+  };
+}
+// Expose only fixed diagnostic codes, never database bodies or credentials.
+export async function errorLogStorageStatus(): Promise<string> {
+  const { url, key } = storageConfig();
+  if (!url) return "missing_database_url";
+  if (!key) return "missing_server_key";
+  try {
+    const response = await fetch(
+      `${url.replace(/\/$/, "")}/rest/v1/error_logs?select=id&limit=0`,
+      {
+        headers: { apikey: key, Authorization: `Bearer ${key}` },
+        signal: AbortSignal.timeout(4000),
+      },
+    );
+    if (response.ok) return "ready";
+    if (response.status === 401 || response.status === 403)
+      return "database_access_denied";
+    if (response.status === 404) return "missing_table";
+    return "database_rejected";
+  } catch {
+    return "database_unreachable";
+  }
+}
 export async function persistErrorLog(
   input: Partial<ErrorLogEntry>,
 ): Promise<boolean> {
@@ -135,8 +163,9 @@ export async function persistErrorLog(
       ? process.env.VERCEL_REGION
       : null,
   };
-  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const { url, key } = storageConfig();
+  let storageStatus = !url ? "missing_database_url" : "missing_server_key";
+  let storageHttpStatus: number | null = null;
   if (url && key) {
     try {
       const response = await fetch(
@@ -150,15 +179,22 @@ export async function persistErrorLog(
             Prefer: "return=minimal",
           },
           body: JSON.stringify(row),
-          signal: AbortSignal.timeout(1500),
+          signal: AbortSignal.timeout(4000),
         },
       );
       if (response.ok) return true;
+      storageStatus = "database_rejected";
+      storageHttpStatus = response.status;
     } catch {
+      storageStatus = "database_unreachable";
       /* Logging must never fail the original review or retry generation. */
     }
   }
   // Keep a safe diagnostic in Vercel logs if the database is not ready or unreachable.
-  console.warn("tcf_error_log", JSON.stringify(row));
+  console.warn("tcf_error_log", JSON.stringify({
+    ...row,
+    storage_status: storageStatus,
+    storage_http_status: storageHttpStatus,
+  }));
   return false;
 }

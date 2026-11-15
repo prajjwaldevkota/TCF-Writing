@@ -16,12 +16,45 @@ export function ErrorLogPanel() {
   const [loaded, setLoaded] = useState(false);
   const [hasNext, setHasNext] = useState(false);
   const [error, setError] = useState("");
+  const [storageWarning, setStorageWarning] = useState("");
   const sequence = useRef(0);
   const load = async (nextPage = 0) => {
     const current = ++sequence.current;
     setBusy(true);
     setError("");
+    setStorageWarning("");
     try {
+      try {
+        const response = await fetch("/api/error-logs", {
+          cache: "no-store",
+          signal: AbortSignal.timeout(8000),
+        });
+        const status = await response.json();
+        if (sequence.current !== current) return;
+        const warnings: Record<string, string> = {
+          missing_database_url: en
+            ? "Error logging is disabled: set SUPABASE_URL or VITE_SUPABASE_URL in Vercel, then redeploy."
+            : "Journal désactivé : configurez SUPABASE_URL ou VITE_SUPABASE_URL dans Vercel, puis redéployez.",
+          missing_server_key: en
+            ? "Errors cannot be saved: SUPABASE_SERVICE_ROLE_KEY is missing on the Vercel server. Add it to the deployment environment and redeploy."
+            : "Les erreurs ne peuvent pas être enregistrées : SUPABASE_SERVICE_ROLE_KEY manque sur le serveur Vercel. Ajoutez-la à l’environnement du déploiement, puis redéployez.",
+          database_access_denied: en
+            ? "The server cannot access the error table. Check that its Supabase service-role key belongs to the configured project."
+            : "Le serveur ne peut pas accéder au journal. Vérifiez que sa clé Supabase service-role appartient au projet configuré.",
+          missing_table: en
+            ? "The server cannot find the error table. Apply supabase/error-logs.sql to the server’s Supabase project."
+            : "Le serveur ne trouve pas le journal. Appliquez supabase/error-logs.sql au projet Supabase du serveur.",
+        };
+        if (!response.ok || status.storage !== "ready")
+          setStorageWarning(warnings[status.storage] || (en
+            ? "The server’s error storage is unavailable. Check Supabase connectivity and Vercel logs."
+            : "Le stockage des erreurs est indisponible. Vérifiez la connexion Supabase et les journaux Vercel."));
+      } catch {
+        if (sequence.current === current)
+          setStorageWarning(en
+            ? "The server’s error storage could not be checked."
+            : "Impossible de vérifier le stockage des erreurs du serveur.");
+      }
       if (!supabase) throw new Error("not_configured");
       const id = requestId.trim();
       if (
@@ -131,6 +164,9 @@ export function ErrorLogPanel() {
         <p className="notice warning" role="alert">
           {error}
         </p>
+      )}
+      {storageWarning && (
+        <p className="notice warning" role="alert">{storageWarning}</p>
       )}
       {!loaded && !error && (
         <p className="muted text-small">

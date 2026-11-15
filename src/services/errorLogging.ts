@@ -53,7 +53,7 @@ export function reportReviewError(
         client_context: getClientDiagnostics(),
       }),
       keepalive: true,
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(8000),
     }).catch(() => {});
   } catch {
     /* Offline or older browsers must still display the original error. */

@@ -1,8 +1,15 @@
-import { persistErrorLog } from "../server/errorLogs";
+import { errorLogStorageStatus, persistErrorLog } from "../server/errorLogs";
 import type { ErrorLogEntry } from "../src/types/errorLog";
 export const config = { runtime: "edge" };
 export default async function handler(request: Request): Promise<Response> {
   const headers = { "Cache-Control": "no-store" };
+  if (request.method === "GET") {
+    const storage = await errorLogStorageStatus();
+    return new Response(JSON.stringify({ storage }), {
+      status: storage === "ready" ? 200 : 503,
+      headers: { ...headers, "Content-Type": "application/json" },
+    });
+  }
   if (request.method !== "POST")
     return new Response(null, { status: 405, headers });
   const origin = request.headers.get("Origin");
@@ -27,7 +34,7 @@ export default async function handler(request: Request): Promise<Response> {
       ].includes(body.code)
     )
       return new Response(null, { status: 400, headers });
-    await persistErrorLog({
+    const stored = await persistErrorLog({
       ...body,
       source: "client",
       key_source: null,
@@ -35,7 +42,10 @@ export default async function handler(request: Request): Promise<Response> {
       provider_code: null,
       http_status: null,
     } as Partial<ErrorLogEntry>);
-    return new Response(null, { status: 202, headers });
+    return new Response(JSON.stringify({ stored }), {
+      status: stored ? 201 : 503,
+      headers: { ...headers, "Content-Type": "application/json" },
+    });
   } catch {
     return new Response(null, { status: 400, headers });
   }

@@ -105,7 +105,12 @@ try {
   for (const name of envNames) delete process.env[name];
   assert.equal(await logger.persistErrorLog(entry), false);
   assert.equal(warnings.length, 1);
+  assert.equal(warnings[0].row.storage_status, "missing_database_url");
+  let health = await handler(new Request("https://app.fixture/api/error-logs"));
+  assert.equal(health.status, 503);
+  assert.equal((await health.json()).storage, "missing_database_url");
   process.env.SUPABASE_URL = "https://fixture.supabase.co";
+  assert.equal(await logger.errorLogStorageStatus(), "missing_server_key");
   process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-sentinel";
   globalThis.fetch = async (url, options) => {
     calls.push({ url, options });
@@ -116,10 +121,24 @@ try {
   assert.equal(calls[0].options.headers.apikey, "service-role-sentinel");
   assert(!calls[0].options.body.includes("sentinel"));
   assert(calls[0].options.signal instanceof AbortSignal);
+  assert.equal(await logger.errorLogStorageStatus(), "ready");
+  for (const [status, expected] of [
+    [401, "database_access_denied"],
+    [403, "database_access_denied"],
+    [404, "missing_table"],
+    [500, "database_rejected"],
+  ]) {
+    globalThis.fetch = async () => new Response("secret-sentinel", { status });
+    health = await handler(new Request("https://app.fixture/api/error-logs"));
+    assert.equal(health.status, 503);
+    assert.equal((await health.json()).storage, expected);
+  }
   globalThis.fetch = async () => {
     throw new Error("service-role-sentinel");
   };
   assert.equal(await logger.persistErrorLog(entry), false);
+  assert.equal(warnings.at(-1).row.storage_status, "database_unreachable");
+  assert.equal(await logger.errorLogStorageStatus(), "database_unreachable");
   assert(!JSON.stringify(warnings).includes("service-role-sentinel"));
   globalThis.fetch = async (url, options) => {
     calls.push({ url, options });
@@ -143,7 +162,9 @@ try {
     model: "gemini-3.8-flash",
     request_id: reference,
   };
-  assert.equal((await handler(request(client))).status, 202);
+  const accepted = await handler(request(client));
+  assert.equal(accepted.status, 201);
+  assert.deepEqual(await accepted.json(), { stored: true });
   const stored = JSON.parse(calls.at(-1).options.body);
   assert.equal(stored.source, "client");
   assert.equal(stored.key_source, null);
@@ -165,10 +186,19 @@ try {
     413,
   );
   assert.equal(
-    (await handler(new Request("https://app.fixture/api/error-logs"))).status,
+    (await handler(new Request("https://app.fixture/api/error-logs", { method: "PUT" }))).status,
     405,
   );
   assert.equal(calls.length, before);
+  globalThis.fetch = async () => new Response("secret-sentinel", { status: 403 });
+  const rejected = await handler(request(client));
+  assert.equal(rejected.status, 503, "Never acknowledge a failed database insert");
+  assert.deepEqual(await rejected.json(), { stored: false });
+  assert.equal(warnings.at(-1).row.storage_http_status, 403);
+  delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const unconfigured = await handler(request(client));
+  assert.equal(unconfigured.status, 503);
+  assert.deepEqual(await unconfigured.json(), { stored: false });
   const sql = fs.readFileSync("supabase/error-logs.sql", "utf8");
   assert(sql.includes("enable row level security"));
   assert(
