@@ -4,23 +4,24 @@
 
 1. Run `npm ci`, then `npm run dev -- --host 127.0.0.1`.
 2. Open the printed URL. No account or database is required to practise.
-3. Open **Settings & AI / Réglages et IA** and save your own Gemini API key.
-   The model chain is automatic: 3.8 Flash → 3.6 Flash → 3.5 Flash-Lite. Set GEMINI_BACKUP_KEY in Vercel for an optional backup.
+3. For feedback, configure `GEMINI_API_KEY` in `.env.local` before starting Vite.
+   The development server provides the same `/api/gemini` route as Vercel.
+   Learners do not enter keys in Settings. The model chain is automatic:
+   3.8 Flash → 3.6 Flash → 3.5 Flash-Lite.
 4. Write a guided task or a full mock. Request feedback only when ready.
 5. Export your writing from Settings regularly. Clearing browser data removes
    local submissions, correction review status, and drafts.
 
-Copy `.env.example` to `.env.local` only if you need build defaults or optional
+Copy `.env.example` to `.env.local` for local feedback credentials or optional
 account storage. `GEMINI_MODEL` optionally overrides the chain starting point (default: gemini-3.8-flash).
 Model accessibility must match your own provider account. These identifiers are
 public configuration and do not establish grading accuracy.
 
-Browser-entered API keys are stored in localStorage and override build defaults.
-Build variables prefixed with VITE are embedded in browser code. Keep actual
-server secrets unprefixed and behind a server endpoint if you later extend the
-architecture. The app uses the browser-to-Gemini evaluation path.
-`GEMINI_BACKUP_KEY` stays on the server; `/api/gemini` uses it only for backup requests. Keys in the same
-Google project share quota; a backup key does not multiply the free quota.
+All feedback requests use `/api/gemini`. The server reads `GEMINI_API_KEY` and
+optionally `GEMINI_BACKUP_KEY` at request time. The legacy `VITE_GEMINI_API_KEY`
+and alternate `GEMINI_BACKUP_API_KEY` names are also supported server-side.
+Gemini credentials are excluded from the browser build; old browser-entered keys
+are ignored. Keys in the same Google project share quota.
 
 ## Optional Supabase accounts
 
@@ -50,11 +51,11 @@ optional build defaults in that project's environment, then redeploy after
 changing them. A successful Git push alone is not verification of a completed
 Vercel deployment or its provider credentials.
 
-Set `VITE_GEMINI_API_KEY` and optionally `GEMINI_BACKUP_KEY` in your
-hosting project's build environment, then rebuild/redeploy. For example:
+Set `GEMINI_API_KEY` and optionally `GEMINI_BACKUP_KEY` in your
+Vercel project’s environment for the relevant deployment, then redeploy. For example:
 
 ```env
-VITE_GEMINI_API_KEY=your-primary-gemini-key
+GEMINI_API_KEY=your-primary-gemini-key
 GEMINI_BACKUP_KEY=your-backup-gemini-key
 # Optional: omit to use gemini-3.8-flash automatically
 GEMINI_MODEL=gemini-3.8-flash

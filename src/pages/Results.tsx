@@ -18,7 +18,7 @@ import { countFrenchWords, formatTime } from "../utils/wordCount";
 import { practicedKeys, TASK_INFO, TASK_KEYS } from "../utils/practice";
 import { withGeminiReview } from "../utils/reviewState";
 import { reviewSubmission } from "../services/reviewWorkflow";
-import { hasGeminiKey, getGeminiModel } from "../utils/geminiSettings";
+import { getGeminiModel } from "../utils/geminiSettings";
 import { mockProjectionEligibility } from "../services/pedagogicalAssessment";
 import { AIEvaluationView } from "../components/AIEvaluationView";
 import { SubmissionExport } from "../components/SubmissionExport";
@@ -52,7 +52,6 @@ export function Results({
   const original = result.revisionOf
     ? getStoredSubmissions().find((s) => s.id === result.revisionOf)
     : null;
-  const available = hasGeminiKey();
   const chosen = result.aiEvaluation;
   const assessment = chosen?.pedagogical;
   const feedback = assessment?.tasks[active];
@@ -205,7 +204,7 @@ export function Results({
             <button
               className="button primary"
               disabled={!!busy}
-              onClick={() => (available ? void review() : onSettings())}
+              onClick={() => void review()}
             >
               {busy ? (
                 <Loader2 className="spin" size={17} />
@@ -216,13 +215,9 @@ export function Results({
                 ? en
                   ? "Reviewing…"
                   : "Analyse en cours…"
-                : available
-                  ? en
-                    ? "Get my feedback"
-                    : "Obtenir mon bilan"
-                  : en
-                    ? "Connect AI"
-                    : "Configurer l’IA"}
+                : en
+                  ? "Get my feedback"
+                  : "Obtenir mon bilan"}
             </button>
           </div>
         </section>
@@ -396,7 +391,7 @@ export function Results({
                     </p>
                     <button
                       className="button secondary"
-                      disabled={busy || !available}
+                      disabled={busy}
                       onClick={() => void review(true)}
                     >
                       <RotateCcw size={15} />
@@ -630,13 +625,13 @@ export function Results({
           </summary>
           <p>
             {en
-              ? "A new Gemini review uses the model selected in Settings & AI and consumes API quota. Your saved feedback stays available if the request fails."
-              : "Un nouveau bilan Gemini utilise le modèle choisi dans Réglages et IA et consomme du quota API. Votre bilan enregistré reste disponible si la demande échoue."}
+              ? "A new Gemini review uses the app’s automatic model selection and consumes API quota. Your saved feedback stays available if the request fails."
+              : "Un nouveau bilan Gemini utilise la sélection automatique du modèle et consomme du quota API. Votre bilan enregistré reste disponible si la demande échoue."}
           </p>
           <div className="row wrap">
             <button
               className="button secondary"
-              disabled={!!busy || !available}
+              disabled={!!busy}
               onClick={() => void review(true)}
             >
               <RotateCcw size={14} />

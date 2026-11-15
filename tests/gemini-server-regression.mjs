@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import ts from "typescript";
-import { createHash } from "node:crypto";
 const source = ts.transpileModule(fs.readFileSync("api/gemini.ts", "utf8"), {
   compilerOptions: {
     module: ts.ModuleKind.ESNext,
@@ -11,87 +10,161 @@ const source = ts.transpileModule(fs.readFileSync("api/gemini.ts", "utf8"), {
 const { default: handler } = await import(
   "data:text/javascript;base64," + Buffer.from(source).toString("base64")
 );
-const oldKey = process.env.GEMINI_BACKUP_KEY,
-  oldFetch = globalThis.fetch;
+const names = [
+  "GEMINI_API_KEY",
+  "VITE_GEMINI_API_KEY",
+  "GEMINI_BACKUP_KEY",
+  "GEMINI_BACKUP_API_KEY",
+];
+const saved = Object.fromEntries(
+  names.map((name) => [name, process.env[name]]),
+);
+const oldFetch = globalThis.fetch;
 const body = {
   model: "gemini-3.8-flash",
-  request: {
-    contents: [{ role: "user", parts: [{ text: "Test" }] }],
-    generationConfig: { responseMimeType: "application/json" },
-  },
+  request: { contents: [{ role: "user", parts: [{ text: "Test" }] }] },
 };
-const request = (value = body, headers = {}) =>
+const request = (value = body) =>
   new Request("https://fixture/api/gemini", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...headers },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(value),
   });
 let calls = [];
-try {
-  delete process.env.GEMINI_BACKUP_KEY;
-  assert.equal((await handler(request())).status, 401);
-  process.env.GEMINI_BACKUP_KEY = "private-server-sentinel";
+function arrange(primary, backup, responses, legacy = "") {
+  for (const name of names) delete process.env[name];
+  if (primary) process.env.GEMINI_API_KEY = primary;
+  if (backup) process.env.GEMINI_BACKUP_KEY = backup;
+  if (legacy) process.env.VITE_GEMINI_API_KEY = legacy;
+  calls = [];
   globalThis.fetch = async (url, options) => {
     calls.push({ url, options });
-    return new Response('{"candidates":[]}', { status: 200 });
+    const response = responses.shift();
+    assert(response, "No unexpected provider request");
+    if (response instanceof Error) throw response;
+    return response;
   };
-  const response = await handler(request());
-  assert.equal(response.status, 200);
-  assert.equal(calls.length, 1);
+}
+const success = () => new Response('{"candidates":[]}', { status: 200 });
+try {
+  arrange("", "", []);
+  const missing = await handler(request());
+  assert.equal(missing.status, 503);
+  assert.equal(missing.headers.get("X-TCF-Error"), "server_not_configured");
+  assert.equal(missing.headers.get("X-TCF-No-Retry"), "1");
+  for (const [primary, backup, legacy, source, key] of [
+    [
+      "primary-sentinel",
+      "backup-sentinel",
+      "legacy-sentinel",
+      "primary",
+      "primary-sentinel",
+    ],
+    ["", "backup-sentinel", "", "backup", "backup-sentinel"],
+    ["", "", "legacy-sentinel", "primary", "legacy-sentinel"],
+  ]) {
+    arrange(primary, backup, [success()], legacy);
+    const response = await handler(request());
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("X-TCF-Key-Source"), source);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].options.headers["x-goog-api-key"], key);
+    assert(calls[0].url.includes("gemini-3.8-flash:generateContent"));
+    assert(!JSON.stringify([...response.headers]).includes("sentinel"));
+    assert(!(await response.text()).includes("sentinel"));
+  }
+  arrange("", "", [success()]);
+  process.env.GEMINI_BACKUP_API_KEY = "alternate-backup-sentinel";
+  assert.equal((await handler(request())).status, 200);
   assert.equal(
     calls[0].options.headers["x-goog-api-key"],
-    "private-server-sentinel",
+    "alternate-backup-sentinel",
   );
-  assert(calls[0].url.includes("gemini-3.8-flash:generateContent"));
-  assert(
-    !JSON.stringify([...response.headers]).includes("private-server-sentinel"),
-  );
-  assert(!(await response.text()).includes("private-server-sentinel"));
-  const identicalHash = createHash("sha256")
-    .update(body.model + "\nprivate-server-sentinel")
-    .digest("hex");
-  assert.equal(
-    (await handler(request(body, { "x-tcf-primary-key-hash": identicalHash })))
-      .status,
-    409,
-  );
-  assert.equal(
-    calls.length,
-    1,
-    "An identical backup key must not replay generation",
-  );
+  for (const status of [401, 403, 404, 429, 500, 502, 503, 504]) {
+    arrange("primary-sentinel", "backup-sentinel", [
+      new Response("primary-sentinel", { status }),
+      success(),
+    ]);
+    const response = await handler(request());
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("X-TCF-Key-Source"), "backup");
+    assert.deepEqual(
+      calls.map((c) => c.options.headers["x-goog-api-key"]),
+      ["primary-sentinel", "backup-sentinel"],
+    );
+    assert.equal(calls[0].url, calls[1].url);
+  }
+  arrange("same-sentinel", "same-sentinel", [
+    new Response("same-sentinel", { status: 403 }),
+  ]);
+  const duplicate = await handler(request());
+  assert.equal(duplicate.status, 403);
+  assert.equal(calls.length, 1);
+  assert(!(await duplicate.text()).includes("sentinel"));
+  arrange("primary-sentinel", "backup-sentinel", [
+    new Response("primary-sentinel", { status: 400 }),
+  ]);
+  assert.equal((await handler(request())).status, 400);
+  assert.equal(calls.length, 1, "Invalid requests do not use backup quota");
+  arrange("primary-sentinel", "backup-sentinel", []);
   assert.equal(
     (await handler(request({ ...body, model: "arbitrary-model" }))).status,
+    400,
+  );
+  assert.equal((await handler(request(null))).status, 400);
+  assert.equal(
+    (
+      await handler(
+        new Request("https://fixture/api/gemini", {
+          method: "POST",
+          body: "invalid",
+        }),
+      )
+    ).status,
     400,
   );
   assert.equal(
     (await handler(new Request("https://fixture/api/gemini"))).status,
     405,
   );
-  globalThis.fetch = async () =>
-    new Response("private-server-sentinel", {
+  assert.equal(calls.length, 0);
+  arrange("primary-sentinel", "backup-sentinel", [
+    new Response("primary-sentinel", { status: 429 }),
+    new Response("backup-sentinel", {
       status: 429,
       headers: { "Retry-After": "90" },
-    });
+    }),
+  ]);
   const quota = await handler(request());
   assert.equal(quota.status, 429);
   assert.equal(quota.headers.get("Retry-After"), "90");
-  assert(!(await quota.text()).includes("private-server-sentinel"));
-  let failureCalls = 0;
-  globalThis.fetch = async () => {
-    failureCalls++;
-    throw new Error("private-server-sentinel");
-  };
-  const failed = await handler(request());
-  assert.equal(failed.status, 502);
-  assert.equal(failed.headers.get("X-TCF-No-Retry"), "1");
-  assert.equal(failureCalls, 1);
-  assert(!(await failed.text()).includes("private-server-sentinel"));
+  assert(!(await quota.text()).includes("sentinel"));
+  arrange("primary-sentinel", "backup-sentinel", [
+    new Error("primary-sentinel"),
+  ]);
+  const failure = await handler(request());
+  assert.equal(failure.status, 502);
+  assert.equal(failure.headers.get("X-TCF-No-Retry"), "1");
+  assert.equal(
+    calls.length,
+    1,
+    "A network failure must not replay accepted work",
+  );
+  assert(!(await failure.text()).includes("sentinel"));
+  // Runtime variables are read for each request, independent of build-time flags.
+  arrange("changed-runtime-sentinel", "", [success()]);
+  assert.equal((await handler(request())).status, 200);
+  assert.equal(
+    calls[0].options.headers["x-goog-api-key"],
+    "changed-runtime-sentinel",
+  );
   console.log(
-    "PASS: Vercel GEMINI_BACKUP_KEY stays server-side, same-model transport, identical-key rejection, error redaction, preserved cooldown and no network replay.",
+    "PASS: runtime server credentials, primary/backup/legacy support, bounded fallback, deduplication, safe diagnostics, validation and no ambiguous replay.",
   );
 } finally {
   globalThis.fetch = oldFetch;
-  if (oldKey === undefined) delete process.env.GEMINI_BACKUP_KEY;
-  else process.env.GEMINI_BACKUP_KEY = oldKey;
+  for (const name of names) {
+    if (saved[name] === undefined) delete process.env[name];
+    else process.env[name] = saved[name];
+  }
 }

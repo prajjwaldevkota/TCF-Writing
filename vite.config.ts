@@ -1,5 +1,5 @@
 import { defineConfig, loadEnv } from "vite";
-import geminiBackupHandler from "./api/gemini";
+import geminiHandler from "./api/gemini";
 import react from "@vitejs/plugin-react";
 import legacy from "@vitejs/plugin-legacy";
 import path from "path";
@@ -7,12 +7,9 @@ import path from "path";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const backupConfigured = Boolean(
-    process.env.GEMINI_BACKUP_KEY || env.GEMINI_BACKUP_KEY,
-  );
   const model =
     process.env.GEMINI_MODEL || env.GEMINI_MODEL || "gemini-3.8-flash";
-  const installBackupRoute = (server: any) => {
+  const installGeminiRoute = (server: any) => {
     server.middlewares.use("/api/gemini", async (req: any, res: any) => {
       try {
         let body = "";
@@ -25,9 +22,15 @@ export default defineConfig(({ mode }) => {
           }
         }
         // Match the server-only variable contract locally without exposing its value.
-        if (!process.env.GEMINI_BACKUP_KEY && env.GEMINI_BACKUP_KEY)
-          process.env.GEMINI_BACKUP_KEY = env.GEMINI_BACKUP_KEY;
-        const response = await geminiBackupHandler(
+        for (const name of [
+          "GEMINI_API_KEY",
+          "GEMINI_BACKUP_KEY",
+          "GEMINI_BACKUP_API_KEY",
+          "VITE_GEMINI_API_KEY",
+        ]) {
+          if (!process.env[name] && env[name]) process.env[name] = env[name];
+        }
+        const response = await geminiHandler(
           new Request("http://localhost/api/gemini", {
             method: req.method,
             headers: req.headers,
@@ -39,14 +42,15 @@ export default defineConfig(({ mode }) => {
         res.end(await response.text());
       } catch {
         res.statusCode = 500;
-        res.end("Gemini backup transport failed.");
+        res.end("Gemini server transport failed.");
       }
     });
   };
   return {
+    // Only public Supabase settings may be read from VITE-prefixed environment
+    // variables. Even the legacy VITE_GEMINI_API_KEY stays out of browser builds.
+    envPrefix: ["VITE_SUPABASE_"],
     define: {
-      "import.meta.env.VITE_GEMINI_SERVER_BACKUP":
-        JSON.stringify(backupConfigured),
       "import.meta.env.VITE_GEMINI_MODEL": JSON.stringify(model),
     },
     resolve: {
@@ -56,9 +60,9 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       {
-        name: "local-gemini-backup",
-        configureServer: installBackupRoute,
-        configurePreviewServer: installBackupRoute,
+        name: "local-gemini-server",
+        configureServer: installGeminiRoute,
+        configurePreviewServer: installGeminiRoute,
       },
       react(),
       legacy({

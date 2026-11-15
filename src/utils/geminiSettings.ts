@@ -14,15 +14,6 @@ export function getGeminiModelChain(initial = getGeminiModel()): string[] {
   return index >= 0 ? GEMINI_FALLBACK_MODELS.slice(index) : [initial];
 }
 export const GEMINI_MODEL_STORAGE = "tcf_gemini_model";
-export const GEMINI_PRIMARY_STORAGE = "tcf_gemini_api_key";
-export const GEMINI_BACKUP_STORAGE = "tcf_gemini_backup_api_key";
-const read = (key: string) => {
-  try {
-    return localStorage.getItem(key)?.trim() || "";
-  } catch {
-    return "";
-  }
-};
 export function getGeminiModel(): string {
   return import.meta.env.VITE_GEMINI_MODEL?.trim() || "gemini-3.8-flash";
 }
@@ -33,31 +24,4 @@ export function setGeminiModel(model: string): void {
   )
     throw new Error("Unknown Gemini model.");
   localStorage.setItem(GEMINI_MODEL_STORAGE, model);
-}
-export function getGeminiApiKey(): string {
-  return (
-    read(GEMINI_PRIMARY_STORAGE) ||
-    import.meta.env.VITE_GEMINI_API_KEY?.trim() ||
-    ""
-  );
-}
-export function getGeminiBackupApiKey(): string {
-  return read(GEMINI_BACKUP_STORAGE);
-}
-export function hasServerGeminiBackup(): boolean {
-  return import.meta.env.VITE_GEMINI_SERVER_BACKUP === true;
-}
-export function hasGeminiKey(): boolean {
-  return Boolean(
-    getGeminiApiKey() || getGeminiBackupApiKey() || hasServerGeminiBackup(),
-  );
-}
-export function setGeminiApiKey(key: string): void {
-  localStorage.setItem(GEMINI_PRIMARY_STORAGE, key.trim());
-}
-export function setGeminiBackupApiKey(key: string): void {
-  localStorage.setItem(GEMINI_BACKUP_STORAGE, key.trim());
-}
-export function clearGeminiApiKey(): void {
-  localStorage.removeItem(GEMINI_PRIMARY_STORAGE);
 }

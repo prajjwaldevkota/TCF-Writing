@@ -84,6 +84,7 @@ export function Simulator({
   const [focusWriting, setFocusWriting] = useState(false);
   const [mobilePromptOpen, setMobilePromptOpen] = useState(true);
   const [accentsOpen, setAccentsOpen] = useState(false);
+  const [uppercaseAccents, setUppercaseAccents] = useState(false);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [templates, setTemplates] = useState(false);
   const [finish, setFinish] = useState(false);
@@ -244,7 +245,19 @@ export function Simulator({
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h1>{en ? info.en : info.fr}</h1>
+            <h1>
+              {focusWriting
+                ? session.revisionOf
+                  ? en
+                    ? "Revision"
+                    : "Réécriture"
+                  : en
+                    ? "Your writing"
+                    : "Votre rédaction"
+                : en
+                  ? info.en
+                  : info.fr}
+            </h1>
             <p>
               {isExam
                 ? en
@@ -550,7 +563,13 @@ export function Simulator({
           <div className="writing-editor-header">
             <h2>
               <label htmlFor="task-response">
-                {en ? "Write your response" : "Rédigez votre réponse"}
+                {focusWriting
+                  ? en
+                    ? "Your response"
+                    : "Votre réponse"
+                  : en
+                    ? "Write your response"
+                    : "Rédigez votre réponse"}
               </label>
             </h2>
             <div className="row">
@@ -600,9 +619,13 @@ export function Simulator({
             </div>
           </div>
           <p className="response-instructions" id="response-instructions">
-            {en
-              ? `Task ${info.number} · ${requirement.minWords}–${requirement.maxWords} words in French. Your response is saved as you type.`
-              : `Tâche ${info.number} · ${requirement.minWords}–${requirement.maxWords} mots en français. Votre réponse est enregistrée au fil de la saisie.`}
+            {focusWriting
+              ? en
+                ? `Task ${info.number} · ${requirement.minWords}–${requirement.maxWords} words in French`
+                : `Tâche ${info.number} · ${requirement.minWords}–${requirement.maxWords} mots en français`
+              : en
+                ? `Task ${info.number} · ${requirement.minWords}–${requirement.maxWords} words in French. Your response is saved as you type.`
+                : `Tâche ${info.number} · ${requirement.minWords}–${requirement.maxWords} mots en français. Votre réponse est enregistrée au fil de la saisie.`}
           </p>
           {accentsOpen && (
             <div
@@ -610,6 +633,15 @@ export function Simulator({
               id="writing-accents"
               aria-label={en ? "French accents" : "Accents français"}
             >
+              <button
+                className="writing-accent-case"
+                aria-label={en ? "Uppercase accents" : "Accents majuscules"}
+                title={en ? "Uppercase accents" : "Accents majuscules"}
+                aria-pressed={uppercaseAccents}
+                onClick={() => setUppercaseAccents(!uppercaseAccents)}
+              >
+                ABC
+              </button>
               {[
                 "é",
                 "è",
@@ -626,15 +658,18 @@ export function Simulator({
                 "œ",
                 "«",
                 "»",
-              ].map((c) => (
-                <button
-                  key={c}
-                  onClick={() => insert(c)}
-                  aria-label={`${en ? "Insert" : "Insérer"} ${c}`}
-                >
-                  {c}
-                </button>
-              ))}
+              ].map((c) => {
+                const character = uppercaseAccents ? c.toUpperCase() : c;
+                return (
+                  <button
+                    key={c}
+                    onClick={() => insert(character)}
+                    aria-label={`${en ? "Insert" : "Insérer"} ${character}`}
+                  >
+                    {character}
+                  </button>
+                );
+              })}
             </div>
           )}
           <textarea

@@ -42,17 +42,17 @@ npm ci
 npm run dev -- --host 127.0.0.1
 ```
 
-Open the URL printed by Vite. An account and Supabase are optional. Add your own
-Gemini key under **Settings & AI** to request feedback. Your writing and saved
-corrections remain usable without AI. Drafts and local-mode work belong to this
-browser profile; use a backup to move them to another device.
+Open the URL printed by Vite. An account and Supabase are optional. Feedback
+uses `/api/gemini`, which reads the deployment's server credentials. Learners do
+not need personal API keys. Your writing and saved corrections remain usable
+without AI. Drafts and local-mode work belong to this browser profile; use a
+backup to move them to another device.
 
-The model is selected automatically: `GEMINI_MODEL` in the deployment, or
-`gemini-3.8-flash` when it is unset. Browser model selections are ignored. They are model configuration, not private
-values or claims of grading accuracy. Browser-entered keys take precedence over
-build defaults. `GEMINI_BACKUP_KEY` supplies the server-only backup used by `/api/gemini`. They are stored in that browser; backups exclude keys and auth
-state. VITE-prefixed keys are exposed in the browser build and must not be treated
-as server secrets.
+Configure `GEMINI_API_KEY` and optionally `GEMINI_BACKUP_KEY` in Vercel (or
+`.env.local` for local development). The function also accepts the existing
+`VITE_GEMINI_API_KEY` and `GEMINI_BACKUP_API_KEY` names for compatibility; their
+values are excluded from browser builds. Existing browser-entered keys are ignored.
+`GEMINI_MODEL` selects the starting model, defaulting to `gemini-3.8-flash`.
 
 See [LOCAL-SETUP.md](LOCAL-SETUP.md) for optional account storage and Vercel setup.
 
@@ -75,10 +75,12 @@ HTTP error. The model chain runs automatically: **3.8 Flash → 3.6 Flash →
 unavailability) move to the next model after available keys are exhausted. There
 are at most three models and two keys per model. It stops on the first successful
 response; invalid assessments and ambiguous timeouts do not trigger more calls.
-The Vercel function reads `process.env.GEMINI_BACKUP_KEY`; Vite exposes only a
-boolean indicating that a server backup is configured, never that key value.
+The Vercel function reads both keys at request time and tries the backup on the
+same model after a supported HTTP rejection. No browser key or build-time
+credential flag is required. Missing server credentials produce a deployment
+configuration error rather than asking the learner to enter a key.
 Timeouts, network interruptions and invalid output do not trigger another request. Failed reviews preserve existing saved feedback.
-Rate-limit cooldowns use hashed key/model identifiers, never stored raw keys.
+Rate-limit cooldowns use hashed transport/model identifiers, never stored raw keys.
 
 The automatic default chain is Gemini 3.8 Flash, 3.6 Flash, then 3.5 Flash-Lite.
 `GEMINI_MODEL` may override its starting point; no browser selection is needed. These have published [free API tiers](https://ai.google.dev/gemini-api/docs/pricing),

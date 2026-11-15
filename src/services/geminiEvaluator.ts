@@ -9,18 +9,7 @@ import { ExamResult, TaskKey } from "../types/exam";
 import { AIEvaluation, TaskEvaluation, CefrLevel } from "../types/aiEvaluation";
 import { countFrenchWords } from "../utils/wordCount";
 
-import {
-  getGeminiApiKey,
-  getGeminiBackupApiKey,
-  getGeminiModel,
-  getGeminiModelChain,
-  hasServerGeminiBackup,
-} from "../utils/geminiSettings";
-export {
-  getGeminiApiKey,
-  setGeminiApiKey,
-  clearGeminiApiKey,
-} from "../utils/geminiSettings";
+import { getGeminiModel, getGeminiModelChain } from "../utils/geminiSettings";
 import {
   getRateLimitDeadline,
   recordRateLimit,
@@ -78,23 +67,17 @@ export async function evaluateTcfSubmissionWithGemini(
   customApiKey?: string,
   requestedModel = getGeminiModel(),
 ): Promise<AIEvaluation> {
-  const primary = (customApiKey || getGeminiApiKey()).trim();
-  const backup = customApiKey ? "" : getGeminiBackupApiKey().trim();
-  const serverBackup = !customApiKey && !backup && hasServerGeminiBackup();
-  let primaryIdentity = "";
-  const keys = [
-    ...(primary ? [{ value: primary, source: "primary" as const }] : []),
-    ...(serverBackup
-      ? [{ value: "server-backup", source: "backup" as const, server: true }]
-      : []),
-    ...(backup && backup !== primary
-      ? [{ value: backup, source: "backup" as const }]
-      : []),
-  ];
-  if (!keys.length)
-    throw new Error(
-      "Clé API Gemini introuvable. Ajoutez une clé dans Réglages et IA.",
-    );
+  // Normal reviews always use the deployment's server credentials. Old browser
+  // keys must not override the deployment or be required on a fresh browser.
+  const keys = customApiKey?.trim()
+    ? [
+        {
+          value: customApiKey.trim(),
+          source: "primary" as const,
+          server: false,
+        },
+      ]
+    : [{ value: "server", source: "primary" as const, server: true }];
 
   const activeTaskKeys = getActiveEvaluatedTasks(result);
 
@@ -114,14 +97,12 @@ export async function evaluateTcfSubmissionWithGemini(
   const modelChain = getGeminiModelChain(requestedModel);
   modelAttempts: for (const candidateModel of modelChain) {
     modelName = candidateModel;
-    primaryIdentity = "";
     let modelUnavailable = false;
     for (let index = 0; index < keys.length; index++) {
       const key = keys[index];
       const identity = await instructionFingerprint(
         `${modelName}\n${key.value}`,
       );
-      if (key.source === "primary") primaryIdentity = identity;
       const deadline = getRateLimitDeadline(identity);
       if (deadline > Date.now()) {
         modelUnavailable = true;
@@ -148,9 +129,7 @@ export async function evaluateTcfSubmissionWithGemini(
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              ...(server
-                ? { "x-tcf-primary-key-hash": primaryIdentity }
-                : { "x-goog-api-key": key.value }),
+              ...(!server ? { "x-goog-api-key": key.value } : {}),
             },
             signal: AbortSignal.timeout(120000),
             body: JSON.stringify(
@@ -166,14 +145,26 @@ export async function evaluateTcfSubmissionWithGemini(
         );
       }
       if (!response.ok) {
+        if (
+          server &&
+          response.headers.get("X-TCF-Error") === "server_not_configured"
+        ) {
+          throw new Error(
+            feedbackLanguage === "en"
+              ? "The feedback service is not configured on the server. The site administrator must configure the deployment’s Gemini key. No personal API key is needed. Your writing is saved."
+              : "Le service de correction n’est pas configuré sur le serveur. L’administrateur doit configurer la clé Gemini du déploiement. Aucune clé personnelle n’est nécessaire. Votre rédaction est sauvegardée.",
+          );
+        }
         // A proxy timeout is ambiguous: the upstream job may already be running.
         if (response.headers.get("X-TCF-No-Retry") === "1") {
           throw new Error(
             feedbackLanguage === "en"
-              ? "Gemini backup connection interrupted. Your writing is saved; no further model was tried."
-              : "Connexion Gemini de secours interrompue. Votre rédaction est sauvegardée ; aucun autre modèle n’a été essayé.",
+              ? "Gemini server connection interrupted. Your writing is saved; no further model was tried."
+              : "Connexion au serveur Gemini interrompue. Votre rédaction est sauvegardée ; aucun autre modèle n’a été essayé.",
           );
         }
+        if (response.headers.get("X-TCF-Model-Unavailable") === "1")
+          modelUnavailable = true;
         const until =
           response.status === 429
             ? recordRateLimit(identity, response.headers.get("Retry-After"))
@@ -183,8 +174,8 @@ export async function evaluateTcfSubmissionWithGemini(
             ? rateLimitMessage(until, feedbackLanguage)
             : response.status === 401 || response.status === 403
               ? feedbackLanguage === "en"
-                ? "Check your Gemini keys and project access in Settings & AI."
-                : "Vérifiez vos clés Gemini et les accès du projet dans Réglages et IA."
+                ? "The site administrator must check the server’s Gemini credentials and project access."
+                : "L’administrateur doit vérifier les clés Gemini du serveur et les accès du projet."
               : response.status === 404
                 ? feedbackLanguage === "en"
                   ? "This model is unavailable to your project."
@@ -208,8 +199,21 @@ export async function evaluateTcfSubmissionWithGemini(
           continue modelAttempts;
         throw lastError;
       }
+      if (
+        server &&
+        !response.headers.get("Content-Type")?.includes("application/json")
+      ) {
+        throw new Error(
+          feedbackLanguage === "en"
+            ? "The feedback server returned an unexpected response. The site administrator must check the /api/gemini deployment. Your writing is saved."
+            : "Réponse inattendue du serveur de correction. L’administrateur doit vérifier le déploiement /api/gemini. Votre rédaction est sauvegardée.",
+        );
+      }
       payload = await response.json();
-      keySource = key.source;
+      keySource =
+        server && response.headers.get("X-TCF-Key-Source") === "backup"
+          ? "backup"
+          : key.source;
       break modelAttempts;
     }
     if (!modelUnavailable)
