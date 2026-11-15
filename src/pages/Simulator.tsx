@@ -267,13 +267,13 @@ export function Simulator({
         <div
           className={`writing-clock ${isExam && timeLeft < 300 ? "urgent" : ""}`}
         >
-          <Clock3 size={17} />
+          <Clock3 size={22} aria-hidden="true" />
           <span>{formatTime(isExam ? timeLeft : elapsed)}</span>
           <small>
             {isExam
               ? en
-                ? "left"
-                : "restantes"
+                ? "Time left"
+                : "Temps restant"
               : en
                 ? "optional timer"
                 : "chrono facultatif"}
@@ -555,12 +555,14 @@ export function Simulator({
             </h2>
             <div className="row">
               <button
-                className="writing-tool-button"
+                className="writing-tool-button writing-accent-toggle"
                 aria-expanded={accentsOpen}
                 aria-controls="writing-accents"
                 onClick={() => setAccentsOpen(!accentsOpen)}
               >
-                é<span>{en ? "Accents" : "Accents"}</span>
+                <b aria-hidden="true">é</b>
+                <span>Accents</span>
+                <ChevronDown size={16} aria-hidden="true" />
               </button>
               <button
                 className="writing-tool-button"
