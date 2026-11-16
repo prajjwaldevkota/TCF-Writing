@@ -7556,6 +7556,126 @@
             "document2": "Document 2 : « De nos jours, le nombre d’années d’études n’a pas vraiment d’influence sur le salaire, et les jeunes diplômés ont bien souvent du mal à trouver du travail. C’est le cas de Claire qui, après son doctorat, est restée de longs mois au chômage. Les entreprises lui reprochaient son manque d’expérience professionnelle. Claire a dû accepter un travail moins qualifié pour vivre. Aujourd’hui, elle pense reprendre une formation qui lui permettra de développer des compétences professionnelles et d’avoir de l’expérience. »"
           }
         }
+      },
+      {
+        "combination": 854,
+        "combinationNumber": 52,
+        "tasks": {
+          "task1": {
+            "instruction": "Un nouveau centre de loisirs vient d’ouvrir dans votre quartier. Vous écrivez un message à un(e) ami(e) pour lui proposer d’y aller ensemble. Présentez le centre, les activités qui vous intéressent et les détails pratiques de votre sortie.",
+            "minWords": 60,
+            "maxWords": 120
+          },
+          "task2": {
+            "instruction": "Vous avez participé à une journée durant laquelle les habitants de votre quartier pouvaient échanger des objets et des services sans utiliser d’argent. Sur votre blog, racontez cette expérience, expliquez ce que vous avez échangé et donnez votre avis sur cette initiative.",
+            "minWords": 120,
+            "maxWords": 150
+          },
+          "task3": {
+            "instruction": "Les consultations médicales à distance",
+            "title": "Les consultations médicales à distance",
+            "minWords": 120,
+            "maxWords": 180,
+            "document1": "« Depuis que je peux consulter mon médecin à distance, mon quotidien est plus simple. Pour renouveler une ordonnance ou discuter de résultats d’analyses, je n’ai plus besoin de me déplacer ni de prendre une demi-journée de congé. C’est aussi une solution pratique pour les personnes qui vivent loin d’un cabinet médical. Lorsque la situation le permet, je trouve que ce service facilite vraiment l’accès aux soins. »\nCamille, 38 ans",
+            "document2": "« Je préfère les consultations en cabinet. À travers un écran, le médecin ne peut pas toujours examiner correctement son patient. Certaines personnes peuvent aussi avoir du mal à décrire leurs symptômes ou à utiliser les outils numériques. Enfin, je trouve que les échanges sont moins personnels à distance. Pour moi, la consultation médicale doit rester avant tout une rencontre en face à face. »\nLaurent, 56 ans"
+          }
+        }
+      },
+      {
+        "combination": 855,
+        "combinationNumber": 53,
+        "tasks": {
+          "task1": {
+            "instruction": "La bibliothèque de votre ville organise une rencontre avec un écrivain. Écrivez un message à votre ami(e) pour l’inviter à cet événement.",
+            "minWords": 60,
+            "maxWords": 120
+          },
+          "task2": {
+            "instruction": "Vous avez participé à un événement nommé “La semaine du goût”. Écrivez un article de blog pour raconter cette expérience.",
+            "minWords": 120,
+            "maxWords": 150
+          },
+          "task3": {
+            "instruction": "L’art Urbain : Pour Ou Contre ?",
+            "title": "L’art Urbain : Pour Ou Contre ?",
+            "minWords": 120,
+            "maxWords": 180,
+            "document1": "Grâce à l’art, la curiosité des citadins est attisée dans l’espace urbain. Que ce soit par une peinture ou un spectacle de rue, l’atmosphère éphémère ainsi créée offre une interaction entre des artistes peu connus et un public hétéroclite, parfois peu habitué à côtoyer cette forme d’art. Les villes d’aujourd’hui n’ont plus la même vocation que celles d’hier. Plus qu’un lieu de résidence, la ville se réinvente, s’enrichit de la diversité de sa population, s’agence différemment et s’ouvre sur le monde. Les espaces verts se créent et les murs se parent de couleurs grâce au street art. Cela débouche sur des lieux où la qualité de vie est privilégiée, tout en respectant la nature et l’environnement.",
+            "document2": "Mais à une plus large échelle, cela n’est pas aussi évident. Les graffitis peuvent être perçus comme une dégradation de la communauté, une pollution visuelle ou une preuve de la rupture sociale. On les considère comme du vandalisme qui défigure les biens publics. Le débat sur les avantages et les inconvénients des graffitis fait rage parmi les artistes, les législateurs et les membres de la communauté."
+          }
+        }
+      },
+      {
+        "combination": 856,
+        "combinationNumber": 54,
+        "tasks": {
+          "task1": {
+            "instruction": "France Télévision prépare un reportage sur le sport amateur. Et vous, quel sportif êtes-vous ? Envoyez-nous vos témoignages sur francetélévision.fr.",
+            "minWords": 60,
+            "maxWords": 120
+          },
+          "task2": {
+            "instruction": "Vous avez passé des vacances dans une belle région de votre pays. Vous écrivez un message à vos amis dans lequel vous décrivez votre expérience, vous expliquez pourquoi vous avez beaucoup aimé ce séjour.",
+            "minWords": 120,
+            "maxWords": 150
+          },
+          "task3": {
+            "instruction": "Les écoles privées ou publiques ?",
+            "title": "Les écoles privées ou publiques ?",
+            "minWords": 120,
+            "maxWords": 180,
+            "document1": "À la rentrée, le nombre d’élèves inscrits dans des écoles privées a augmenté en France. Le succès des établissements privés n’est pas directement lié aux bons résultats scolaires de leurs élèves. C’est la réputation de ces lieux qui explique un tel enthousiasme. Aux yeux de nombreux parents, les élèves y sont mieux encadrés, mieux surveillés et les professeurs sont plus présents. Les parents sont aussi rassurés parce que les classes sont homogènes : elles accueillent généralement des élèves de milieux sociaux favorisés. En effet, les études dans ces établissements sont payantes, ce qui n’est pas le cas dans les écoles publiques.",
+            "document2": "Dans les collèges privés, il y a peu d’élèves de milieux sociaux défavorisés. Comme les études dans ces établissements sont payantes, certaines catégories de population en sont exclues. Ce système qui oppose écoles publiques et écoles privées ne facilite pas la mixité sociale. Ainsi, les élèves du privé ont rarement l’occasion de rencontrer d’autres jeunes issus de milieux sociaux moins favorisés qu’eux et inversement. Ce modèle scolaire reproduit les inégalités sociales et renforce le sentiment d’exclusion de certains jeunes."
+          }
+        }
+      },
+      {
+        "combination": 857,
+        "combinationNumber": 55,
+        "tasks": {
+          "task1": {
+            "instruction": "Vous venez d’emménager dans un nouveau logement. Vous écrivez un message à vos amis pour les inviter à une fête afin de célébrer votre déménagement. Vous précisez la date, l’heure, le lieu et le programme de la soirée.",
+            "minWords": 60,
+            "maxWords": 120
+          },
+          "task2": {
+            "instruction": "Dans votre blog, vous racontez votre dernier voyage à l’étranger : les lieux que vous avez visités, les personnes que vous avez rencontrées, vos activités et ce que vous avez aimé ou moins aimé.",
+            "minWords": 120,
+            "maxWords": 150
+          },
+          "task3": {
+            "instruction": "L’utilisation du téléphone portable : pour ou contre ?",
+            "title": "L’utilisation du téléphone portable : pour ou contre ?",
+            "minWords": 120,
+            "maxWords": 180,
+            "document1": "Document 1 : « Aujourd’hui, le téléphone portable occupe une place essentielle dans notre vie quotidienne. Il nous permet de communiquer facilement avec nos proches, de travailler, de nous informer et d’accéder rapidement à de nombreux services. Certaines personnes pensent qu’il faudrait réduire son utilisation ou même s’en priver pendant quelques jours. Mais pourquoi devrait-on se passer d’un outil aussi pratique et indispensable ? À mon avis, le téléphone nous facilite tellement la vie qu’il serait difficile d’imaginer notre quotidien sans lui. »",
+            "document2": "Document 2 : « De nos jours, nous passons énormément de temps sur nos téléphones portables, parfois sans même nous en rendre compte. Cette utilisation excessive peut provoquer du stress, de la fatigue mentale et des difficultés de concentration. Pourtant, il suffit de passer quelques jours sans téléphone pour découvrir les bienfaits de cette déconnexion. On se sent plus détendu, plus libre et moins préoccupé par les notifications. Cette expérience permet également de profiter davantage du moment présent et de retrouver une certaine tranquillité. »"
+          }
+        }
+      },
+      {
+        "combination": 858,
+        "combinationNumber": 56,
+        "tasks": {
+          "task1": {
+            "instruction": "Vous avez reçu ce message de votre ami Thomas : « Salut ! Je ne connais pas bien la culture et les traditions de ton pays. Peux-tu me parler d’une grande fête célébrée chez toi ? À bientôt ! » Consigne : Répondez-lui en décrivant une fête importante de votre pays.",
+            "minWords": 60,
+            "maxWords": 120
+          },
+          "task2": {
+            "instruction": "Vous avez assisté à un festival de cinéma. Vous avez vu plusieurs films. Sur votre site personnel, vous racontez le film que vous avez préféré. Vous expliquez votre choix.",
+            "minWords": 120,
+            "maxWords": 150
+          },
+          "task3": {
+            "instruction": "Que pensez-vous des maisons de retraite?",
+            "title": "Que pensez-vous des maisons de retraite?",
+            "minWords": 120,
+            "maxWords": 180,
+            "document1": "J’habite dans un pays où il y a très peu de maisons de retraite. Ici, quand une personne âgée ne peut plus être autonome, elle habite avec les générations plus jeunes, et dans l’ensemble, cela ne pose pas de problèmes majeurs. Il nous paraît étrange de confier nos parents ou grands-parents à des personnes qu’ils ne connaissent pas.",
+            "document2": "Beaucoup de gens critiquent les maisons de retraite, pourtant c’est une bonne solution d’accueil pour les personnes âgées ! D’abord, pour lutter contre l’isolement puisqu’elles sont entourées de personnes de leur âge à la maison de retraite. Ensuite, pour les soins et les services médicaux offerts dans ce type d’établissement. Enfin, parce que c’est pratique et rassurant pour leurs enfants et petits-enfants. Malheureusement, ce type de logement reste encore trop cher pour certains."
+          }
+        }
       }
     ]
   },
