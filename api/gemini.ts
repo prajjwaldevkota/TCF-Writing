@@ -8,7 +8,9 @@ import {
 } from "../server/errorLogs";
 import type { ErrorLogEntry } from "../src/types/errorLog";
 /** All deployment credentials stay in this Vercel function. */
-export const config = { maxDuration: 300 };
+/** All deployment credentials stay in this Vercel function. */
+export const config = { runtime: "edge" };
+
 
 const allowedModels = new Set([
   "gemini-3.8-flash",
