@@ -59,7 +59,7 @@ try {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "gemini-3.8-flash",
+      model: "gemini-3.6-flash",
       request: { contents: [{ role: "user", parts: [{ text: "Test" }] }] },
     }),
   }));

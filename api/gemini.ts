@@ -12,7 +12,6 @@ import type { ErrorLogEntry } from "../src/types/errorLog.js";
 // initial-response deadline. Keep room for two 120s attempts and diagnostics.
 export const config = { maxDuration: 300 };
 const allowedModels = new Set([
-  "gemini-3.8-flash",
   "gemini-3.6-flash",
   "gemini-3.5-flash-lite",
   "gemini-3.1-flash-lite",

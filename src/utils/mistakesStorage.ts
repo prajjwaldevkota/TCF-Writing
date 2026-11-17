@@ -135,15 +135,13 @@ export function getStoredMistakes(): SavedMistake[] {
 
     // Auto-seed/sync from stored submissions if any exist
     const submissions = getStoredSubmissions();
-    if (submissions && submissions.length > 0) {
-      const synced = mergeMistakesFromSubmissions(mistakes, submissions);
-      if (synced.length !== mistakes.length) {
-        localStorage.setItem(MISTAKES_STORAGE_KEY, JSON.stringify(synced));
-        return synced;
-      }
+    const synced = submissions && submissions.length > 0
+      ? mergeMistakesFromSubmissions(mistakes, submissions)
+      : filterDeletedMistakes(mistakes);
+    if (synced.length !== mistakes.length) {
+      localStorage.setItem(MISTAKES_STORAGE_KEY, JSON.stringify(synced));
     }
-
-    return filterDeletedMistakes(mistakes);
+    return synced;
   } catch (err) {
     console.error('Error reading mistakes from localStorage:', err);
     return [];

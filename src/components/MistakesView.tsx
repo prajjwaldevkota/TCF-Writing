@@ -38,6 +38,7 @@ export const MistakesView: React.FC<MistakesViewProps> = ({
   // Filter dropdown state
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [storageError, setStorageError] = useState('');
 
   // Track which category dropdowns/accordions are expanded
   // By default, open all categories that have mistakes
@@ -78,8 +79,11 @@ export const MistakesView: React.FC<MistakesViewProps> = ({
   // Delete a single mistake
   const handleDeleteMistake = (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    const updated = deleteStoredMistake(id);
-    onMistakesChange(updated);
+    try {
+      const updated = deleteStoredMistake(id);
+      onMistakesChange(updated);
+      setStorageError('');
+    } catch { setStorageError(language === 'en' ? 'The mistake could not be deleted.' : 'Impossible de supprimer la faute.'); }
   };
 
   // Clear all mistakes
@@ -90,8 +94,11 @@ export const MistakesView: React.FC<MistakesViewProps> = ({
         : 'Voulez-vous vraiment effacer toutes les fautes enregistrées de votre carnet ?'
     );
     if (!confirmed) return;
-    clearAllStoredMistakes();
-    onMistakesChange([]);
+    try {
+      clearAllStoredMistakes();
+      onMistakesChange([]);
+      setStorageError('');
+    } catch { setStorageError(language === 'en' ? 'The mistakes could not be deleted.' : 'Impossible de supprimer les fautes.'); }
   };
 
   // Compute category counts
@@ -154,6 +161,7 @@ export const MistakesView: React.FC<MistakesViewProps> = ({
 
   return (
     <div className="space-y-6">
+      {storageError && <p role="alert" className="notice warning">{storageError}</p>}
       {/* Top Banner / Explanation Card */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 sm:p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">

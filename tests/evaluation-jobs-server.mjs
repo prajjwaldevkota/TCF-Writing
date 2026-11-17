@@ -17,7 +17,7 @@ let claimFails = false;
 const response = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 const clone = value => JSON.parse(JSON.stringify(value));
 const requestBody = () => ({
-  id: randomUUID(), token: randomUUID(), model: "gemini-3.8-flash",
+  id: randomUUID(), token: randomUUID(), model: "gemini-3.6-flash",
   request: { contents: [{ role: "user", parts: [{ text: "private essay" }] }] },
   submission: { id: "local-submission", answers: { task1: "private essay" } },
 });
@@ -123,7 +123,7 @@ try {
   assert.equal((await work(timeoutJob.id)).status, 503);
   assert.equal(jobs.get(timeoutJob.id).next_step, 2, "Deadline skips the same model's backup key");
   assert.equal((await work(timeoutJob.id)).status, 200);
-  assert(providerCalls.at(-1).url.includes("gemini-3.6-flash"));
+  assert(providerCalls.at(-1).url.includes("gemini-3.5-flash-lite"));
 
   const concurrent = requestBody();
   await enqueue(concurrent);

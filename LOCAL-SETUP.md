@@ -7,13 +7,13 @@
 3. For feedback, configure `GEMINI_API_KEY` in `.env.local` before starting Vite.
    The development server provides the same `/api/gemini` route as Vercel.
    Learners do not enter keys in Settings. The model chain is automatic:
-   3.8 Flash → 3.6 Flash → 3.5 Flash-Lite.
+   3.6 Flash → 3.5 Flash-Lite → 3.1 Flash-Lite.
 4. Write a guided task or a full mock. Request feedback only when ready.
 5. Export your writing from Settings regularly. Clearing browser data removes
    local submissions, correction review status, and drafts.
 
 Copy `.env.example` to `.env.local` for local feedback credentials or optional
-account storage. `GEMINI_MODEL` optionally overrides the chain starting point (default: gemini-3.8-flash).
+account storage. `GEMINI_MODEL` optionally overrides the chain starting point (default: gemini-3.6-flash).
 Model accessibility must match your own provider account. These identifiers are
 public configuration and do not establish grading accuracy.
 
@@ -72,8 +72,8 @@ Vercel project’s environment for the relevant deployment, then redeploy. For e
 ```env
 GEMINI_API_KEY=your-primary-gemini-key
 GEMINI_BACKUP_KEY=your-backup-gemini-key
-# Optional: omit to use gemini-3.8-flash automatically
-GEMINI_MODEL=gemini-3.8-flash
+# Optional: omit to use gemini-3.6-flash automatically
+GEMINI_MODEL=gemini-3.6-flash
 ```
 
 The current UI and practice flow are documented in [README.md](README.md).
@@ -142,9 +142,74 @@ same browser. Queue setup or delivery failures preserve the saved writing and
 job reference. The browser uses the synchronous route only when the queue is
 explicitly disabled and there is no pending job to duplicate.
 
+Status polling runs every **30 seconds** while the tab is visible and every
+**2 minutes** while it is hidden. Realtime completion/failure notifications
+trigger an immediate status check. Intermediate job updates do not trigger
+extra requests. Polling only reads the existing database job; it never creates
+another Gemini request or QStash delivery. The visible-tab interval uses 90%
+fewer periodic status requests than the previous 3-second interval. Guest
+results may take up to one polling interval to appear after completion.
+
+The default model is `gemini-3.6-flash`, followed by `gemini-3.5-flash-lite` and
+`gemini-3.1-flash-lite`. If the Vercel project explicitly sets `GEMINI_MODEL`,
+change that override to `gemini-3.6-flash` (or remove it), then redeploy so the
+browser build picks up the new starting model.
+
 References: [QStash publishing](https://upstash.com/docs/qstash/api-reference/messages/publish-a-message),
 [QStash retries](https://upstash.com/docs/qstash/features/retry), and
 [Supabase Realtime with RLS](https://supabase.com/docs/guides/realtime/postgres-changes).
+
+### Verify a deployed background review
+
+1. Open the deployed site, write a practice response, and open your browser's
+   Network panel before choosing **Get my feedback**.
+2. `POST /api/evaluate` should quickly return **202** with a job ID. Subsequent
+   `GET /api/evaluate?id=…` requests should show `queued`, `running` or `retrying`,
+   followed by `completed`. A newly requested job should not use `/api/gemini`
+   when the queue is enabled.
+3. In Supabase, inspect the matching row without exposing the essay or token:
+
+   ```sql
+   select id, status, attempts, model, error_code, created_at, updated_at
+   from public.evaluation_jobs
+   order by created_at desc
+   limit 10;
+   ```
+
+4. In QStash delivery logs, verify delivery to your canonical domain's
+   `/api/evaluation-worker`. A successful final delivery returns **200**;
+   a transient failure can return **503** and retry after a delay.
+5. After the initial **202**, close the tab. Wait, reopen the same site in the
+   same browser, and open that saved submission. The feedback should appear
+   using the **same job ID**, with no second job row. A reused POST can return
+   **200** when the job already completed.
+
+An empty JSON POST to `/api/evaluate` safely checks configuration without
+creating a job: **400** means validation was reached; **409 queue_disabled**
+means background reviews are off; **503** means configuration or a required
+service is unavailable. This probe does not verify the database migration or
+worker delivery. Use the real review above for that end-to-end check.
+
+## Notebook cleanup
+
+The correction notebook supports **Delete correction**, **Delete reviewed**,
+and **I've learned this · Remove**. Deleting a notebook correction preserves
+the source writing and its feedback. Removed corrections stay removed when
+old feedback is loaded again; repeating the mistake in a new submission still
+creates a new practice item.
+
+The cleanup reminder defaults to **30 days after review**, with **90 days** and
+**Off** options. It checks when the notebook opens, regains focus, or remains
+open for an hour. It asks before removing anything. **Keep them** postpones the
+reminder for seven days. Unreviewed mistakes never become cleanup candidates.
+Older reviewed records without a review date start their reminder clock when
+the updated notebook is first opened. Preferences, review dates and deletion
+records are browser-local and included in practice backups (version 3).
+
+To test cleanup, delete one correction, reload, and check that it stays removed.
+Reveal another correction and choose **I've learned this · Remove**. Mark a
+third reviewed, then use **Delete reviewed**; cancel once and accept once.
+The original saved submission and its feedback should remain available.
 
 ## Error logs
 

@@ -29,12 +29,13 @@ export function createBackup() {
   };
   return {
     app: "ecriture",
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     submissions: getStoredSubmissions(),
     draft: read(DRAFT_KEY),
     mistakes: read("tcf_saved_mistakes_v1") || [],
     reviewed: read("tcf_reviewed_corrections") || [],
+    mistakeLifecycle: read("tcf_mistake_lifecycle_v1"),
     favorites: read("tcf_favorite_topics") || [],
   };
 }
@@ -44,7 +45,7 @@ export function importBackup(value: unknown): number {
   if (
     !data ||
     data.app !== "ecriture" ||
-    ![1, 2].includes(data.version) ||
+    ![1, 2, 3].includes(data.version) ||
     !Array.isArray(data.submissions) ||
     !data.submissions.every(isSubmission)
   )
@@ -61,6 +62,23 @@ export function importBackup(value: unknown): number {
   const updates: Record<string, string> = {
     tcf_exam_submissions_v1: JSON.stringify(combined),
   };
+  // Keep deletions when restoring practice data on another browser, so saved
+  // feedback cannot silently repopulate corrections the learner removed.
+  if (data.mistakeLifecycle && typeof data.mistakeLifecycle === "object") {
+    let old: any;
+    try { old = JSON.parse(localStorage.getItem("tcf_mistake_lifecycle_v1") || "null"); } catch { old = null; }
+    const incoming = data.mistakeLifecycle;
+    const validTimes = (value: any) => value && typeof value === "object"
+      ? Object.fromEntries(Object.entries(value).filter(([, time]) => typeof time === "number" && Number.isFinite(time) && time > 0)) : {};
+    updates.tcf_mistake_lifecycle_v1 = JSON.stringify({
+      deleted: [...new Set([...(Array.isArray(old?.deleted) ? old.deleted : []), ...(Array.isArray(incoming.deleted) ? incoming.deleted : [])]
+        .filter(id => typeof id === "string" && /^[0-9a-f]{16}$/.test(id)))],
+      reviewedAt: { ...validTimes(incoming.reviewedAt), ...validTimes(old?.reviewedAt) },
+      askAfterDays: [0, 30, 90].includes(old?.askAfterDays) ? old.askAfterDays
+        : [0, 30, 90].includes(incoming.askAfterDays) ? incoming.askAfterDays : 30,
+      remindAfter: Math.max(Number.isFinite(old?.remindAfter) ? old.remindAfter : 0, Number.isFinite(incoming.remindAfter) ? incoming.remindAfter : 0),
+    });
+  }
   if (
     Array.isArray(data.reviewed) &&
     data.reviewed.every((id) => typeof id === "string")

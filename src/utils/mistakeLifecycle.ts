@@ -12,11 +12,13 @@ interface Lifecycle {
 }
 
 export function getReviewedMistakeIds(): string[] {
-  const value = JSON.parse(localStorage.getItem(REVIEWED_KEY) || "[]");
+  let value;
+  try { value = JSON.parse(localStorage.getItem(REVIEWED_KEY) || "[]"); } catch { return []; }
   return Array.isArray(value) ? value.filter(id => typeof id === "string") : [];
 }
 export function getMistakeLifecycle(): Lifecycle {
-  const value = JSON.parse(localStorage.getItem(LIFECYCLE_KEY) || "{}");
+  let value;
+  try { value = JSON.parse(localStorage.getItem(LIFECYCLE_KEY) || "{}"); } catch { value = {}; }
   return {
     deleted: Array.isArray(value?.deleted) ? value.deleted.filter((id: unknown) => typeof id === "string" && /^[0-9a-f]{16}$/.test(id)) : [],
     reviewedAt: value?.reviewedAt && typeof value.reviewedAt === "object"
@@ -85,6 +87,13 @@ export function setMistakeCleanupDays(days: CleanupDays, now = Date.now()) {
   // Old review IDs have no reliable review date. Start their reminder clock
   // now, instead of treating the mistake's creation date as its learning date.
   for (const id of getReviewedMistakeIds()) state.reviewedAt[id] ??= now;
+  localStorage.setItem(LIFECYCLE_KEY, JSON.stringify(state));
+}
+export function initializeReviewedMistakeDates(now = Date.now()) {
+  const state = getMistakeLifecycle();
+  const missing = getReviewedMistakeIds().filter(id => !state.reviewedAt[id]);
+  if (!missing.length) return;
+  for (const id of missing) state.reviewedAt[id] = now;
   localStorage.setItem(LIFECYCLE_KEY, JSON.stringify(state));
 }
 export function getCleanupCandidates(mistakes: SavedMistake[], now = Date.now()): SavedMistake[] {

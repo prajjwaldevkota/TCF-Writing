@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -7,20 +7,24 @@ import {
   Eye,
   NotebookPen,
   RotateCcw,
+  Trash2,
 } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
-import { getStoredMistakes } from "../utils/mistakesStorage";
+import { getStoredMistakes, deleteStoredMistakes } from "../utils/mistakesStorage";
+import {
+  getReviewedMistakeIds, markMistakeReviewed, getMistakeLifecycle,
+  setMistakeCleanupDays, getCleanupCandidates, postponeMistakeCleanup,
+  initializeReviewedMistakeDates,
+  type CleanupDays,
+} from "../utils/mistakeLifecycle";
 export function Notebook({ onPractice }: { onPractice: () => void }) {
   const { language } = useLanguage();
   const en = language === "en";
-  const [mistakes] = useState(() => getStoredMistakes());
+  const [mistakes, setMistakes] = useState(() => getStoredMistakes());
   const [category, setCategory] = useState("all");
   const [reviewed, setReviewed] = useState<string[]>(() => {
     try {
-      const value = JSON.parse(
-        localStorage.getItem("tcf_reviewed_corrections") || "[]",
-      );
-      return Array.isArray(value) ? value : [];
+      return getReviewedMistakeIds();
     } catch {
       return [];
     }
@@ -30,6 +34,20 @@ export function Notebook({ onPractice }: { onPractice: () => void }) {
   const [revealed, setRevealed] = useState(false);
   const [attempt, setAttempt] = useState("");
   const [notice, setNotice] = useState("");
+  const [cleanupDays, setCleanupDays] = useState<CleanupDays>(() => {
+    try { initializeReviewedMistakeDates(); return getMistakeLifecycle().askAfterDays; } catch { return 30; }
+  });
+  const [cleanupIds, setCleanupIds] = useState<string[]>([]);
+  useEffect(() => {
+    const check = () => {
+      try { setCleanupIds(getCleanupCandidates(mistakes).map(m => m.id)); }
+      catch { setNotice(en ? "Cleanup reminders could not be read." : "Impossible de lire les rappels de nettoyage."); }
+    };
+    check();
+    const timer = window.setInterval(check, 60 * 60_000);
+    window.addEventListener("focus", check);
+    return () => { window.clearInterval(timer); window.removeEventListener("focus", check); };
+  }, [mistakes, reviewed, cleanupDays, en]);
   const entries = mistakes.filter(
     (m) =>
       (category === "all" || m.category === category) &&
@@ -45,20 +63,33 @@ export function Notebook({ onPractice }: { onPractice: () => void }) {
   };
   const mark = () => {
     if (!current) return;
-    const next = [...new Set([...reviewed, current.id])];
-    setReviewed(next);
     try {
-      localStorage.setItem("tcf_reviewed_corrections", JSON.stringify(next));
+      setReviewed(markMistakeReviewed(current.id));
     } catch {
       setNotice(
         en
           ? "Review status could not be saved."
           : "Le statut de révision n’a pas pu être sauvegardé.",
       );
+      return;
     }
     setRevealed(false);
     setAttempt("");
     if (!onlyPending) setIndex(Math.min(index + 1, entries.length - 1));
+  };
+  const remove = (ids: string[]) => {
+    try {
+      const next = deleteStoredMistakes(ids);
+      setMistakes(next);
+      setReviewed(getReviewedMistakeIds());
+      setIndex(0);
+      setRevealed(false);
+      setAttempt("");
+      if (category !== "all" && !next.some(m => m.category === category)) setCategory("all");
+      setNotice(en ? `${ids.length} correction(s) removed from this notebook.` : `${ids.length} correction(s) supprimée(s) de ce carnet.`);
+    } catch {
+      setNotice(en ? "The corrections could not be deleted. Please try again." : "Impossible de supprimer les corrections. Réessayez.");
+    }
   };
   return (
     <div className="page-enter">
@@ -85,6 +116,49 @@ export function Notebook({ onPractice }: { onPractice: () => void }) {
           {mastered} / {mistakes.length} {en ? "reviewed" : "revues"}
         </span>
       </div>
+      {notice && <p className="notice" role="status">{notice}</p>}
+      <div className="filter-bar">
+        <label className="select-field">
+          <span>{en ? "Ask before cleanup" : "Demander avant de nettoyer"}</span>
+          <select
+            aria-label={en ? "Cleanup reminder" : "Rappel de nettoyage"}
+            value={cleanupDays}
+            onChange={event => {
+              const days = Number(event.target.value) as CleanupDays;
+              try { setMistakeCleanupDays(days); setCleanupDays(days); }
+              catch { setNotice(en ? "The reminder preference could not be saved." : "Impossible d’enregistrer ce réglage."); }
+            }}
+          >
+            <option value={0}>{en ? "Off" : "Désactivé"}</option>
+            <option value={30}>{en ? "30 days after review" : "30 jours après révision"}</option>
+            <option value={90}>{en ? "90 days after review" : "90 jours après révision"}</option>
+          </select>
+        </label>
+        <button className="button secondary" disabled={!mastered} onClick={() => {
+          const ids = mistakes.filter(m => reviewed.includes(m.id)).map(m => m.id);
+          if (window.confirm(en ? `Delete ${ids.length} reviewed correction(s) from this notebook?` : `Supprimer ${ids.length} correction(s) revue(s) de ce carnet ?`)) remove(ids);
+        }}>
+          <Trash2 size={15} />{en ? "Delete reviewed" : "Supprimer les corrections revues"}
+        </button>
+      </div>
+      <p className="footnote">{en
+        ? "Cleanup asks first. Removing a notebook correction keeps the original writing and feedback. This preference applies to this browser."
+        : "Le nettoyage demande votre accord. Supprimer une correction du carnet conserve la rédaction et son bilan. Ce réglage s’applique à ce navigateur."}</p>
+      {cleanupIds.length > 0 && (
+        <div className="notice" role="status">
+          <div>
+            <p>{en ? `${cleanupIds.length} correction(s) were reviewed at least ${cleanupDays} days ago. Remove them from your notebook?`
+              : `${cleanupIds.length} correction(s) ont été revues il y a au moins ${cleanupDays} jours. Les supprimer du carnet ?`}</p>
+            <div className="row wrap">
+              <button className="button secondary" onClick={() => remove(cleanupIds)}>{en ? "Yes, delete these corrections" : "Oui, supprimer ces corrections"}</button>
+              <button className="text-button" onClick={() => {
+                try { postponeMistakeCleanup(); setCleanupIds([]); }
+                catch { setNotice(en ? "The reminder could not be postponed." : "Impossible de reporter le rappel."); }
+              }}>{en ? "Keep them · remind me in 7 days" : "Les garder · me rappeler dans 7 jours"}</button>
+            </div>
+          </div>
+        </div>
+      )}
       {mistakes.length ? (
         <>
           <div className="filter-bar">
@@ -127,11 +201,6 @@ export function Notebook({ onPractice }: { onPractice: () => void }) {
               {entries.length} {en ? "corrections" : "corrections"}
             </span>
           </div>
-          {notice && (
-            <p className="notice warning" role="status">
-              {notice}
-            </p>
-          )}
           {current ? (
             <div className="revision-card panel">
               <div className="row between">
@@ -181,6 +250,9 @@ export function Notebook({ onPractice }: { onPractice: () => void }) {
                         ? "I understand · Mark reviewed"
                         : "J’ai compris · Marquer comme revue"}
                     </button>
+                    <button className="button secondary" onClick={() => remove([current.id])}>
+                      <Trash2 size={16} />{en ? "I’ve learned this · Remove" : "J’ai appris cette règle · Supprimer"}
+                    </button>
                     <button
                       className="button secondary"
                       onClick={() => move(1)}
@@ -213,6 +285,9 @@ export function Notebook({ onPractice }: { onPractice: () => void }) {
                 <span>
                   {current.task_name} · {current.date}
                 </span>
+                <button className="text-button" onClick={() => remove([current.id])}>
+                  <Trash2 size={15} />{en ? "Delete correction" : "Supprimer la correction"}
+                </button>
                 <button
                   className="icon-button"
                   disabled={index >= entries.length - 1}

@@ -3,11 +3,16 @@ import fs from "node:fs";
 import ts from "typescript";
 import { randomUUID } from "node:crypto";
 
-const original = { fetch: globalThis.fetch, localStorage: globalThis.localStorage, setTimeout: globalThis.setTimeout };
+const original = { fetch: globalThis.fetch, localStorage: globalThis.localStorage, setTimeout: globalThis.setTimeout, document: globalThis.document };
 const stored = new Map();
 const references = [];
 let removeCount = 0;
-const channel = { on() { return this; }, subscribe() { return this; } };
+let realtimeListener;
+let eventOnSubscribe = null;
+const channel = {
+  on(_event, _filter, listener) { realtimeListener = listener; return this; },
+  subscribe() { if (eventOnSubscribe) realtimeListener({ new: { status: eventOnSubscribe } }); return this; },
+};
 globalThis.__jobClient = {
   supabase: {
     auth: { getSession: async () => ({ data: { session: { access_token: "owner-session" } } }) },
@@ -23,7 +28,15 @@ globalThis.localStorage = {
   removeItem: key => stored.delete(key),
   key: index => [...stored.keys()][index] ?? null,
 };
-globalThis.setTimeout = (callback, ms, ...args) => original.setTimeout(callback, ms === 3000 ? 0 : ms, ...args);
+const pollDelays = [];
+globalThis.document = { visibilityState: "visible" };
+globalThis.setTimeout = (callback, ms, ...args) => {
+  if ([30_000, 120_000].includes(ms)) {
+    pollDelays.push(ms);
+    return original.setTimeout(callback, 0, ...args);
+  }
+  return original.setTimeout(callback, ms === 3000 ? 0 : ms, ...args);
+};
 const source = ts.transpileModule(fs.readFileSync("src/services/evaluationJobs.ts", "utf8"), {
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
 }).outputText.replace(/^import .*;\n/gm, "");
@@ -32,7 +45,7 @@ const { queueEvaluation, hasPendingEvaluationJob, pendingEvaluationJobMatches } 
 );
 const input = {
   result: { id: "submission-1", answers: { task1: "Essay" }, combination: { tasks: {} } },
-  model: "gemini-3.8-flash", fingerprint: "essay-and-language-hash", language: "en",
+  model: "gemini-3.6-flash", fingerprint: "essay-and-language-hash", language: "en",
   request: { contents: [] },
 };
 const response = (value, status = 200, headers = {}) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json", ...headers } });
@@ -58,8 +71,22 @@ try {
   assert.equal(complete.model, "gemini-3.6-flash");
   assert.equal(complete.keySource, "backup");
   assert.equal(polls, 1);
+  assert.equal(pollDelays.at(-1), 30_000, "Visible tabs poll at most once every 30 seconds");
   assert.equal(removeCount, 1, "Realtime subscriptions must be cleaned up");
   assert.equal(hasPendingEvaluationJob(input.result.id), false);
+
+  globalThis.document.visibilityState = "hidden";
+  await queueEvaluation({ ...input, fingerprint: "hidden-tab" });
+  assert.equal(pollDelays.at(-1), 120_000, "Background tabs poll only every two minutes");
+  globalThis.document.visibilityState = "visible";
+  const beforeRealtime = pollDelays.length;
+  eventOnSubscribe = "completed";
+  await queueEvaluation({ ...input, fingerprint: "realtime-complete" });
+  assert.equal(pollDelays.length, beforeRealtime, "Realtime completion must not wait for the polling timer");
+  eventOnSubscribe = "running";
+  await queueEvaluation({ ...input, fingerprint: "realtime-running" });
+  assert.equal(pollDelays.length, beforeRealtime + 1, "Intermediate Realtime events must not trigger extra status reads");
+  eventOnSubscribe = null;
 
   // A failed POST acknowledgement keeps its capability, even before success
   // is known. Reopening must submit exactly the same id, not spend new quota.

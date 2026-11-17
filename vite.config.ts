@@ -11,7 +11,7 @@ import path from "path";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const model =
-    process.env.GEMINI_MODEL || env.GEMINI_MODEL || "gemini-3.8-flash";
+    process.env.GEMINI_MODEL || env.GEMINI_MODEL || "gemini-3.6-flash";
   const installGeminiRoute = (server: any) => {
     for (const [route, handler] of [
       ["/api/gemini", geminiHandler],

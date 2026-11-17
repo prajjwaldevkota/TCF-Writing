@@ -115,8 +115,8 @@ export function Settings({
           <p>{getGeminiModel()}</p>
           <p className="footnote">
             {en
-              ? "Automatic order: Gemini 3.8 Flash → 3.6 Flash → 3.5 Flash-Lite. A model availability error, quota error or temporary unavailability triggers the next model. No manual selection is needed. The model used is shown on your review."
-              : "Ordre automatique : Gemini 3.8 Flash → 3.6 Flash → 3.5 Flash-Lite. Une erreur d’accès au modèle, de quota ou d’indisponibilité temporaire déclenche le modèle suivant. Aucun choix manuel n’est nécessaire. Le modèle utilisé figure sur votre bilan."}
+              ? "Automatic order: Gemini 3.6 Flash → 3.5 Flash-Lite → 3.1 Flash-Lite. A model availability error, quota error or temporary unavailability triggers the next model. No manual selection is needed. The model used is shown on your review."
+              : "Ordre automatique : Gemini 3.6 Flash → 3.5 Flash-Lite → 3.1 Flash-Lite. Une erreur d’accès au modèle, de quota ou d’indisponibilité temporaire déclenche le modèle suivant. Aucun choix manuel n’est nécessaire. Le modèle utilisé figure sur votre bilan."}
           </p>
           <a
             className="text-button"

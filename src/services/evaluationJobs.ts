@@ -121,11 +121,18 @@ export async function queueEvaluation(input: {
     window.dispatchEvent(new CustomEvent("tcf-review-queued", { detail: { submissionId: input.result.id } }));
 
   let wake: (() => void) | undefined;
+  let completionNotified = false;
   // Authenticated owners receive Realtime notifications under RLS. Guests and
   // disconnected sockets use capability-protected short polling requests.
   const channel = auth.Authorization && supabase
     ? supabase.channel(`evaluation:${ref.id}`)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "evaluation_jobs", filter: `id=eq.${ref.id}` }, () => wake?.())
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "evaluation_jobs", filter: `id=eq.${ref.id}` }, event => {
+        // Intermediate worker updates do not need another status request.
+        if (["completed", "failed"].includes(event.new.status)) {
+          completionNotified = true;
+          wake?.();
+        }
+      })
       .subscribe()
     : null;
   try {
@@ -133,11 +140,18 @@ export async function queueEvaluation(input: {
     // the saved capability resumes it later without another provider request.
     const until = Date.now() + 30 * 60_000;
     while (current.status !== "completed" && current.status !== "failed") {
-      await new Promise<void>(resolve => {
-        const done = () => { clearTimeout(timer); wake = undefined; resolve(); };
-        const timer = setTimeout(done, 3000);
-        wake = done;
-      });
+      if (!completionNotified) {
+        await new Promise<void>(resolve => {
+          const done = () => { clearTimeout(timer); wake = undefined; resolve(); };
+          // Status reads consume hosting/database requests, not Gemini calls.
+          // Keep a slower watchdog even when Realtime is connected, in case
+          // its completion notification is missed or the socket disconnects.
+          const hidden = typeof document !== "undefined" && document.visibilityState === "hidden";
+          const timer = setTimeout(done, hidden ? 120_000 : 30_000);
+          wake = done;
+        });
+      }
+      completionNotified = false;
       if (Date.now() > until) throw interrupted();
       try {
         const status = await fetch(`/api/evaluate?id=${ref.id}`, {
