@@ -217,7 +217,15 @@ export function Settings({
                     ? "Sync my account"
                     : "Synchroniser mon compte"}
               </button>
-              <button className="text-button" onClick={() => void signOut()}>
+              <button
+                className="text-button"
+                onClick={() => {
+                  try {
+                    sessionStorage.removeItem("tcf_splash_dismissed");
+                  } catch {}
+                  void signOut();
+                }}
+              >
                 {en ? "Sign out" : "Se déconnecter"}
               </button>
             </div>

@@ -30,6 +30,10 @@ export function Notebook({ onPractice }: { onPractice: () => void }) {
     }
   });
   const [onlyPending, setOnlyPending] = useState(false);
+  const [quizMode, setQuizMode] = useState(false);
+  const [quizChecked, setQuizChecked] = useState(false);
+  const [quizSuccess, setQuizSuccess] = useState(false);
+  const [quizScore, setQuizScore] = useState({ correct: 0, total: 0 });
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [attempt, setAttempt] = useState("");
@@ -59,7 +63,28 @@ export function Notebook({ onPractice }: { onPractice: () => void }) {
   const move = (offset: number) => {
     setIndex(Math.max(0, Math.min(entries.length - 1, index + offset)));
     setRevealed(false);
+    setQuizChecked(false);
+    setQuizSuccess(false);
     setAttempt("");
+  };
+  const checkAnswer = () => {
+    if (!current) return;
+    const norm = (s: string) =>
+      s
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[«»""''`]/g, "")
+        .replace(/\s+/g, " ")
+        .replace(/[.,!?;:]/g, "");
+    const match = norm(attempt) === norm(current.corrected_text);
+    setQuizSuccess(match);
+    setQuizChecked(true);
+    setQuizScore((prev) => ({
+      correct: prev.correct + (match ? 1 : 0),
+      total: prev.total + 1,
+    }));
   };
   const mark = () => {
     if (!current) return;
@@ -74,6 +99,8 @@ export function Notebook({ onPractice }: { onPractice: () => void }) {
       return;
     }
     setRevealed(false);
+    setQuizChecked(false);
+    setQuizSuccess(false);
     setAttempt("");
     if (!onlyPending) setIndex(Math.min(index + 1, entries.length - 1));
   };
@@ -161,6 +188,30 @@ export function Notebook({ onPractice }: { onPractice: () => void }) {
       )}
       {mistakes.length ? (
         <>
+          <div className="segmented" style={{ marginBottom: 16 }}>
+            <button
+              type="button"
+              aria-pressed={!quizMode}
+              onClick={() => {
+                setQuizMode(false);
+                setQuizChecked(false);
+                setRevealed(false);
+              }}
+            >
+              📖 {en ? "Flashcard Mode" : "Mode Fiche"}
+            </button>
+            <button
+              type="button"
+              aria-pressed={quizMode}
+              onClick={() => {
+                setQuizMode(true);
+                setQuizChecked(false);
+                setRevealed(false);
+              }}
+            >
+              ⚡ {en ? "Interactive Quiz Sprint" : "Mode Quiz Interactif"}
+            </button>
+          </div>
           <div className="filter-bar">
             <label className="select-field">
               <NotebookPen size={17} />
@@ -228,7 +279,80 @@ export function Notebook({ onPractice }: { onPractice: () => void }) {
                   }
                 />
               </label>
-              {revealed ? (
+              {quizMode ? (
+                <>
+                  {!quizChecked ? (
+                    <button
+                      className="button primary"
+                      disabled={!attempt.trim()}
+                      onClick={checkAnswer}
+                    >
+                      <Check size={16} />
+                      {en ? "Check my correction" : "Vérifier ma correction"}
+                    </button>
+                  ) : (
+                    <div className="revealed-correction">
+                      {quizSuccess ? (
+                        <div className="rounded-lg p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 space-y-1 mb-2">
+                          <strong className="block text-sm font-bold flex items-center gap-1.5">
+                            <span>🎉</span>
+                            <span>{en ? "Excellent! Exact correction." : "Bravo ! Correction validée."}</span>
+                          </strong>
+                          <p className="text-xs">
+                            {en ? "Your answer matches the recommended TCF standard." : "Votre formulation correspond aux attentes officielles du TCF."}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="rounded-lg p-3.5 bg-amber-50 border border-amber-200 text-amber-900 space-y-2 mb-2">
+                          <strong className="block text-sm font-bold flex items-center gap-1.5">
+                            <span>💡</span>
+                            <span>{en ? "Not quite there — compare below:" : "Pas tout à fait — comparez ci-dessous :"}</span>
+                          </strong>
+                          <div className="text-xs space-y-1 font-mono">
+                            <p><span className="text-slate-500 font-sans font-semibold">{en ? "Your try:" : "Votre proposition :"}</span> {attempt || "(vide)"}</p>
+                            <p><span className="text-emerald-700 font-sans font-semibold">{en ? "Target:" : "Correction attendue :"}</span> {current.corrected_text}</p>
+                          </div>
+                        </div>
+                      )}
+                      <span className="eyebrow">
+                        {en ? "RULE & EXPLANATION" : "RÈGLE ET EXPLICATION"}
+                      </span>
+                      <p className="after-text">
+                        <Check size={18} />
+                        {current.corrected_text}
+                      </p>
+                      <p>{current.explanation}</p>
+                      <div className="row wrap">
+                        <button className="button primary" onClick={mark}>
+                          <CheckCheck size={16} />
+                          {quizSuccess
+                            ? (en ? "Next · Mark reviewed" : "Suivant · Marquer comme maîtrisé")
+                            : (en ? "Understood · Mark reviewed" : "J’ai compris · Marquer comme revu")}
+                        </button>
+                        {!quizSuccess && (
+                          <button
+                            className="button secondary"
+                            onClick={() => {
+                              setQuizChecked(false);
+                              setAttempt("");
+                            }}
+                          >
+                            <RotateCcw size={15} />
+                            {en ? "Try again" : "Réessayer"}
+                          </button>
+                        )}
+                        <button
+                          className="button secondary"
+                          onClick={() => move(1)}
+                        >
+                          <ArrowRight size={15} />
+                          {en ? "Skip for now" : "Passer à la suivante"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : revealed ? (
                 <div className="revealed-correction">
                   <span className="eyebrow">
                     {en ? "THE SAVED CORRECTION" : "LA CORRECTION ENREGISTRÉE"}

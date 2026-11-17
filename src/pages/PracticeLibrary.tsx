@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import data from "../data/questions.json";
 import type { ExamResult, QuestionsDB, TaskKey } from "../types/exam";
-import { QuestionEntry, questionEntries, TASK_INFO } from "../utils/practice";
+import { QuestionEntry, questionEntries, TASK_INFO, TOPIC_THEMES, detectTopicTheme, type TopicThemeKey } from "../utils/practice";
 import { useLanguage } from "../context/LanguageContext";
 import { selectRandomCombination } from "../utils/randomCombination";
 import { normalizeParagraphText } from "../utils/cleanText";
@@ -24,6 +24,7 @@ export const PracticeLibrary: React.FC<{
   const [task, setTask] = useState<TaskKey | "exam">("task1");
   const [query, setQuery] = useState("");
   const [year, setYear] = useState("all");
+  const [selectedTheme, setSelectedTheme] = useState<TopicThemeKey>("all");
   const [savedOnly, setSavedOnly] = useState(false);
   const [page, setPage] = useState(1);
   const [saved, setSaved] = useState<string[]>(() => {
@@ -45,20 +46,25 @@ export const PracticeLibrary: React.FC<{
   const filtered = useMemo(
     () =>
       allQuestions.filter(
-        (entry) =>
-          (year === "all" || entry.year === year) &&
-          (!savedOnly || saved.includes(entry.id)) &&
-          (!query.trim() ||
-            (task === "exam"
-              ? Object.values(entry.combination.tasks)
-              : [entry.combination.tasks[task]]
-            ).some((t) =>
-              (t.instruction + " " + (t.title || ""))
-                .toLocaleLowerCase()
-                .includes(query.trim().toLocaleLowerCase()),
-            )),
+        (entry) => {
+          const matchesYear = year === "all" || entry.year === year;
+          const matchesSaved = !savedOnly || saved.includes(entry.id);
+          const tasksToCheck = task === "exam"
+            ? Object.values(entry.combination.tasks)
+            : [entry.combination.tasks[task]];
+          const matchesQuery = !query.trim() || tasksToCheck.some((t) =>
+            (t.instruction + " " + (t.title || ""))
+              .toLocaleLowerCase()
+              .includes(query.trim().toLocaleLowerCase()),
+          );
+          const fullText = Object.values(entry.combination.tasks)
+            .map((t) => `${t.title || ""} ${t.instruction}`)
+            .join(" ");
+          const matchesTheme = selectedTheme === "all" || detectTopicTheme(fullText) === selectedTheme;
+          return matchesYear && matchesSaved && matchesQuery && matchesTheme;
+        },
       ),
-    [year, savedOnly, saved, query, task],
+    [year, savedOnly, saved, query, task, selectedTheme],
   );
   const displayed = randomSelection ? [randomSelection] : filtered;
   const drawRandom = () => {
@@ -195,6 +201,19 @@ export const PracticeLibrary: React.FC<{
           {en ? "Saved" : "Favoris"}
         </button>
       </div>
+      <div className="theme-filter-bar" role="group" aria-label={en ? "Filter by theme" : "Filtrer par thème"}>
+        {TOPIC_THEMES.map((themeItem) => (
+          <button
+            key={themeItem.key}
+            type="button"
+            className={`theme-pill ${selectedTheme === themeItem.key ? "active" : ""}`}
+            onClick={() => update(() => setSelectedTheme(themeItem.key))}
+          >
+            <span aria-hidden="true">{themeItem.icon}</span>
+            <span>{en ? themeItem.en : themeItem.fr}</span>
+          </button>
+        ))}
+      </div>
       <div className="row between library-count">
         <span className="muted text-small">
           {displayed.length} {en ? "sets found" : "séries disponibles"}
@@ -251,18 +270,32 @@ export const PracticeLibrary: React.FC<{
               );
               const unavailable =
                 (task === "task3" || task === "exam") && !hasSources;
+              const entryTheme = detectTopicTheme(
+                Object.values(entry.combination.tasks)
+                  .map((t) => `${t.title || ""} ${t.instruction}`)
+                  .join(" "),
+              );
+              const themeMeta = TOPIC_THEMES.find((t) => t.key === entryTheme);
               return (
                 <article className="topic-card" key={entry.id}>
                   <div className="row between">
-                    <span
-                      className={`badge ${task === "exam" ? "sand" : TASK_INFO[key].color}`}
-                    >
-                      {task === "exam"
-                        ? en
-                          ? "Full mock"
-                          : "Examen blanc"
-                        : `Tâche ${TASK_INFO[key].number}`}
-                    </span>
+                    <div className="row gap-2 items-center">
+                      <span
+                        className={`badge ${task === "exam" ? "sand" : TASK_INFO[key].color}`}
+                      >
+                        {task === "exam"
+                          ? en
+                            ? "Full mock"
+                            : "Examen blanc"
+                          : `Tâche ${TASK_INFO[key].number}`}
+                      </span>
+                      {themeMeta && themeMeta.key !== "all" && (
+                        <span className="topic-theme-badge">
+                          <span aria-hidden="true">{themeMeta.icon}</span>
+                          <span>{en ? themeMeta.en : themeMeta.fr}</span>
+                        </span>
+                      )}
+                    </div>
                     <button
                       className={`icon-button ${saved.includes(entry.id) ? "bookmarked" : ""}`}
                       aria-label={

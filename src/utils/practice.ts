@@ -7,6 +7,45 @@ import type {
 } from "../types/exam";
 
 export const TASK_KEYS: TaskKey[] = ["task1", "task2", "task3"];
+
+export type TopicThemeKey = "all" | "work" | "ecology" | "education" | "tech" | "society" | "culture";
+
+export interface TopicTheme {
+  key: TopicThemeKey;
+  fr: string;
+  en: string;
+  icon: string;
+}
+
+export const TOPIC_THEMES: TopicTheme[] = [
+  { key: "all", fr: "Tous les thèmes", en: "All Themes", icon: "🌐" },
+  { key: "work", fr: "Travail & Entreprise", en: "Work & Career", icon: "💼" },
+  { key: "ecology", fr: "Écologie & Climat", en: "Environment & Climate", icon: "🌱" },
+  { key: "education", fr: "Éducation & Jeunesse", en: "Education & Youth", icon: "🎓" },
+  { key: "tech", fr: "Numérique & IA", en: "Tech & AI", icon: "💻" },
+  { key: "society", fr: "Société & Vie quotidienne", en: "Society & Daily Life", icon: "👥" },
+  { key: "culture", fr: "Culture & Loisirs", en: "Culture & Leisure", icon: "✈️" },
+];
+
+export function detectTopicTheme(text: string): TopicThemeKey {
+  const lower = text.toLowerCase();
+  if (/travail|emploi|entreprise|bureau|salaire|télétravail|profession|collègue|métier|recrutement|chômage|poste|carrière/i.test(lower)) {
+    return "work";
+  }
+  if (/écolog|environn|climat|planète|déchet|recycl|pollut|énergie|vert|durable|nature|transport en commun|voiture|vélo/i.test(lower)) {
+    return "ecology";
+  }
+  if (/écol|étudiant|professeur|universit|jeune|enfant|enseign|scolaire|diplôme|formation|langue|cours|apprentissage/i.test(lower)) {
+    return "education";
+  }
+  if (/technolog|ordinat|téléphone|internet|numériq|intelligence artificielle|\bia\b|réseau social|écran|application|virtuel|robot/i.test(lower)) {
+    return "tech";
+  }
+  if (/voyage|tourisme|vacance|livre|musée|art|cinéma|sport|loisir|festival|musique|culture|spectacle/i.test(lower)) {
+    return "culture";
+  }
+  return "society";
+}
 export const TASK_INFO = {
   task1: {
     number: 1,

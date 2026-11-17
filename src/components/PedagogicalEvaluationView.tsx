@@ -1,8 +1,107 @@
 import React, { useState } from 'react';
 import { AIEvaluation, DimensionScore } from '../types/aiEvaluation';
 import { PedagogicalTask } from '../services/pedagogicalAssessment';
+import { ExamAnswers, ExamCombination } from '../types/exam';
 import { useLanguage } from '../context/LanguageContext';
 import { countFrenchWords } from '../utils/wordCount';
+
+/* ──────────────────────────────────────────────────
+   NCLC 7+ (B2/C1) Level-Up Models & Transformations
+   ────────────────────────────────────────────────── */
+const LEVEL_UP_DATA: Record<string, {
+  category: { en: string; fr: string };
+  b1: string;
+  b2_c1: string;
+  note: { en: string; fr: string };
+}[]> = {
+  task1: [
+    {
+      category: { en: 'Greeting & Opening', fr: 'Entrée en matière & Objet' },
+      b1: 'Je vous écris pour vous demander si...',
+      b2_c1: 'Je me permets de vous solliciter afin de recueillir de plus amples informations au sujet de...',
+      note: {
+        en: "Uses polite reflexives ('se permettre de') and formal vocabulary ('solliciter', 'au sujet de').",
+        fr: "Recours à la formule de politesse soutenue ('se permettre de') et au lexique formel ('solliciter', 'au sujet de').",
+      },
+    },
+    {
+      category: { en: 'Nuanced Cause & Reason', fr: 'Justification & Cause nuancée' },
+      b1: "Parce que c'est très important pour mon voyage...",
+      b2_c1: 'Étant donné que ce séjour revêt une importance capitale à mes yeux...',
+      note: {
+        en: "Replaces basic 'parce que' with causal participial connectors ('étant donné que') and idiomatic expression ('revêtir une importance').",
+        fr: "Remplace 'parce que' par un connecteur causal soutenu ('étant donné que') et la locution verbale 'revêtir une importance'.",
+      },
+    },
+    {
+      category: { en: 'Diplomatic Closing', fr: 'Prise de congé & Remerciements' },
+      b1: 'Merci beaucoup et répondez-moi vite.',
+      b2_c1: "En vous remerciant par avance pour l'attention accordée à ma requête, je vous prie d'agréer mes salutations distinguées.",
+      note: {
+        en: 'Uses a gerund opening and the classic formal closing formula required for official writing.',
+        fr: "Utilisation du gérondif introductif et de la formule de politesse officielle pour les courriers formels.",
+      },
+    },
+  ],
+  task2: [
+    {
+      category: { en: 'Chronological Narrative', fr: 'Progression temporelle & Narration' },
+      b1: "D'abord je suis allé là-bas et après j'ai vu beaucoup de choses.",
+      b2_c1: "Dès mon arrivée sur les lieux, je fus frappé par la diversité des paysages qui s'offraient à mon regard.",
+      note: {
+        en: "Replaces repetitive 'd'abord... après' with a temporal locator ('Dès mon arrivée...') and descriptive imagery.",
+        fr: "Évite l'enchaînement plat 'd'abord/après' au profit d'un marqueur d'immédiateté ('dès mon arrivée') et d'un enrichissement lexical.",
+      },
+    },
+    {
+      category: { en: 'Personal Reflection', fr: 'Prise de recul & Évaluation personnelle' },
+      b1: 'C’était bien et je recommande cette expérience à tout le monde.',
+      b2_c1: "Cette expérience s'est révélée particulièrement enrichissante, à telle enseigne que je ne saurais trop la recommander.",
+      note: {
+        en: "Expresses consequence with an advanced connector ('à telle enseigne que') and the polite conditional ('je ne saurais trop').",
+        fr: "Exprime la conséquence soutenue ('à telle enseigne que') et la nuance au conditionnel présent ('je ne saurais trop').",
+      },
+    },
+    {
+      category: { en: 'Contrast & Plot Twist', fr: 'Péripétie & Contraste narratif' },
+      b1: 'Mais il y a eu un problème imprévu avec notre transport.',
+      b2_c1: 'Toutefois, un contretemps logistique majeur est venu bousculer le déroulement initial de notre expédition.',
+      note: {
+        en: "Replaces 'problème' with 'contretemps logistique majeur' and uses 'venir + infinitif' for narrative dynamism.",
+        fr: "Substitue au mot passe-partout 'problème' un vocabulaire ciblé ('contretemps') et la tournure stylistique 'est venu bousculer'.",
+      },
+    },
+  ],
+  task3: [
+    {
+      category: { en: 'Synthesis of Viewpoints', fr: 'Synthèse des deux documents' },
+      b1: 'Le document 1 dit que le télétravail est bien alors que le document 2 dit le contraire.',
+      b2_c1: 'Tandis que le premier document met en exergue les vertus émancipatrices du télétravail, le second en dénonce les dérives insidieuses sur la cohésion d’équipe.',
+      note: {
+        en: "Balanced antithesis using 'Tandis que' with precise analytical verbs ('mettre en exergue', 'dénoncer les dérives').",
+        fr: "Antithèse équilibrée articulée par 'Tandis que' avec verbes analytiques ('mettre en exergue', 'dénoncer les dérives').",
+      },
+    },
+    {
+      category: { en: 'Nuanced Concession', fr: 'Concession & Réfutation nuancée' },
+      b1: "Même si les gens n'aiment pas cela, moi je pense que c'est une bonne chose.",
+      b2_c1: 'Bien que ces réticences soient légitimes, force est de constater que les retombées positives prévalent à long terme.',
+      note: {
+        en: "Employs the subjunctive after 'bien que' coupled with the impersonal rhetorical formula 'force est de constater'.",
+        fr: "Concession avec subjonctif obligatoire ('soient') et formule rhétorique impersonnelle ('force est de constater').",
+      },
+    },
+    {
+      category: { en: 'Position Defense', fr: 'Prise de position argumentée' },
+      b1: 'À mon avis, le gouvernement doit obliger les entreprises à faire attention.',
+      b2_c1: 'Il m’apparaît impérieux que les pouvoirs publics instaurent un cadre régulateur concerté plutôt qu’une contrainte arbitraire.',
+      note: {
+        en: "Replaces repetitive 'à mon avis' with 'il m’apparaît impérieux que + subjonctif' ('instaurent') and antithetical contrast.",
+        fr: "Élève le registre avec la tournure impersonnelle exigeant le subjonctif ('instaurent') et un contraste d’idées percutant.",
+      },
+    },
+  ],
+};
 
 /* ──────────────────────────────────────────────────
    Dimension labels & colour map
@@ -79,7 +178,14 @@ const CollapsibleSection: React.FC<{ title: string; icon: string; defaultOpen?: 
 /* ──────────────────────────────────────────────────
    Task-level evaluation card
    ────────────────────────────────────────────────── */
-const TaskCard: React.FC<{ taskKey: string; task: PedagogicalTask; en: boolean }> = ({ taskKey, task, en }) => {
+const TaskCard: React.FC<{
+  taskKey: string;
+  task: PedagogicalTask;
+  en: boolean;
+  userWordCount?: number;
+  minWords?: number;
+  maxWords?: number;
+}> = ({ taskKey, task, en, userWordCount, minWords, maxWords }) => {
   const [copiedModel, setCopiedModel] = useState(false);
   const taskNumber = taskKey.slice(-1);
 
@@ -91,7 +197,7 @@ const TaskCard: React.FC<{ taskKey: string; task: PedagogicalTask; en: boolean }
   };
 
   return (
-    <article className="border border-slate-200 rounded-xl overflow-hidden">
+    <article className="border border-slate-200 rounded-xl overflow-hidden bg-white">
       {/* Task Header */}
       <div className="bg-gradient-to-r from-slate-50 to-white px-5 py-4 border-b border-slate-200">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -138,6 +244,46 @@ const TaskCard: React.FC<{ taskKey: string; task: PedagogicalTask; en: boolean }
       </div>
 
       <div className="px-5 py-4 space-y-4">
+        {/* Official Word Count & Length Control */}
+        {userWordCount !== undefined && minWords !== undefined && maxWords !== undefined && (
+          <div
+            className={`rounded-lg p-3.5 border text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+              userWordCount < minWords
+                ? 'bg-red-50/80 border-red-200 text-red-950'
+                : userWordCount > maxWords
+                ? 'bg-amber-50/70 border-amber-200 text-amber-950'
+                : 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
+            }`}
+          >
+            <div className="flex items-start gap-2.5">
+              <span className="text-base shrink-0 mt-0.5">
+                {userWordCount < minWords ? '⚠️' : userWordCount > maxWords ? 'ℹ️' : '✅'}
+              </span>
+              <div>
+                <strong className="block text-xs uppercase tracking-wider font-bold">
+                  {en ? 'TCF Official Word Count Check' : 'Contrôle officiel de longueur TCF'}
+                </strong>
+                <p className="text-xs mt-0.5 leading-relaxed">
+                  {userWordCount < minWords
+                    ? en
+                      ? `Your text has ${userWordCount} words (minimum required: ${minWords} words). In the official TCF exam, falling below the minimum threshold incurs an automatic grade ceiling (-1 to -2 CEFR levels).`
+                      : `Votre texte contient ${userWordCount} mots (minimum requis : ${minWords} mots). Dans le TCF officiel, un texte sous le seuil minimal entraîne un plafonnement automatique de la note (-1 à -2 niveaux CEFR).`
+                    : userWordCount > maxWords
+                    ? en
+                      ? `Your text has ${userWordCount} words (+${userWordCount - maxWords} words over ${maxWords}). The TCF does not directly deduct points for slight excess, but manage your total exam time.`
+                      : `Votre texte contient ${userWordCount} mots (+${userWordCount - maxWords} mots au-dessus de ${maxWords}). Le TCF ne sanctionne pas directement un léger dépassement, mais veillez à la gestion de votre temps global.`
+                    : en
+                      ? `Word target met: ${userWordCount} words (required range: ${minWords}–${maxWords} words). Fully compliant.`
+                      : `Longueur conforme : ${userWordCount} mots (plage requise : ${minWords}–${maxWords} mots). Parfaitement recevable.`}
+                </p>
+              </div>
+            </div>
+            <span className="font-mono font-bold text-xs px-2.5 py-1 rounded bg-white/90 border border-current shrink-0 self-start sm:self-center">
+              {userWordCount} / {minWords}–{maxWords} {en ? 'words' : 'mots'}
+            </span>
+          </div>
+        )}
+
         {/* Admissibility Risks */}
         {task.risks.length > 0 && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
@@ -351,6 +497,48 @@ const TaskCard: React.FC<{ taskKey: string; task: PedagogicalTask; en: boolean }
           </CollapsibleSection>
         )}
 
+        {/* NCLC 7+ (B2/C1) Level-Up Transformations */}
+        {LEVEL_UP_DATA[taskKey] && (
+          <CollapsibleSection
+            title={en ? 'Level-Up to B2/C1 · Phrasing Upgrades' : 'Passez au niveau B2/C1 · Boîte à outils NCLC 7+'}
+            icon="🚀"
+            defaultOpen={false}
+          >
+            <div className="space-y-3">
+              <p className="text-xs text-slate-500">
+                {en
+                  ? 'Key syntactic patterns, connectors, and formal registers that elevate your score toward the NCLC 7+ benchmark:'
+                  : 'Structures syntaxiques, connecteurs logiques et tournures à haut rendement pour viser le seuil NCLC 7+ :'}
+              </p>
+              <div className="grid gap-3">
+                {LEVEL_UP_DATA[taskKey].map((item, i) => (
+                  <div key={i} className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/50 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
+                      <span>{en ? item.category.en : item.category.fr}</span>
+                      <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                        B1 → B2/C1
+                      </span>
+                    </div>
+                    <div className="space-y-1.5 text-xs font-mono">
+                      <div className="flex items-start gap-2 text-slate-600 bg-white p-2 rounded border border-slate-200">
+                        <span className="text-slate-400 font-sans font-bold text-[10px] uppercase shrink-0 mt-0.5">B1</span>
+                        <span>{item.b1}</span>
+                      </div>
+                      <div className="flex items-start gap-2 text-indigo-950 bg-indigo-50/60 p-2 rounded border border-indigo-200 font-semibold">
+                        <span className="text-indigo-600 font-sans font-bold text-[10px] uppercase shrink-0 mt-0.5">B2/C1</span>
+                        <span>{item.b2_c1}</span>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-600 italic">
+                      💡 {en ? item.note.en : item.note.fr}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CollapsibleSection>
+        )}
+
         {/* Model Answer */}
         {task.model_answer && task.model_answer.trim() && (
           <CollapsibleSection
@@ -391,7 +579,12 @@ const TaskCard: React.FC<{ taskKey: string; task: PedagogicalTask; en: boolean }
 /* ──────────────────────────────────────────────────
    Main PedagogicalEvaluationView
    ────────────────────────────────────────────────── */
-export const PedagogicalEvaluationView: React.FC<{ evaluation: AIEvaluation }> = ({ evaluation }) => {
+export const PedagogicalEvaluationView: React.FC<{
+  evaluation: AIEvaluation;
+  combination?: ExamCombination;
+  userAnswers?: ExamAnswers | Record<string, string>;
+  wordCounts?: { task1: number; task2: number; task3: number } | Record<string, number>;
+}> = ({ evaluation, combination, userAnswers, wordCounts }) => {
   const { language } = useLanguage();
   const en = language === 'en';
   const assessment = evaluation.pedagogical!;
@@ -430,7 +623,7 @@ export const PedagogicalEvaluationView: React.FC<{ evaluation: AIEvaluation }> =
         </div>
       </div>
 
-      {evaluation.rubric_version !== 'pedagogical-evidence-v5' && <p className="p-4 rounded-lg bg-amber-50 text-sm">{en?'Earlier review: this used different rating instructions and may contain custom practice points. Reassess to use the current evidence-based guide.':'Ancien bilan : consignes différentes, avec possibles notes pédagogiques personnalisées. Relancez l’évaluation pour utiliser le guide actuel fondé sur les observations.'}</p>}
+      {!evaluation.rubric_version?.startsWith('pedagogical-evidence') && <p className="p-4 rounded-lg bg-amber-50 text-sm">{en?'Earlier review: this used different rating instructions and may contain custom practice points. Reassess to use the current evidence-based guide.':'Ancien bilan : consignes différentes, avec possibles notes pédagogiques personnalisées. Relancez l’évaluation pour utiliser le guide actuel fondé sur les observations.'}</p>}
       {/* NCLC Projection */}
       <div className="border border-emerald-200 bg-emerald-50 p-5 rounded-xl">
         <h3 className="font-semibold text-emerald-900">
@@ -460,7 +653,20 @@ export const PedagogicalEvaluationView: React.FC<{ evaluation: AIEvaluation }> =
       {evaluation.evaluated_tasks.map(key => {
         const task = assessment.tasks[key];
         if (!task) return null;
-        return <TaskCard key={key} taskKey={key} task={task} en={en} />;
+        const taskReq = combination?.tasks?.[key];
+        const userText = userAnswers?.[key] || '';
+        const count = wordCounts?.[key] ?? (userText ? countFrenchWords(userText) : undefined);
+        return (
+          <TaskCard
+            key={key}
+            taskKey={key}
+            task={task}
+            en={en}
+            userWordCount={count}
+            minWords={taskReq?.minWords}
+            maxWords={taskReq?.maxWords}
+          />
+        );
       })}
 
       {/* Footer */}

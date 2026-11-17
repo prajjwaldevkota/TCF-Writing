@@ -8,11 +8,13 @@ import {
   AlertCircle,
   FilePenLine,
   Loader2,
+  Lock,
   RotateCcw,
   Sparkles,
 } from "lucide-react";
 import type { ExamResult, TaskKey } from "../types/exam";
 import { useLanguage } from "../context/LanguageContext";
+import { useAuth } from "../context/AuthContext";
 import { getStoredSubmissions } from "../utils/storage";
 import { countFrenchWords, formatTime } from "../utils/wordCount";
 import { practicedKeys, TASK_INFO, TASK_KEYS } from "../utils/practice";
@@ -23,6 +25,7 @@ import { getGeminiModel } from "../utils/geminiSettings";
 import { mockProjectionEligibility } from "../services/pedagogicalAssessment";
 import { AIEvaluationView } from "../components/AIEvaluationView";
 import { SubmissionExport } from "../components/SubmissionExport";
+import { EvaluationStepper } from "../components/EvaluationStepper";
 export function Results({
   result,
   onSave,
@@ -30,6 +33,7 @@ export function Results({
   onHomeClick,
   onSettings,
   onNotebook,
+  onLogin,
 }: {
   result: ExamResult;
   onSave: (result: ExamResult) => void;
@@ -37,7 +41,9 @@ export function Results({
   onHomeClick: () => void;
   onSettings: () => void;
   onNotebook: () => void;
+  onLogin?: () => void;
 }) {
+  const { user } = useAuth();
   const { language } = useLanguage();
   const en = language === "en";
   const keys = result.isPracticeMode ? practicedKeys(result) : TASK_KEYS;
@@ -63,6 +69,15 @@ export function Results({
     result.isPracticeMode ? keys : ["task1", "task2", "task3"],
   );
   const review = async (force = false, resume = false) => {
+    if (!user) {
+      setError(
+        en
+          ? "An account is required to generate AI reviews. Please sign in or create a free account."
+          : "Un compte est requis pour générer un bilan par IA. Veuillez vous connecter ou créer un compte gratuit.",
+      );
+      if (onLogin) onLogin();
+      return;
+    }
     if (locked.current) return;
     locked.current = true;
     setBusy(true);
@@ -123,13 +138,8 @@ export function Results({
         </span>
       </div>
       <SubmissionExport key={result.id} result={result} />
-      {busy && background && (
-        <div className="notice" role="status">
-          <Loader2 className="spin" size={20} />
-          <p>{en
-            ? "Your review is running in the background. You can close this tab and reopen this submission later to collect your feedback."
-            : "Votre correction continue en arrière-plan. Vous pouvez fermer cet onglet et rouvrir cette rédaction plus tard pour retrouver votre bilan."}</p>
-        </div>
+      {busy && (
+        <EvaluationStepper en={en} isBackground={background} />
       )}
       <div className="review-summary">
         <div>
@@ -219,27 +229,55 @@ export function Results({
                 : "Obtenez une plage de niveau, des preuves tirées de votre texte, des corrections vérifiées et quelques priorités claires. Aucun appel IA automatique."}
             </p>
           </div>
-          <div className="review-provider-actions">
-            <span className="muted text-small">{getGeminiModel()}</span>
-            <button
-              className="button primary"
-              disabled={!!busy}
-              onClick={() => void review()}
-            >
-              {busy ? (
-                <Loader2 className="spin" size={17} />
-              ) : (
-                <Sparkles size={17} />
-              )}{" "}
-              {busy
-                ? en
-                  ? "Reviewing…"
-                  : "Analyse en cours…"
-                : en
-                  ? "Get my feedback"
-                  : "Obtenir mon bilan"}
-            </button>
-          </div>
+          {user ? (
+            <div className="review-provider-actions">
+              <span className="muted text-small">{getGeminiModel()}</span>
+              <button
+                className="button primary"
+                disabled={!!busy}
+                onClick={() => void review()}
+              >
+                {busy ? (
+                  <Loader2 className="spin" size={17} />
+                ) : (
+                  <Sparkles size={17} />
+                )}{" "}
+                {busy
+                  ? en
+                    ? "Reviewing…"
+                    : "Analyse en cours…"
+                  : en
+                    ? "Get my feedback"
+                    : "Obtenir mon bilan"}
+              </button>
+            </div>
+          ) : (
+            <div className="review-auth-gate rounded-xl border border-blue-200 bg-blue-50/80 p-5 space-y-3">
+              <div className="flex items-center gap-2 text-blue-900 font-bold text-sm">
+                <Lock size={17} className="text-blue-700" />
+                <span>
+                  {en
+                    ? "Sign in required for AI evaluation"
+                    : "Connexion requise pour l'évaluation par IA"}
+                </span>
+              </div>
+              <p className="text-xs text-blue-950 leading-relaxed">
+                {en
+                  ? "Your writing is safely saved on this device. Create a free account or sign in to generate your complete AI pedagogical review, CEFR level range, and mistake analysis."
+                  : "Votre rédaction est bien conservée sur cet appareil. Connectez-vous ou créez un compte gratuit pour lancer le bilan pédagogique IA, le niveau CECRL et les corrections détaillées."}
+              </p>
+              <div className="pt-1">
+                <button
+                  type="button"
+                  className="button primary"
+                  onClick={onLogin}
+                >
+                  <Lock size={15} />
+                  <span>{en ? "Sign In / Create Free Account" : "Se connecter / Créer un compte gratuit"}</span>
+                </button>
+              </div>
+            </div>
+          )}
         </section>
       )}
       {!result.isPracticeMode && (
@@ -374,8 +412,8 @@ export function Results({
               <Loader2 className="spin" size={20} />
               <span>
                 {en
-                  ? "Reading your communication, then your language control. This may take a moment."
-                  : "Lecture de votre communication, puis de votre maîtrise de la langue. Cela peut prendre un moment."}
+                  ? "Evaluating your answer against CEFR benchmarks (see progress above)…"
+                  : "Évaluation de votre réponse selon les critères du CECRL (voir progression ci-dessus)…"}
               </span>
             </div>
           )}
@@ -643,24 +681,40 @@ export function Results({
             {en ? "Review options" : "Options de correction"}
             <ChevronDown size={16} />
           </summary>
-          <p>
-            {en
-              ? "A new Gemini review uses the app’s automatic model selection and consumes API quota. Your saved feedback stays available if the request fails."
-              : "Un nouveau bilan Gemini utilise la sélection automatique du modèle et consomme du quota API. Votre bilan enregistré reste disponible si la demande échoue."}
-          </p>
-          <div className="row wrap">
-            <button
-              className="button secondary"
-              disabled={!!busy}
-              onClick={() => void review(true)}
-            >
-              <RotateCcw size={14} />
-              {en ? "New Gemini review" : "Nouvelle correction Gemini"}
-            </button>
-            <button className="text-button" onClick={onSettings}>
-              {en ? "AI settings" : "Réglages IA"}
-            </button>
-          </div>
+          {user ? (
+            <>
+              <p>
+                {en
+                  ? "A new Gemini review uses the app’s automatic model selection and consumes API quota. Your saved feedback stays available if the request fails."
+                  : "Un nouveau bilan Gemini utilise la sélection automatique du modèle et consomme du quota API. Votre bilan enregistré reste disponible si la demande échoue."}
+              </p>
+              <div className="row wrap">
+                <button
+                  className="button secondary"
+                  disabled={!!busy}
+                  onClick={() => void review(true)}
+                >
+                  <RotateCcw size={14} />
+                  {en ? "New Gemini review" : "Nouvelle correction Gemini"}
+                </button>
+                <button className="text-button" onClick={onSettings}>
+                  {en ? "AI settings" : "Réglages IA"}
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="py-2 space-y-2">
+              <p className="text-xs text-slate-500">
+                {en
+                  ? "Sign in to request additional AI evaluations."
+                  : "Connectez-vous pour demander de nouveaux bilans IA."}
+              </p>
+              <button className="button primary" onClick={onLogin}>
+                <Lock size={14} />
+                <span>{en ? "Sign in to review" : "Se connecter pour évaluer"}</span>
+              </button>
+            </div>
+          )}
         </details>
       )}
     </div>

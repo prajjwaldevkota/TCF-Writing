@@ -9,6 +9,7 @@ import { Progress } from "./pages/Progress";
 import { Notebook } from "./pages/Notebook";
 import { Settings } from "./pages/Settings";
 import { Login } from "./pages/Login";
+import { SplashScreen } from "./pages/SplashScreen";
 import { AppLayout, AppView } from "./components/AppLayout";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LanguageProvider, useLanguage } from "./context/LanguageContext";
@@ -70,6 +71,18 @@ function MainRouter() {
   const [draft, setDraft] = useState<PracticeSession | null>(
     loadPracticeSession,
   );
+  const [guestDismissed, setGuestDismissed] = useState<boolean>(() => {
+    try {
+      return (
+        sessionStorage.getItem("tcf_splash_dismissed") === "1" ||
+        (location.hash.length > 2 &&
+          location.hash !== "#/home" &&
+          location.hash !== "#/login")
+      );
+    } catch {
+      return false;
+    }
+  });
   const [active, setActive] = useState<ExamResult | null>(
     () => getStoredSubmissions().find((s) => s.id === route().id) || null,
   );
@@ -298,6 +311,7 @@ function MainRouter() {
           onHomeClick={() => navigate("home")}
           onSettings={() => navigate("settings")}
           onNotebook={() => navigate("notebook")}
+          onLogin={() => navigate("login")}
         />
       );
     if (view === "library")
@@ -325,9 +339,18 @@ function MainRouter() {
       );
     if (view === "login")
       return (
-        <Login
-          onSuccess={() => navigate("home")}
-          onHomeClick={() => navigate("home")}
+        <SplashScreen
+          onSuccess={() => {
+            setGuestDismissed(true);
+            navigate("home");
+          }}
+          onContinueGuest={() => {
+            try {
+              sessionStorage.setItem("tcf_splash_dismissed", "1");
+            } catch {}
+            setGuestDismissed(true);
+            navigate("home");
+          }}
         />
       );
     return (
@@ -345,6 +368,25 @@ function MainRouter() {
       />
     );
   };
+
+  if ((!user && !guestDismissed && (view === "home" || view === "login")) || view === "login") {
+    return (
+      <SplashScreen
+        onSuccess={() => {
+          setGuestDismissed(true);
+          navigate("home");
+        }}
+        onContinueGuest={() => {
+          try {
+            sessionStorage.setItem("tcf_splash_dismissed", "1");
+          } catch {}
+          setGuestDismissed(true);
+          navigate("home");
+        }}
+      />
+    );
+  }
+
   return (
     <AppLayout view={view} onNavigate={navigate} name={name} hasDraft={!!draft}>
       {notice && (

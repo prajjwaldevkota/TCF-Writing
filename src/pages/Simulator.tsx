@@ -310,6 +310,44 @@ export function Simulator({
           )}
         </div>
       </header>
+      {isExam && (
+        <div
+          role="status"
+          className={`exam-simulation-banner ${
+            timeLeft <= 300
+              ? "critical"
+              : timeLeft <= 900
+              ? "warning"
+              : "normal"
+          }`}
+        >
+          <div className="exam-banner-left">
+            <span className="exam-badge">
+              🇨🇦 {en ? "OFFICIAL TCF CANADA SIMULATION" : "SIMULATION OFFICIELLE TCF CANADA"}
+            </span>
+            <span className="exam-conditions-tag">
+              {en
+                ? "60 min global · Spell-check & Paste locked"
+                : "60 min global · Correcteur & Copier-coller verrouillés"}
+            </span>
+          </div>
+          <div className="exam-banner-right">
+            {timeLeft <= 300 ? (
+              <span className="exam-urgency-alert pulse">
+                🚨 {en ? "Final 5 minutes! Review agreements and accents." : "Dernières 5 minutes ! Relisez les accords et accents."}
+              </span>
+            ) : timeLeft <= 900 ? (
+              <span className="exam-urgency-alert">
+                ⏳ {en ? "15 minutes remaining — allocate time for Task 3." : "Plus que 15 minutes — gardez du temps pour la tâche 3."}
+              </span>
+            ) : (
+              <span className="exam-hint">
+                {en ? "Manage your time freely between Tasks 1, 2, and 3." : "Gérez librement vos 60 minutes entre les 3 tâches."}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
       <div className="writing-session-bar">
         {session.keys.length > 1 ? (
           <div
@@ -722,11 +760,11 @@ export function Simulator({
                   : `Retirez au moins ${words - requirement.maxWords} ${words - requirement.maxWords === 1 ? "mot" : "mots"} pour respecter la limite.`
                 : inRange
                   ? en
-                    ? "Word target reached. Review your response before finishing."
-                    : "Longueur respectée. Relisez votre texte avant de terminer."
+                    ? `Word target reached (${requirement.minWords}–${requirement.maxWords} words). Fully compliant.`
+                    : `Longueur conforme aux exigences officielles (${requirement.minWords}–${requirement.maxWords} mots).`
                   : en
-                    ? `${requirement.minWords - words} more words to reach the minimum.`
-                    : `Encore ${requirement.minWords - words} mots pour atteindre le minimum.`}
+                    ? `${requirement.minWords - words} more words to reach the minimum (TCF penalty applies below ${requirement.minWords}).`
+                    : `Encore ${requirement.minWords - words} mots pour atteindre le minimum (seuil officiel : ${requirement.minWords} mots).`}
             </span>
           </div>
           <div className="writing-editor-footer">

@@ -213,11 +213,10 @@ export const Home: React.FC<{
         <section className="panel simple-recent">
           <div className="section-head">
             <h2>{en ? "Your recent writing" : "Vos dernières rédactions"}</h2>
-            <span className="muted text-small">
-              {en
-                ? "Open to review or rewrite"
-                : "Ouvrir pour corriger ou réécrire"}
-            </span>
+            <button className="text-button" onClick={onProgress}>
+              {en ? "View all writings" : "Voir toutes les rédactions"} ({submissions.length})
+              <ArrowRight size={15} />
+            </button>
           </div>
           <SessionList sessions={submissions.slice(0, 3)} onOpen={onOpen} />
         </section>

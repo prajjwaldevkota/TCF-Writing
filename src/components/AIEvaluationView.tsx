@@ -390,5 +390,10 @@ const LegacyAIEvaluationView: React.FC<AIEvaluationViewProps> = ({
 };
 
 export const AIEvaluationView: React.FC<AIEvaluationViewProps> = (props) => props.evaluation.pedagogical
-  ? <PedagogicalEvaluationView evaluation={props.evaluation}/>
+  ? <PedagogicalEvaluationView
+      evaluation={props.evaluation}
+      combination={props.combination}
+      userAnswers={props.userAnswers}
+      wordCounts={props.wordCounts}
+    />
   : <><p className="p-4 bg-amber-50 text-sm">Ancienne estimation IA / Legacy AI estimate — non officielle. Relancez une séance pour obtenir le nouveau bilan pédagogique.</p><LegacyAIEvaluationView {...props}/></>;
