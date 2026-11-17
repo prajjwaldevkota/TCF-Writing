@@ -93,7 +93,10 @@ export async function handler(request: Request): Promise<Response> {
       duration_ms: Date.now() - started, error_type: type, provider_code: provider,
       retry_after_seconds: retryAfter,
     });
-    const retryable = code !== "invalid_json" && (!status || [401, 403, 404, 429, 500, 502, 503, 504].includes(status));
+    // Receiving HTTP headers is not a completed response. A deadline/network
+    // failure while reading a 200 response body still needs queue fallback.
+    const retryable = code === "timeout" || code === "network_error" ||
+      (code === "http_error" && [401, 403, 404, 429, 500, 502, 503, 504].includes(status));
     let next = job.next_step + 1;
     // A timeout skips the rest of this model instead of repeating slow work.
     if (code === "timeout" || status === 504)

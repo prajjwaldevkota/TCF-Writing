@@ -11,6 +11,7 @@ const oldWarn = console.warn;
 const jobs = new Map();
 const publications = [];
 const providerCalls = [];
+const statusSelections = [];
 let providerResponses = [];
 let publishFails = false;
 let claimFails = false;
@@ -82,6 +83,11 @@ try {
       Object.assign(job, body);
       return response([clone(job)]);
     }
+    const selection = url.searchParams.get("select");
+    if (selection) {
+      statusSelections.push(selection.split(","));
+      return response(job ? [Object.fromEntries(selection.split(",").map(field => [field, job[field]]))] : []);
+    }
     return response(job ? [clone(job)] : []);
   };
   const first = requestBody();
@@ -99,6 +105,12 @@ try {
   const visible = await (await status(first)).json();
   assert(!JSON.stringify(visible).includes("private essay"));
   assert(!JSON.stringify(visible).includes("sentinel"));
+  assert(statusSelections.length > 0);
+  for (const fields of statusSelections) {
+    assert(!fields.includes("input"), "Polling must not download the full essay/prompt from Supabase");
+    assert(fields.includes("token_hash"), "Projected reads must still check the job capability");
+    assert(fields.includes("response"), "Completed results remain retrievable");
+  }
   assert.equal((await work(first.id, false)).status, 401);
   assert.equal(providerCalls.length, 0);
 
@@ -124,6 +136,20 @@ try {
   assert.equal(jobs.get(timeoutJob.id).next_step, 2, "Deadline skips the same model's backup key");
   assert.equal((await work(timeoutJob.id)).status, 200);
   assert(providerCalls.at(-1).url.includes("gemini-3.5-flash-lite"));
+
+  // Headers can arrive before the provider's body finishes. A 200 header
+  // must not turn a body deadline into a permanent job failure.
+  const stalledBodyJob = requestBody();
+  await enqueue(stalledBodyJob);
+  providerResponses = [
+    { status: 200, ok: true, text: async () => { throw timeout; } },
+    response({ candidates: [] }),
+  ];
+  assert.equal((await work(stalledBodyJob.id)).status, 503);
+  assert.equal(jobs.get(stalledBodyJob.id).status, "retrying");
+  assert.equal(jobs.get(stalledBodyJob.id).next_step, 2);
+  assert.equal((await work(stalledBodyJob.id)).status, 200);
+  assert.equal(jobs.get(stalledBodyJob.id).model, "gemini-3.5-flash-lite");
 
   const concurrent = requestBody();
   await enqueue(concurrent);

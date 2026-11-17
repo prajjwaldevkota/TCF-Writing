@@ -53,7 +53,14 @@ export async function getJob(id: string): Promise<EvaluationJob | undefined> {
   return (await database<EvaluationJob[]>(`evaluation_jobs?id=eq.${id}&limit=1`))[0];
 }
 
-export function publicJob(job: EvaluationJob) {
+type JobStatus = Pick<EvaluationJob, "id" | "token_hash" | "status" | "attempts" | "response" | "model" | "key_source" | "error_code">;
+export async function getJobStatus(id: string): Promise<JobStatus | undefined> {
+  // Polls need neither the essay/prompt nor lease and ownership metadata.
+  const fields = "id,token_hash,status,attempts,response,model,key_source,error_code";
+  return (await database<JobStatus[]>(`evaluation_jobs?id=eq.${id}&select=${fields}&limit=1`))[0];
+}
+
+export function publicJob(job: Omit<JobStatus, "token_hash">) {
   return {
     id: job.id, status: job.status, attempts: job.attempts,
     response: job.status === "completed" ? job.response : null,

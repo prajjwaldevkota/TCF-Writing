@@ -1,5 +1,5 @@
 import {
-  UUID, MODELS, hash, json, database, getJob, publicJob, queueConfig,
+  UUID, MODELS, hash, json, database, getJob, getJobStatus, publicJob, queueConfig,
   publishJob, credentials, terminal, databaseConfig,
 } from "../server/evaluationJobs.js";
 
@@ -13,7 +13,7 @@ export async function handler(request: Request): Promise<Response> {
       const id = new URL(request.url).searchParams.get("id") || "";
       const token = request.headers.get("X-TCF-Job-Token") || "";
       if (!UUID.test(id) || !UUID.test(token)) return json({ error: "not_found" }, 404);
-      const job = await getJob(id);
+      const job = await getJobStatus(id);
       if (!job || job.token_hash !== hash(token)) return json({ error: "not_found" }, 404);
       return json(publicJob(job));
     }
