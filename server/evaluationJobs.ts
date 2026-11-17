@@ -81,22 +81,30 @@ export function workerAuthorized(request: Request): boolean {
 
 export async function publishJob(id: string): Promise<string> {
   const { token, secret, origin } = queueConfig();
-  const response = await fetch(`https://qstash.upstash.io/v2/publish/${origin}/api/evaluation-worker`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`, "Content-Type": "application/json",
-      "Upstash-Forward-Authorization": `Bearer ${secret}`,
-      "Upstash-Deduplication-Id": id,
-      "Upstash-Retries": "8",
-      "Upstash-Retry-Delay": "min(300000, 30000 * pow(2, retried))",
-      "Upstash-Timeout": "150s",
-      "Upstash-Failure-Callback": `${origin}/api/evaluation-worker?failed=${id}`,
-      "Upstash-Failure-Callback-Forward-Authorization": `Bearer ${secret}`,
-    },
-    // The queue receives only a random job ID; essays and Gemini keys stay in Supabase/Vercel.
-    body: JSON.stringify({ id }),
-    signal: AbortSignal.timeout(5000),
+  const qstashBase = (process.env.QSTASH_URL || "https://qstash.upstash.io").trim().replace(/\/$/, "");
+  const headers = {
+    Authorization: `Bearer ${token}`, "Content-Type": "application/json",
+    "Upstash-Forward-Authorization": `Bearer ${secret}`,
+    "Upstash-Deduplication-Id": id,
+    "Upstash-Retries": "8",
+    "Upstash-Retry-Delay": "min(300000, 30000 * pow(2, retried))",
+    "Upstash-Timeout": "150s",
+    "Upstash-Failure-Callback": `${origin}/api/evaluation-worker?failed=${id}`,
+    "Upstash-Failure-Callback-Forward-Authorization": `Bearer ${secret}`,
+  };
+  // The queue receives only a random job ID; essays and Gemini keys stay in Supabase/Vercel.
+  let response = await fetch(`${qstashBase}/v2/publish/${origin}/api/evaluation-worker`, {
+    method: "POST", headers, body: JSON.stringify({ id }), signal: AbortSignal.timeout(5000),
   });
+  // If the account belongs to US-East-1 (North America accounts), auto-fallback on region mismatch
+  if (response.status === 404 && qstashBase === "https://qstash.upstash.io") {
+    const text = await response.text().catch(() => "");
+    if (text.includes("not found in this region")) {
+      response = await fetch(`https://qstash-us-east-1.upstash.io/v2/publish/${origin}/api/evaluation-worker`, {
+        method: "POST", headers, body: JSON.stringify({ id }), signal: AbortSignal.timeout(5000),
+      });
+    }
+  }
   if (!response.ok) throw new Error("queue_publish_failed");
   const body = await response.json();
   if (typeof body.messageId !== "string") throw new Error("queue_publish_failed");

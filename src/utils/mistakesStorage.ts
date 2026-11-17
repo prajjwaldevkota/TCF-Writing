@@ -1,8 +1,9 @@
 import { AIEvaluation, MistakeItem, SavedMistake } from '../types/aiEvaluation';
 import { ExamResult, TaskKey } from '../types/exam';
 import { getStoredSubmissions } from './storage';
+import { MISTAKES_STORAGE_KEY, filterDeletedMistakes, removeMistakes } from './mistakeLifecycle';
 
-export const MISTAKES_STORAGE_KEY = 'tcf_saved_mistakes_v1';
+export { MISTAKES_STORAGE_KEY } from './mistakeLifecycle';
 
 export const CANONICAL_CATEGORIES = [
   'Orthographe / Accents',
@@ -142,7 +143,7 @@ export function getStoredMistakes(): SavedMistake[] {
       }
     }
 
-    return mistakes;
+    return filterDeletedMistakes(mistakes);
   } catch (err) {
     console.error('Error reading mistakes from localStorage:', err);
     return [];
@@ -221,7 +222,7 @@ export function saveEvaluationMistakes(evaluation: AIEvaluation, result: ExamRes
     }
   }
 
-  const updated = [...newMistakes, ...existingMistakes];
+  const updated = filterDeletedMistakes([...newMistakes, ...existingMistakes]);
   try {
     localStorage.setItem(MISTAKES_STORAGE_KEY, JSON.stringify(updated));
   } catch (e) {
@@ -290,31 +291,23 @@ export function mergeMistakesFromSubmissions(
     }
   }
 
-  return result;
+  return filterDeletedMistakes(result);
 }
 
 /**
  * Delete a mistake by id
  */
 export function deleteStoredMistake(id: string): SavedMistake[] {
-  try {
-    const mistakes = getStoredMistakes();
-    const updated = mistakes.filter((m) => m.id !== id);
-    localStorage.setItem(MISTAKES_STORAGE_KEY, JSON.stringify(updated));
-    return updated;
-  } catch (e) {
-    console.error('Error deleting mistake:', e);
-    return [];
-  }
+  return deleteStoredMistakes([id]);
+}
+export function deleteStoredMistakes(ids: string[]): SavedMistake[] {
+  return removeMistakes(getStoredMistakes(), ids);
 }
 
 /**
  * Clear all stored mistakes
  */
 export function clearAllStoredMistakes(): void {
-  try {
-    localStorage.removeItem(MISTAKES_STORAGE_KEY);
-  } catch (e) {
-    console.error('Error clearing mistakes:', e);
-  }
+  const mistakes = getStoredMistakes();
+  removeMistakes(mistakes, mistakes.map(m => m.id));
 }
