@@ -17,7 +17,8 @@ import { getStoredSubmissions } from "../utils/storage";
 import { countFrenchWords, formatTime } from "../utils/wordCount";
 import { practicedKeys, TASK_INFO, TASK_KEYS } from "../utils/practice";
 import { withGeminiReview } from "../utils/reviewState";
-import { reviewSubmission } from "../services/reviewWorkflow";
+import { reviewSubmission, resumeSubmissionReview } from "../services/reviewWorkflow";
+import { hasPendingEvaluationJob } from "../services/evaluationJobs";
 import { getGeminiModel } from "../utils/geminiSettings";
 import { mockProjectionEligibility } from "../services/pedagogicalAssessment";
 import { AIEvaluationView } from "../components/AIEvaluationView";
@@ -42,6 +43,7 @@ export function Results({
   const keys = result.isPracticeMode ? practicedKeys(result) : TASK_KEYS;
   const [active, setActive] = useState<TaskKey>(keys[0] || "task1");
   const [busy, setBusy] = useState(false);
+  const [background, setBackground] = useState(() => hasPendingEvaluationJob(result.id));
   const [error, setError] = useState("");
   const locked = useRef(false);
   const errorRef = useRef<HTMLDivElement>(null);
@@ -60,14 +62,14 @@ export function Results({
     result,
     result.isPracticeMode ? keys : ["task1", "task2", "task3"],
   );
-  const review = async (force = false) => {
+  const review = async (force = false, resume = false) => {
     if (locked.current) return;
     locked.current = true;
     setBusy(true);
     setError("");
     try {
-      const data = await reviewSubmission(result, force);
-      onSave(withGeminiReview(result, data));
+      const data = resume ? await resumeSubmissionReview(result) : await reviewSubmission(result, force);
+      if (data) onSave(withGeminiReview(result, data));
     } catch (e) {
       setError(
         e instanceof Error
@@ -81,6 +83,16 @@ export function Results({
       setBusy(false);
     }
   };
+  useEffect(() => {
+    const queued = (event: Event) => {
+      if ((event as CustomEvent).detail?.submissionId === result.id) setBackground(true);
+    };
+    window.addEventListener("tcf-review-queued", queued);
+    // Resuming a saved job reads its existing result; it never creates a new
+    // evaluation just because the learner opened this page.
+    if (hasPendingEvaluationJob(result.id)) void review(true, true);
+    return () => window.removeEventListener("tcf-review-queued", queued);
+  }, [result.id]);
   const words = countFrenchWords(result.answers[active]);
   const requirement = result.combination.tasks[active];
   return (
@@ -111,6 +123,14 @@ export function Results({
         </span>
       </div>
       <SubmissionExport key={result.id} result={result} />
+      {busy && background && (
+        <div className="notice" role="status">
+          <Loader2 className="spin" size={20} />
+          <p>{en
+            ? "Your review is running in the background. You can close this tab and reopen this submission later to collect your feedback."
+            : "Votre correction continue en arrière-plan. Vous pouvez fermer cet onglet et rouvrir cette rédaction plus tard pour retrouver votre bilan."}</p>
+        </div>
+      )}
       <div className="review-summary">
         <div>
           <span className="eyebrow">{en ? "SESSION" : "SÉANCE"}</span>

@@ -4,6 +4,7 @@ import {
   reportReviewError,
 } from "./errorLogging";
 import { safeParseGeminiJson } from "./aiJson";
+import { queueEvaluation } from "./evaluationJobs";
 export { safeParseGeminiJson } from "./aiJson";
 import {
   buildEvaluationInstructions,
@@ -125,12 +126,20 @@ async function evaluateGeminiRequest(
     systemPrompt + "\n" + userPrompt,
   );
 
-  let payload: any;
-  let keySource: "primary" | "backup" = "primary";
-  let modelName = requestedModel;
+  const requestBody = {
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+    generationConfig: { responseMimeType: "application/json", temperature: 0.15 },
+  };
+  const queued = customApiKey?.trim() ? null : await queueEvaluation({
+    result, model: requestedModel, request: requestBody, fingerprint: promptHash, language: feedbackLanguage,
+  });
+  let payload: any = queued?.payload;
+  let keySource: "primary" | "backup" = queued?.keySource || "primary";
+  let modelName = queued?.model || requestedModel;
   let lastError: Error | null = null;
   const modelChain = getGeminiModelChain(requestedModel);
-  modelAttempts: for (const candidateModel of modelChain) {
+  modelAttempts: for (const candidateModel of queued ? [] : modelChain) {
     modelName = candidateModel;
     let modelUnavailable = false;
     for (let index = 0; index < keys.length; index++) {
@@ -145,14 +154,6 @@ async function evaluateGeminiRequest(
         continue;
       }
       const server = "server" in key && key.server;
-      const requestBody = {
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          temperature: 0.15,
-        },
-      };
       // A timeout or network failure can follow accepted work. Do not replay it.
       let response: Response;
       try {
@@ -174,7 +175,9 @@ async function evaluateGeminiRequest(
                 : {}),
               ...(!server ? { "x-goog-api-key": key.value } : {}),
             },
-            signal: AbortSignal.timeout(120000),
+            // Server transport includes primary + backup attempts (120s each)
+            // and logging, within the function's 300s execution budget.
+            signal: AbortSignal.timeout(server ? 270000 : 120000),
             body: JSON.stringify(
               server ? { model: modelName, request: requestBody } : requestBody,
             ),

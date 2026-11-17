@@ -36,6 +36,7 @@ globalThis.__reviewFixture = {
   instructionFingerprint: async () => hash,
   getActiveEvaluatedTasks: () => ["task1"],
   getGeminiModel: () => model,
+  matchingJob: false,
   evaluateTcfSubmissionWithGemini: () => {
     calls++;
     return new Promise((resolve) => {
@@ -51,9 +52,10 @@ const source = compile("src/services/reviewWorkflow.ts").replace(
 );
 const setup = `import {savedGeminiReview} from ${JSON.stringify(state)};
 const {buildEvaluationInstructions,instructionFingerprint,getActiveEvaluatedTasks,evaluateTcfSubmissionWithGemini,getGeminiModel}=globalThis.__reviewFixture;
+const pendingEvaluationJobMatches=()=>globalThis.__reviewFixture.matchingJob;
 `;
 try {
-  const { reviewSubmission } = await import(url(setup + source));
+  const { reviewSubmission, resumeSubmissionReview } = await import(url(setup + source));
   const result = { aiEvaluation: review };
   assert.equal(await reviewSubmission(result), review);
   assert.equal(calls, 0, "Matching saved review must not spend quota");
@@ -92,6 +94,15 @@ try {
   assert.equal(calls, 4, "Changing model must not reuse an older model review");
   release();
   await newModel;
+  const beforeResume = calls;
+  assert.equal(await resumeSubmissionReview(result), null);
+  assert.equal(calls, beforeResume, "Opening a page must not create an unrequested review");
+  globalThis.__reviewFixture.matchingJob = true;
+  const resumed = resumeSubmissionReview(result);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(calls, beforeResume + 1, "Recover a requested job even when older feedback is saved");
+  release();
+  assert.equal(await resumed, review);
 } finally {
   globalThis.localStorage = storage;
   delete globalThis.__reviewFixture;

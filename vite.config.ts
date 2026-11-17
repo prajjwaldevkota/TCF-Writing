@@ -1,6 +1,8 @@
 import { defineConfig, loadEnv } from "vite";
-import geminiHandler from "./api/gemini";
-import errorLogHandler from "./api/error-logs";
+import { handler as geminiHandler } from "./api/gemini";
+import { handler as errorLogHandler } from "./api/error-logs";
+import { handler as evaluateHandler } from "./api/evaluate";
+import { handler as evaluationWorkerHandler } from "./api/evaluation-worker";
 import react from "@vitejs/plugin-react";
 import legacy from "@vitejs/plugin-legacy";
 import path from "path";
@@ -14,6 +16,8 @@ export default defineConfig(({ mode }) => {
     for (const [route, handler] of [
       ["/api/gemini", geminiHandler],
       ["/api/error-logs", errorLogHandler],
+      ["/api/evaluate", evaluateHandler],
+      ["/api/evaluation-worker", evaluationWorkerHandler],
     ] as const) {
       server.middlewares.use(route, async (req: any, res: any) => {
         try {
@@ -35,11 +39,15 @@ export default defineConfig(({ mode }) => {
             "SUPABASE_SERVICE_ROLE_KEY",
             "SUPABASE_URL",
             "VITE_SUPABASE_URL",
+            "EVALUATION_QUEUE_ENABLED",
+            "EVALUATION_PUBLIC_URL",
+            "EVALUATION_WORKER_SECRET",
+            "QSTASH_TOKEN",
           ]) {
             if (!process.env[name] && env[name]) process.env[name] = env[name];
           }
           const response = await handler(
-            new Request(`http://${req.headers.host}${route}`, {
+            new Request(`http://${req.headers.host}${route}${new URL(req.url || "/", "http://local").search}`, {
               method: req.method,
               headers: req.headers,
               ...(req.method !== "GET" && req.method !== "HEAD"

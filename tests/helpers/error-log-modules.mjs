@@ -12,7 +12,7 @@ export const moduleUrl = (source) =>
 const typesUrl = moduleUrl(compile("src/types/errorLog.ts"));
 export const errorLogsUrl = moduleUrl(
   compile("server/errorLogs.ts").replace(
-    /(["'])\.\.\/src\/types\/errorLog\1/,
+    /(["'])\.\.\/src\/types\/errorLog\.js\1/,
     JSON.stringify(typesUrl),
   ),
 );

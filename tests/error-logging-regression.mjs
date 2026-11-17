@@ -6,10 +6,10 @@ import {
   errorLogsUrl,
   logger,
 } from "./helpers/error-log-modules.mjs";
-const { default: handler } = await import(
+const { default: { fetch: handler } } = await import(
   moduleUrl(
     compile("api/error-logs.ts").replace(
-      /(["'])\.\.\/server\/errorLogs\1/,
+      /(["'])\.\.\/server\/errorLogs\.js\1/,
       JSON.stringify(errorLogsUrl),
     ),
   )

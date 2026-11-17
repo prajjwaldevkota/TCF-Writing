@@ -10,10 +10,10 @@ const source = ts
     },
   })
   .outputText.replace(
-    /(["'])\.\.\/server\/errorLogs\1/,
+    /(["'])\.\.\/server\/errorLogs\.js\1/,
     JSON.stringify(errorLogsUrl),
   );
-const { default: handler } = await import(
+const { default: { fetch: handler } } = await import(
   "data:text/javascript;base64," + Buffer.from(source).toString("base64")
 );
 const names = [
@@ -181,6 +181,18 @@ try {
     "A network failure must not replay accepted work",
   );
   assert(!(await failure.text()).includes("sentinel"));
+  for (const name of ["TimeoutError", "AbortError"]) {
+    const error = new Error("primary-sentinel");
+    error.name = name;
+    arrange("primary-sentinel", "backup-sentinel", [error]);
+    const expired = await handler(request());
+    assert.equal(expired.status, 504);
+    assert.equal(expired.headers.get("X-TCF-Error-Source"), "provider");
+    assert.equal(expired.headers.get("X-TCF-Model-Unavailable"), "1");
+    assert.equal(expired.headers.get("X-TCF-No-Retry"), null);
+    assert.equal(calls.length, 1, "A server deadline must skip backup and allow a different model");
+    assert.equal(logged[0].code, "timeout");
+  }
   // Runtime variables are read for each request, independent of build-time flags.
   arrange("changed-runtime-sentinel", "", [success()]);
   assert.equal((await handler(request())).status, 200);

@@ -1,0 +1,158 @@
+import { supabase } from "../lib/supabase";
+import { createLogRequestId } from "./errorLogging";
+import type { ExamResult } from "../types/exam";
+
+interface JobReference {
+  id: string;
+  token: string;
+  fingerprint: string;
+  submissionId?: string;
+  pending: boolean;
+}
+interface JobStatus {
+  id: string;
+  status: "queued" | "running" | "retrying" | "completed" | "failed";
+  response: unknown;
+  model: string;
+  key_source: "primary" | "backup";
+  error_code: string | null;
+}
+const prefix = "tcf_evaluation_job:";
+const referenceKey = (id: string | undefined, model: string, fingerprint: string) =>
+  prefix + encodeURIComponent(id || "anonymous") + ":" + model + ":" + fingerprint;
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function read(key: string): JobReference | null {
+  try {
+    const ref = JSON.parse(localStorage.getItem(key) || "null");
+    return ref && uuid.test(ref.id) && uuid.test(ref.token) ? ref : null;
+  } catch { return null; }
+}
+export function hasPendingEvaluationJob(submissionId?: string): boolean {
+  if (!submissionId) return false;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(prefix)) {
+        const ref = read(key);
+        if (ref?.submissionId === submissionId && ref.pending) return true;
+      }
+    }
+  } catch { /* Storage may be unavailable; reviews still work for this tab. */ }
+  return false;
+}
+
+export function pendingEvaluationJobMatches(submissionId: string | undefined, model: string, fingerprint: string): boolean {
+  const ref = read(referenceKey(submissionId, model, fingerprint));
+  return !!ref?.pending && ref.submissionId === submissionId;
+}
+export async function queueEvaluation(input: {
+  // Only requested jobs are created; page-open recovery checks the fingerprint first.
+  result: ExamResult;
+  model: string;
+  request: Record<string, unknown>;
+  fingerprint: string;
+  language: "en" | "fr";
+}): Promise<{ payload: any; model: string; keySource: "primary" | "backup" } | null> {
+  const key = referenceKey(input.result.id, input.model, input.fingerprint);
+  const previous = read(key);
+  const ref: JobReference = previous?.pending ? previous : {
+    id: createLogRequestId(), token: createLogRequestId(), fingerprint: input.fingerprint,
+    submissionId: input.result.id, pending: true,
+  };
+  const save = () => { try { localStorage.setItem(key, JSON.stringify(ref)); } catch { /* Keep the in-memory capability. */ } };
+  // Save the id before POST: a lost acknowledgement must never start another job.
+  save();
+  const en = input.language === "en";
+  const interrupted = () => new Error(en
+    ? "Your review request is saved in this browser. Reopen this submission to check its progress. Your writing is saved."
+    : "Votre demande de correction est enregistrée dans ce navigateur. Rouvrez cette rédaction pour suivre son avancement. Votre texte est sauvegardé.");
+  const readStatus = async (response: Response): Promise<JobStatus> => {
+    if (!response.ok) throw interrupted();
+    const value = await response.json();
+    if (value?.id !== ref.id || !["queued", "running", "retrying", "completed", "failed"].includes(value.status)) throw interrupted();
+    return value;
+  };
+  let auth: Record<string, string> = {};
+  if (supabase) {
+    // Session lookup must not hold the submit request open indefinitely.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const session = await Promise.race([
+        supabase.auth.getSession(),
+        new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), 3000); }),
+      ]);
+      const token = session?.data.session?.access_token;
+      if (token) auth = { Authorization: `Bearer ${token}` };
+    } finally { clearTimeout(timer); }
+  }
+  let response: Response;
+  try {
+    const r = input.result;
+    response = await fetch("/api/evaluate", {
+      method: "POST", headers: { "Content-Type": "application/json", ...auth },
+      body: JSON.stringify({
+        id: ref.id, token: ref.token, model: input.model, request: input.request,
+        submission: {
+          id: r.id, answers: r.answers, combination: r.combination,
+          isPracticeMode: r.isPracticeMode, practiceTask: r.practiceTask, practiceTasks: r.practiceTasks,
+        },
+      }), signal: AbortSignal.timeout(20_000),
+    });
+  } catch { throw interrupted(); }
+  if (response.status === 409 && response.headers.get("X-TCF-Queue-Disabled") === "1") {
+    if (previous?.pending) {
+      // Disabling new jobs must not prevent collecting previously queued work.
+      try {
+        response = await fetch(`/api/evaluate?id=${ref.id}`, {
+          headers: { "X-TCF-Job-Token": ref.token }, signal: AbortSignal.timeout(10_000), cache: "no-store",
+        });
+      } catch { throw interrupted(); }
+    } else {
+      try { localStorage.removeItem(key); } catch { /* Ignore blocked storage. */ }
+      return null;
+    }
+  }
+  if (!response.ok) throw new Error(en
+    ? "The background review service is unavailable. Your writing is saved; reopen this submission to try resuming the same job."
+    : "Le service de correction en arrière-plan est indisponible. Votre texte est sauvegardé ; rouvrez cette rédaction pour reprendre la même demande.");
+  let current = await readStatus(response);
+  if (typeof window !== "undefined")
+    window.dispatchEvent(new CustomEvent("tcf-review-queued", { detail: { submissionId: input.result.id } }));
+
+  let wake: (() => void) | undefined;
+  // Authenticated owners receive Realtime notifications under RLS. Guests and
+  // disconnected sockets use capability-protected short polling requests.
+  const channel = auth.Authorization && supabase
+    ? supabase.channel(`evaluation:${ref.id}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "evaluation_jobs", filter: `id=eq.${ref.id}` }, () => wake?.())
+      .subscribe()
+    : null;
+  try {
+    // Stop actively watching after 30 minutes. The durable job keeps running;
+    // the saved capability resumes it later without another provider request.
+    const until = Date.now() + 30 * 60_000;
+    while (current.status !== "completed" && current.status !== "failed") {
+      await new Promise<void>(resolve => {
+        const done = () => { clearTimeout(timer); wake = undefined; resolve(); };
+        const timer = setTimeout(done, 3000);
+        wake = done;
+      });
+      if (Date.now() > until) throw interrupted();
+      try {
+        const status = await fetch(`/api/evaluate?id=${ref.id}`, {
+          headers: { "X-TCF-Job-Token": ref.token }, signal: AbortSignal.timeout(10_000), cache: "no-store",
+        });
+        current = await readStatus(status);
+      } catch { throw interrupted(); }
+    }
+    ref.pending = false;
+    save();
+    if (current.status === "failed") throw new Error(en
+      ? `The review could not finish (${current.error_code || "job_failed"}). Your writing is saved; you can request a new review.`
+      : `La correction n’a pas abouti (${current.error_code || "job_failed"}). Votre texte est sauvegardé ; vous pouvez demander un nouveau bilan.`);
+    return { payload: current.response, model: current.model, keySource: current.key_source };
+  } finally {
+    if (channel) void supabase?.removeChannel(channel);
+  }
+}

@@ -1,7 +1,6 @@
-import { errorLogStorageStatus, persistErrorLog } from "../server/errorLogs";
-import type { ErrorLogEntry } from "../src/types/errorLog";
-export const config = { runtime: "edge" };
-export default async function handler(request: Request): Promise<Response> {
+import { errorLogStorageStatus, persistErrorLog } from "../server/errorLogs.js";
+import type { ErrorLogEntry } from "../src/types/errorLog.js";
+export async function handler(request: Request): Promise<Response> {
   const headers = { "Cache-Control": "no-store" };
   if (request.method === "GET") {
     const storage = await errorLogStorageStatus();
@@ -50,3 +49,4 @@ export default async function handler(request: Request): Promise<Response> {
     return new Response(null, { status: 400, headers });
   }
 }
+export default { fetch: handler };

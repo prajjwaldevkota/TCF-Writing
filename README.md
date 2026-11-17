@@ -86,13 +86,25 @@ provider HTTP 504 (deadline exceeded) moves directly to the next model without
 repeating the slow request with a backup key. Hosting gateway 504 responses are
 logged as timeouts and stop with a saved-writing message. There
 are at most three models and two keys per model. It stops on the first successful
-response; invalid assessments and ambiguous timeouts do not trigger more calls.
+response. A server-observed 120-second provider deadline also advances directly
+to the next model; invalid assessments and ambiguous connection failures do not
+trigger more calls.
 The Vercel function reads both keys at request time and tries the backup on the
 same model after a supported HTTP rejection. No browser key or build-time
 credential flag is required. Missing server credentials produce a deployment
 configuration error rather than asking the learner to enter a key.
-Timeouts, network interruptions and invalid output do not trigger another request. Failed reviews preserve existing saved feedback.
+Browser/gateway timeouts, network interruptions and invalid output do not trigger
+another synchronous request. Failed reviews preserve existing saved feedback.
 Rate-limit cooldowns use hashed transport/model identifiers, never stored raw keys.
+
+Optional background reviews address [issue #5](https://github.com/prajjwaldevkota/TCF-Writing/issues/5).
+When enabled, `POST /api/evaluate` stores the submission and returns a job ID;
+QStash delivers `/api/evaluation-worker`, with one Gemini request per invocation
+and bounded retries/backoff across keys and models. Supabase stores the result
+even when the browser is closed. Reopening the same submission resumes its job
+without starting another review. Signed-in owners receive Supabase Realtime
+updates; short polling also supports guests and disconnected sockets. Failed
+jobs remain available for diagnosis. See [background review setup](LOCAL-SETUP.md#background-reviews).
 
 The automatic default chain is Gemini 3.8 Flash, 3.6 Flash, then 3.5 Flash-Lite.
 `GEMINI_MODEL` may override its starting point; no browser selection is needed. These have published [free API tiers](https://ai.google.dev/gemini-api/docs/pricing),

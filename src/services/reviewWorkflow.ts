@@ -10,7 +10,15 @@ import {
   evaluateTcfSubmissionWithGemini,
 } from "./geminiEvaluator";
 import { getGeminiModel } from "../utils/geminiSettings";
+import { pendingEvaluationJobMatches } from "./evaluationJobs";
 const pending = new Map<string, Promise<AIEvaluation>>();
+export async function resumeSubmissionReview(result: ExamResult): Promise<AIEvaluation | null> {
+  const language = localStorage.getItem("tcf_language") === "en" ? "en" : "fr";
+  const instructions = buildEvaluationInstructions(result, getActiveEvaluatedTasks(result), language);
+  const fingerprint = await instructionFingerprint(instructions.systemPrompt + "\n" + instructions.userPrompt);
+  if (!pendingEvaluationJobMatches(result.id, getGeminiModel(), fingerprint)) return null;
+  return reviewSubmission(result, true);
+}
 export async function reviewSubmission(
   result: ExamResult,
   force = false,

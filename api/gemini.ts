@@ -5,13 +5,12 @@ import {
   errorType,
   providerCode,
   retrySeconds,
-} from "../server/errorLogs";
-import type { ErrorLogEntry } from "../src/types/errorLog";
+} from "../server/errorLogs.js";
+import type { ErrorLogEntry } from "../src/types/errorLog.js";
 /** All deployment credentials stay in this Vercel function. */
-/** All deployment credentials stay in this Vercel function. */
-export const config = { runtime: "edge" };
-
-
+// Node.js permits waiting for the full provider response beyond Edge's 25s
+// initial-response deadline. Keep room for two 120s attempts and diagnostics.
+export const config = { maxDuration: 300 };
 const allowedModels = new Set([
   "gemini-3.8-flash",
   "gemini-3.6-flash",
@@ -22,7 +21,7 @@ const headers = {
   "Content-Type": "application/json",
   "Cache-Control": "no-store",
 };
-export default async function handler(request: Request): Promise<Response> {
+export async function handler(request: Request): Promise<Response> {
   const id = requestId(request.headers.get("X-TCF-Request-ID"));
   const responseHeaders = { ...headers, "X-TCF-Request-ID": id };
   const jsonError = (message: string, status: number, extra = {}) =>
@@ -147,7 +146,13 @@ export default async function handler(request: Request): Promise<Response> {
         duration_ms: Date.now() - started,
         error_type: type,
       });
-      // Accepted work may still be running: never replay a network failure.
+      // A server-observed provider deadline advances to a different model.
+      // Never repeat that model with the backup key or replay ambiguous network failures.
+      if (type === "TimeoutError" || type === "AbortError")
+        return jsonError("Gemini provider deadline exceeded.", 504, {
+          "X-TCF-Error-Source": "provider",
+          "X-TCF-Model-Unavailable": "1",
+        });
       return jsonError(
         "Gemini request could not finish. No automatic retry was made.",
         502,
@@ -157,3 +162,6 @@ export default async function handler(request: Request): Promise<Response> {
   }
   return jsonError("Gemini request failed.", 502);
 }
+
+// Node's Web Standard entry point preserves the Request/Response contract.
+export default { fetch: handler };

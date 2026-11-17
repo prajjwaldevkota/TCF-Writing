@@ -57,6 +57,7 @@ const {buildEvaluationInstructions,instructionFingerprint,validatePedagogicalAss
 const createLogRequestId=()=>crypto.randomUUID();
 const getClientDiagnostics=()=>({browser:"chrome",platform:"windows",viewport_width:1536,viewport_height:740,online:true});
 const reportReviewError=entry=>globalThis.__reviewErrors.push(entry);
+const queueEvaluation=async()=>globalThis.__geminiFixture.queued||null;
 `;
 const { evaluateTcfSubmissionWithGemini: evaluate } = await import(
   url(setup + source)
@@ -262,6 +263,18 @@ try {
   arrange("", "", [success()]);
   await evaluate(input, "explicit-diagnostic-key");
   assert.equal(calls[0].key, "explicit-diagnostic-key");
+  arrange("", "", []);
+  globalThis.__geminiFixture.queued = {
+    payload: await success().json(), model: "gemini-3.6-flash", keySource: "backup",
+  };
+  const queuedReview = await evaluate(input);
+  assert.equal(queuedReview.model, "gemini-3.6-flash");
+  assert.equal(queuedReview.requested_model, "gemini-3.8-flash");
+  assert.equal(queuedReview.key_source, "backup");
+  assert.equal(calls.length, 0, "A completed background job must not call Gemini again");
+  globalThis.__geminiFixture.queued.payload = await success('{"invalid":true}').json();
+  await assert.rejects(evaluate(input), /Invalid evidence/, "Background output must still pass the evidence validator");
+  delete globalThis.__geminiFixture.queued;
   console.log(
     "PASS: server reviews without browser keys, stale-key isolation, primary/backup metadata, deployment diagnostics, model fallback, cooldowns and no ambiguous replay.",
   );

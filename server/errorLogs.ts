@@ -3,7 +3,7 @@ import {
   ERROR_STAGES,
   type ClientDiagnostics,
   type ErrorLogEntry,
-} from "../src/types/errorLog";
+} from "../src/types/errorLog.js";
 
 const models = new Set([
   "gemini-3.8-flash",
