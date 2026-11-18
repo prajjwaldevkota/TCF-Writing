@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  ArrowUpRight,
   BookOpen,
   Check,
   ChevronDown,
@@ -24,6 +26,7 @@ import { hasPendingEvaluationJob } from "../services/evaluationJobs";
 import { getGeminiModel } from "../utils/geminiSettings";
 import { mockProjectionEligibility } from "../services/pedagogicalAssessment";
 import { AIEvaluationView } from "../components/AIEvaluationView";
+import { LEVEL_UP_DATA } from "../components/PedagogicalEvaluationView";
 import { SubmissionExport } from "../components/SubmissionExport";
 import { EvaluationStepper } from "../components/EvaluationStepper";
 export function Results({
@@ -43,7 +46,7 @@ export function Results({
   onNotebook: () => void;
   onLogin?: () => void;
 }) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { language } = useLanguage();
   const en = language === "en";
   const keys = result.isPracticeMode ? practicedKeys(result) : TASK_KEYS;
@@ -103,11 +106,14 @@ export function Results({
       if ((event as CustomEvent).detail?.submissionId === result.id) setBackground(true);
     };
     window.addEventListener("tcf-review-queued", queued);
+    return () => window.removeEventListener("tcf-review-queued", queued);
+  }, [result.id]);
+  useEffect(() => {
+    if (authLoading || !user) return;
     // Resuming a saved job reads its existing result; it never creates a new
     // evaluation just because the learner opened this page.
     if (hasPendingEvaluationJob(result.id)) void review(true, true);
-    return () => window.removeEventListener("tcf-review-queued", queued);
-  }, [result.id]);
+  }, [result.id, authLoading, user?.id]);
   const words = countFrenchWords(result.answers[active]);
   const requirement = result.combination.tasks[active];
   return (
@@ -252,30 +258,32 @@ export function Results({
               </button>
             </div>
           ) : (
-            <div className="review-auth-gate rounded-xl border border-blue-200 bg-blue-50/80 p-5 space-y-3">
-              <div className="flex items-center gap-2 text-blue-900 font-bold text-sm">
-                <Lock size={17} className="text-blue-700" />
+            <div className="review-auth-gate">
+              <div className="review-auth-gate-title">
+                <Lock size={16} aria-hidden="true" />
+                <strong>
+                  {en
+                    ? "Sign in required for AI review"
+                    : "Connexion requise pour le bilan IA"}
+                </strong>
+              </div>
+              <p>
+                {en
+                  ? "Your writing is saved on this device. Sign in or create a free account to unlock the CEFR range, verified corrections, and NCLC projection."
+                  : "Votre rédaction est conservée sur cet appareil. Connectez-vous ou créez un compte gratuit pour débloquer la plage CECRL, les corrections vérifiées et l’estimation NCLC."}
+              </p>
+              <button
+                type="button"
+                className="button primary"
+                onClick={onLogin}
+              >
+                <Lock size={15} />
                 <span>
                   {en
-                    ? "Sign in required for AI evaluation"
-                    : "Connexion requise pour l'évaluation par IA"}
+                    ? "Sign in / Create free account"
+                    : "Se connecter / Créer un compte gratuit"}
                 </span>
-              </div>
-              <p className="text-xs text-blue-950 leading-relaxed">
-                {en
-                  ? "Your writing is safely saved on this device. Create a free account or sign in to generate your complete AI pedagogical review, CEFR level range, and mistake analysis."
-                  : "Votre rédaction est bien conservée sur cet appareil. Connectez-vous ou créez un compte gratuit pour lancer le bilan pédagogique IA, le niveau CECRL et les corrections détaillées."}
-              </p>
-              <div className="pt-1">
-                <button
-                  type="button"
-                  className="button primary"
-                  onClick={onLogin}
-                >
-                  <Lock size={15} />
-                  <span>{en ? "Sign In / Create Free Account" : "Se connecter / Créer un compte gratuit"}</span>
-                </button>
-              </div>
+              </button>
             </div>
           )}
         </section>
@@ -366,11 +374,21 @@ export function Results({
           <div className="section-head">
             <h2>{en ? "Your writing" : "Votre rédaction"}</h2>
             <span
-              className={`badge ${words >= requirement.minWords && words <= requirement.maxWords ? "sage" : "sand"}`}
+              className={`badge ${words >= requirement.minWords && words <= requirement.maxWords ? "sage" : words < requirement.minWords ? "rose" : "sand"}`}
             >
-              {words} {en ? "words" : "mots"}
+              {words} / {requirement.minWords}–{requirement.maxWords} {en ? "words" : "mots"}
             </span>
           </div>
+          {words < requirement.minWords && (
+            <div className="length-check-banner is-under" role="note">
+              <AlertTriangle size={15} aria-hidden="true" />
+              <span>
+                {en
+                  ? `Below official minimum (${requirement.minWords} words). In TCF Canada, short responses trigger an automatic CEFR ceiling.`
+                  : `Sous le seuil minimal officiel (${requirement.minWords} mots). Au TCF Canada, un texte trop court plafonne automatiquement le niveau CECRL.`}
+              </span>
+            </div>
+          )}
           <details className="review-prompt">
             <summary>
               {en ? "See the prompt" : "Revoir la consigne"}
@@ -673,6 +691,38 @@ export function Results({
           {feedback.model_answer_warning && (
             <p className="footnote">{feedback.model_answer_warning}</p>
           )}
+          {LEVEL_UP_DATA[active] && (
+            <details className="level-up-drawer">
+              <summary>
+                <span className="row">
+                  <ArrowUpRight size={16} aria-hidden="true" />
+                  <span>
+                    {en
+                      ? "NCLC 7+ phrasing upgrades (B1 → B2/C1)"
+                      : "Tournures NCLC 7+ (passer de B1 à B2/C1)"}
+                  </span>
+                </span>
+                <ChevronDown size={15} />
+              </summary>
+              <div className="level-up-grid">
+                {LEVEL_UP_DATA[active].map((item, i) => (
+                  <article className="level-up-card" key={i}>
+                    <div className="row between">
+                      <strong>{en ? item.category.en : item.category.fr}</strong>
+                      <span className="badge sage">B1 → B2/C1</span>
+                    </div>
+                    <p className="level-up-b1">
+                      <span>B1</span> {item.b1}
+                    </p>
+                    <p className="level-up-b2">
+                      <span>B2/C1</span> {item.b2_c1}
+                    </p>
+                    <small>{en ? item.note.en : item.note.fr}</small>
+                  </article>
+                ))}
+              </div>
+            </details>
+          )}
         </section>
       )}
       {result.aiEvaluation && (
@@ -703,8 +753,8 @@ export function Results({
               </div>
             </>
           ) : (
-            <div className="py-2 space-y-2">
-              <p className="text-xs text-slate-500">
+            <div className="review-options-guest">
+              <p className="muted text-small">
                 {en
                   ? "Sign in to request additional AI evaluations."
                   : "Connectez-vous pour demander de nouveaux bilans IA."}

@@ -2,25 +2,47 @@ import React, { useMemo, useState } from "react";
 import {
   ArrowRight,
   Bookmark,
+  Briefcase,
   Check,
   Clock3,
+  Compass,
+  Cpu,
+  GraduationCap,
+  Layers,
+  Leaf,
+  type LucideIcon,
   Search,
   SlidersHorizontal,
   Shuffle,
+  Users,
 } from "lucide-react";
-import data from "../data/questions.json";
-import type { ExamResult, QuestionsDB, TaskKey } from "../types/exam";
-import { QuestionEntry, questionEntries, TASK_INFO, TOPIC_THEMES, detectTopicTheme, type TopicThemeKey } from "../utils/practice";
+import type { ExamResult, TaskKey } from "../types/exam";
+import { QuestionEntry, TASK_INFO, TASK_KEYS, TOPIC_THEMES, type TopicTheme, type TopicThemeKey } from "../utils/practice";
+import { getTopicMeta, useQuestions } from "../utils/questionsLoader";
 import { useLanguage } from "../context/LanguageContext";
 import { selectRandomCombination } from "../utils/randomCombination";
 import { normalizeParagraphText } from "../utils/cleanText";
-export const allQuestions = questionEntries(data as QuestionsDB);
+
+const THEME_ICONS: Record<TopicThemeKey, LucideIcon> = {
+  all: Layers,
+  work: Briefcase,
+  ecology: Leaf,
+  education: GraduationCap,
+  tech: Cpu,
+  society: Users,
+  culture: Compass,
+};
+const THEME_MAP = Object.fromEntries(
+  TOPIC_THEMES.map((t) => [t.key, t]),
+) as Record<TopicThemeKey, TopicTheme>;
+
 export const PracticeLibrary: React.FC<{
   onStart: (entry: QuestionEntry, task: TaskKey | "exam") => void;
   submissions: ExamResult[];
 }> = ({ onStart, submissions }) => {
   const { language } = useLanguage();
   const en = language === "en";
+  const { questions: allQuestions, loading } = useQuestions();
   const [task, setTask] = useState<TaskKey | "exam">("task1");
   const [query, setQuery] = useState("");
   const [year, setYear] = useState("all");
@@ -43,29 +65,35 @@ export const PracticeLibrary: React.FC<{
   const [randomSelection, setRandomSelection] = useState<QuestionEntry | null>(
     null,
   );
-  const filtered = useMemo(
-    () =>
-      allQuestions.filter(
-        (entry) => {
-          const matchesYear = year === "all" || entry.year === year;
-          const matchesSaved = !savedOnly || saved.includes(entry.id);
-          const tasksToCheck = task === "exam"
-            ? Object.values(entry.combination.tasks)
-            : [entry.combination.tasks[task]];
-          const matchesQuery = !query.trim() || tasksToCheck.some((t) =>
-            (t.instruction + " " + (t.title || ""))
-              .toLocaleLowerCase()
-              .includes(query.trim().toLocaleLowerCase()),
-          );
-          const fullText = Object.values(entry.combination.tasks)
-            .map((t) => `${t.title || ""} ${t.instruction}`)
-            .join(" ");
-          const matchesTheme = selectedTheme === "all" || detectTopicTheme(fullText) === selectedTheme;
-          return matchesYear && matchesSaved && matchesQuery && matchesTheme;
-        },
-      ),
-    [year, savedOnly, saved, query, task, selectedTheme],
+  const savedSet = useMemo(() => new Set(saved), [saved]);
+  const years = useMemo(
+    () => [...new Set(allQuestions.map((q) => q.year))],
+    [allQuestions],
   );
+  const completedSet = useMemo(() => {
+    const keys = new Set<string>();
+    for (const s of submissions) {
+      const base = `${s.year}-${s.month}-${s.combination.combinationNumber}`;
+      if (!s.isPracticeMode) {
+        for (const k of TASK_KEYS) keys.add(`${base}:${k}`);
+      } else if (s.practiceTasks) {
+        for (const k of s.practiceTasks) keys.add(`${base}:${k}`);
+      }
+    }
+    return keys;
+  }, [submissions]);
+  const filtered = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase();
+    return allQuestions.filter((entry) => {
+      if (year !== "all" && entry.year !== year) return false;
+      if (savedOnly && !savedSet.has(entry.id)) return false;
+      const meta = getTopicMeta(entry);
+      if (selectedTheme !== "all" && meta.theme !== selectedTheme) return false;
+      if (normalizedQuery && !meta.searchByTask[task].includes(normalizedQuery))
+        return false;
+      return true;
+    });
+  }, [allQuestions, year, savedOnly, savedSet, query, task, selectedTheme]);
   const displayed = randomSelection ? [randomSelection] : filtered;
   const drawRandom = () => {
     const entry = selectRandomCombination(filtered, randomSelection?.id);
@@ -187,7 +215,7 @@ export const PracticeLibrary: React.FC<{
             <option value="all">
               {en ? "All years" : "Toutes les années"}
             </option>
-            {[...new Set(allQuestions.map((q) => q.year))].map((y) => (
+            {years.map((y) => (
               <option key={y}>{y}</option>
             ))}
           </select>
@@ -202,17 +230,21 @@ export const PracticeLibrary: React.FC<{
         </button>
       </div>
       <div className="theme-filter-bar" role="group" aria-label={en ? "Filter by theme" : "Filtrer par thème"}>
-        {TOPIC_THEMES.map((themeItem) => (
-          <button
-            key={themeItem.key}
-            type="button"
-            className={`theme-pill ${selectedTheme === themeItem.key ? "active" : ""}`}
-            onClick={() => update(() => setSelectedTheme(themeItem.key))}
-          >
-            <span aria-hidden="true">{themeItem.icon}</span>
-            <span>{en ? themeItem.en : themeItem.fr}</span>
-          </button>
-        ))}
+        {TOPIC_THEMES.map((themeItem) => {
+          const ThemeIcon = THEME_ICONS[themeItem.key];
+          return (
+            <button
+              key={themeItem.key}
+              type="button"
+              className={`theme-pill ${selectedTheme === themeItem.key ? "active" : ""}`}
+              aria-pressed={selectedTheme === themeItem.key}
+              onClick={() => update(() => setSelectedTheme(themeItem.key))}
+            >
+              <ThemeIcon size={14} />
+              <span>{en ? themeItem.en : themeItem.fr}</span>
+            </button>
+          );
+        })}
       </div>
       <div className="row between library-count">
         <span className="muted text-small">
@@ -250,32 +282,22 @@ export const PracticeLibrary: React.FC<{
           {notice}
         </p>
       )}
-      {displayed.length ? (
+      {loading && !displayed.length ? (
+        <div className="empty-state panel" role="status" aria-live="polite">
+          <p>{en ? "Loading topic collection…" : "Chargement de la collection de sujets…"}</p>
+        </div>
+      ) : displayed.length ? (
         <>
           <div className="topic-grid">
             {displayed.slice((page - 1) * 12, page * 12).map((entry) => {
               const key = task === "exam" ? "task1" : task;
               const requirement = entry.combination.tasks[key];
-              const completed = submissions.some(
-                (s) =>
-                  s.year === entry.year &&
-                  s.month === entry.month &&
-                  s.combination.combinationNumber ===
-                    entry.combination.combinationNumber &&
-                  (!s.isPracticeMode || s.practiceTasks?.includes(key)),
-              );
-              const hasSources = Boolean(
-                entry.combination.tasks.task3.document1?.trim() &&
-                entry.combination.tasks.task3.document2?.trim(),
-              );
+              const meta = getTopicMeta(entry);
+              const completed = completedSet.has(`${entry.id}:${key}`);
               const unavailable =
-                (task === "task3" || task === "exam") && !hasSources;
-              const entryTheme = detectTopicTheme(
-                Object.values(entry.combination.tasks)
-                  .map((t) => `${t.title || ""} ${t.instruction}`)
-                  .join(" "),
-              );
-              const themeMeta = TOPIC_THEMES.find((t) => t.key === entryTheme);
+                (task === "task3" || task === "exam") && !meta.hasSources;
+              const themeMeta = THEME_MAP[meta.theme];
+              const isBookmarked = savedSet.has(entry.id);
               return (
                 <article className="topic-card" key={entry.id}>
                   <div className="row between">
@@ -289,17 +311,20 @@ export const PracticeLibrary: React.FC<{
                             : "Examen blanc"
                           : `Tâche ${TASK_INFO[key].number}`}
                       </span>
-                      {themeMeta && themeMeta.key !== "all" && (
-                        <span className="topic-theme-badge">
-                          <span aria-hidden="true">{themeMeta.icon}</span>
-                          <span>{en ? themeMeta.en : themeMeta.fr}</span>
-                        </span>
-                      )}
+                      {themeMeta && themeMeta.key !== "all" && (() => {
+                        const BadgeIcon = THEME_ICONS[themeMeta.key];
+                        return (
+                          <span className="topic-theme-badge">
+                            <BadgeIcon size={12} />
+                            <span>{en ? themeMeta.en : themeMeta.fr}</span>
+                          </span>
+                        );
+                      })()}
                     </div>
                     <button
-                      className={`icon-button ${saved.includes(entry.id) ? "bookmarked" : ""}`}
+                      className={`icon-button ${isBookmarked ? "bookmarked" : ""}`}
                       aria-label={
-                        saved.includes(entry.id)
+                        isBookmarked
                           ? en
                             ? "Remove bookmark"
                             : "Retirer des favoris"
@@ -307,14 +332,12 @@ export const PracticeLibrary: React.FC<{
                             ? "Bookmark topic"
                             : "Ajouter aux favoris"
                       }
-                      aria-pressed={saved.includes(entry.id)}
+                      aria-pressed={isBookmarked}
                       onClick={() => bookmark(entry.id)}
                     >
                       <Bookmark
                         size={18}
-                        fill={
-                          saved.includes(entry.id) ? "currentColor" : "none"
-                        }
+                        fill={isBookmarked ? "currentColor" : "none"}
                       />
                     </button>
                   </div>
@@ -409,6 +432,7 @@ export const PracticeLibrary: React.FC<{
             onClick={() => {
               setQuery("");
               setYear("all");
+              setSelectedTheme("all");
               setSavedOnly(false);
               setPage(1);
             }}

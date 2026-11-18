@@ -2,12 +2,16 @@ import React, { useEffect, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
+  BookOpen,
   Check,
   CheckCheck,
+  CheckCircle2,
   Eye,
+  Info,
   NotebookPen,
   RotateCcw,
   Trash2,
+  Zap,
 } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 import { getStoredMistakes, deleteStoredMistakes } from "../utils/mistakesStorage";
@@ -188,29 +192,50 @@ export function Notebook({ onPractice }: { onPractice: () => void }) {
       )}
       {mistakes.length ? (
         <>
-          <div className="segmented" style={{ marginBottom: 16 }}>
-            <button
-              type="button"
-              aria-pressed={!quizMode}
-              onClick={() => {
-                setQuizMode(false);
-                setQuizChecked(false);
-                setRevealed(false);
-              }}
-            >
-              📖 {en ? "Flashcard Mode" : "Mode Fiche"}
-            </button>
-            <button
-              type="button"
-              aria-pressed={quizMode}
-              onClick={() => {
-                setQuizMode(true);
-                setQuizChecked(false);
-                setRevealed(false);
-              }}
-            >
-              ⚡ {en ? "Interactive Quiz Sprint" : "Mode Quiz Interactif"}
-            </button>
+          <div className="notebook-mode-row">
+            <div className="segmented">
+              <button
+                type="button"
+                aria-pressed={!quizMode}
+                onClick={() => {
+                  setQuizMode(false);
+                  setQuizChecked(false);
+                  setRevealed(false);
+                }}
+              >
+                <BookOpen size={15} />
+                {en ? "Flashcards" : "Mode fiche"}
+              </button>
+              <button
+                type="button"
+                aria-pressed={quizMode}
+                onClick={() => {
+                  setQuizMode(true);
+                  setQuizChecked(false);
+                  setRevealed(false);
+                }}
+              >
+                <Zap size={15} />
+                {en ? "Quiz sprint" : "Mode quiz"}
+              </button>
+            </div>
+            {quizMode && quizScore.total > 0 && (
+              <div className="quiz-score-pill" role="status">
+                <span>
+                  {en ? "Sprint score:" : "Score du sprint :"}{" "}
+                  <strong>
+                    {quizScore.correct} / {quizScore.total}
+                  </strong>
+                </span>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => setQuizScore({ correct: 0, total: 0 })}
+                >
+                  {en ? "Reset" : "Réinitialiser"}
+                </button>
+              </div>
+            )}
           </div>
           <div className="filter-bar">
             <label className="select-field">
@@ -293,24 +318,40 @@ export function Notebook({ onPractice }: { onPractice: () => void }) {
                   ) : (
                     <div className="revealed-correction">
                       {quizSuccess ? (
-                        <div className="rounded-lg p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 space-y-1 mb-2">
-                          <strong className="block text-sm font-bold flex items-center gap-1.5">
-                            <span>🎉</span>
-                            <span>{en ? "Excellent! Exact correction." : "Bravo ! Correction validée."}</span>
+                        <div className="quiz-feedback-card is-success">
+                          <strong>
+                            <CheckCircle2 size={16} aria-hidden="true" />
+                            <span>
+                              {en
+                                ? "Exact match — correction verified."
+                                : "Correction exacte validée."}
+                            </span>
                           </strong>
-                          <p className="text-xs">
-                            {en ? "Your answer matches the recommended TCF standard." : "Votre formulation correspond aux attentes officielles du TCF."}
+                          <p>
+                            {en
+                              ? "Your rewrite matches the target phrasing."
+                              : "Votre reformulation correspond à la tournure attendue."}
                           </p>
                         </div>
                       ) : (
-                        <div className="rounded-lg p-3.5 bg-amber-50 border border-amber-200 text-amber-900 space-y-2 mb-2">
-                          <strong className="block text-sm font-bold flex items-center gap-1.5">
-                            <span>💡</span>
-                            <span>{en ? "Not quite there — compare below:" : "Pas tout à fait — comparez ci-dessous :"}</span>
+                        <div className="quiz-feedback-card is-retry">
+                          <strong>
+                            <Info size={16} aria-hidden="true" />
+                            <span>
+                              {en
+                                ? "Compare your rewrite with the target:"
+                                : "Comparez votre essai avec la correction attendue :"}
+                            </span>
                           </strong>
-                          <div className="text-xs space-y-1 font-mono">
-                            <p><span className="text-slate-500 font-sans font-semibold">{en ? "Your try:" : "Votre proposition :"}</span> {attempt || "(vide)"}</p>
-                            <p><span className="text-emerald-700 font-sans font-semibold">{en ? "Target:" : "Correction attendue :"}</span> {current.corrected_text}</p>
+                          <div className="quiz-compare-rows">
+                            <p>
+                              <span>{en ? "Your try:" : "Votre essai :"}</span>{" "}
+                              <code>{attempt || "—"}</code>
+                            </p>
+                            <p>
+                              <span>{en ? "Target:" : "Attendu :"}</span>{" "}
+                              <code>{current.corrected_text}</code>
+                            </p>
                           </div>
                         </div>
                       )}

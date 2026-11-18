@@ -6,7 +6,10 @@ interface EvaluationStepperProps {
   isBackground?: boolean;
 }
 
-export const EvaluationStepper: React.FC<EvaluationStepperProps> = ({ en, isBackground }) => {
+export const EvaluationStepper: React.FC<EvaluationStepperProps> = ({
+  en,
+  isBackground,
+}) => {
   const [seconds, setSeconds] = useState(0);
 
   useEffect(() => {
@@ -19,113 +22,99 @@ export const EvaluationStepper: React.FC<EvaluationStepperProps> = ({ en, isBack
   const steps = [
     {
       titleEn: "Draft secured & queued",
-      titleFr: "Rédaction sécurisée & mise en file",
-      descEn: "Saved safely in local storage and queued for AI assessment.",
-      descFr: "Sauvegardée dans ce navigateur et transmise au moteur d'évaluation.",
-      minSec: 0,
+      titleFr: "Rédaction enregistrée et mise en file",
+      descEn: "Saved safely in this browser and queued for AI assessment.",
+      descFr: "Sauvegardée dans ce navigateur et transmise au moteur d’évaluation.",
     },
     {
-      titleEn: "Linguistic & syntax analysis",
-      titleFr: "Analyse morphosyntaxique & lexicale",
-      descEn: "Examining verbal tenses, sentence structures, and lexical diversity.",
+      titleEn: "Linguistic & syntax pass",
+      titleFr: "Analyse morphosyntaxique et lexicale",
+      descEn: "Examining verb tenses, sentence structures, and lexical variety.",
       descFr: "Examen des accords, structures de phrases et variété du vocabulaire.",
-      minSec: 4,
     },
     {
-      titleEn: "Evidence cross-check",
-      titleFr: "Vérification des citations & grille CEFR",
-      descEn: "Checking verbatim student quotes against official CEFR level descriptors.",
+      titleEn: "Verbatim evidence verification",
+      titleFr: "Vérification des citations et grille CECRL",
+      descEn: "Checking exact student quotes against official CEFR descriptors.",
       descFr: "Validation des citations exactes selon les descripteurs du CECRL.",
-      minSec: 13,
     },
     {
-      titleEn: "Finalizing pedagogical report",
-      titleFr: "Synthèse du bilan & projection NCLC",
-      descEn: "Synthesizing actionable feedback, strengths, and NCLC estimation.",
-      descFr: "Génération des priorités de progrès et de la projection NCLC.",
-      minSec: 24,
+      titleEn: "Synthesizing pedagogical review",
+      titleFr: "Synthèse du bilan et projection NCLC",
+      descEn: "Preparing actionable priorities, strengths, and NCLC range.",
+      descFr: "Préparation des priorités de progrès et de l’estimation NCLC.",
     },
   ];
 
-  const currentStepIndex = seconds < 4 ? 0 : seconds < 13 ? 1 : seconds < 24 ? 2 : 3;
+  const currentStepIndex =
+    seconds < 4 ? 0 : seconds < 13 ? 1 : seconds < 24 ? 2 : 3;
 
   return (
-    <div
+    <section
       role="status"
       aria-live="polite"
-      className="border border-slate-200 bg-white rounded-xl p-5 shadow-xs space-y-4 my-3 text-slate-800"
+      className="panel eval-stepper"
     >
-      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-            <Sparkles size={17} className="animate-pulse" />
-          </div>
+      <div className="eval-stepper-head">
+        <div className="row">
+          <span className="eval-stepper-icon" aria-hidden="true">
+            <Sparkles size={17} />
+          </span>
           <div>
-            <h4 className="font-bold text-sm text-slate-900 leading-snug">
-              {en ? "AI Evaluation in Progress" : "Bilan pédagogique en cours"}
-            </h4>
-            <p className="text-xs text-slate-500">
+            <strong>
+              {en ? "Pedagogical review in progress" : "Bilan pédagogique en cours"}
+            </strong>
+            <p className="muted">
               {isBackground
                 ? en
-                  ? "Background evaluation active · safe to close or navigate"
-                  : "Traitement en arrière-plan · vous pouvez fermer ou naviguer"
+                  ? "Running in background · safe to navigate or close"
+                  : "Traitement en arrière-plan · vous pouvez naviguer librement"
                 : en
-                  ? `Analyzing your text (${seconds}s elapsed)…`
-                  : `Analyse de votre texte (${seconds}s écoulées)…`}
+                  ? "Reading your writing in two passes…"
+                  : "Lecture de votre rédaction en deux passes…"}
             </p>
           </div>
         </div>
-        <span className="text-xs font-mono font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">
-          {seconds}s
-        </span>
+        <span className="badge neutral">{seconds}s</span>
       </div>
 
-      <div className="space-y-3">
+      <ol className="eval-stepper-list">
         {steps.map((step, idx) => {
           const isDone = idx < currentStepIndex;
           const isCurrent = idx === currentStepIndex;
           return (
-            <div key={idx} className="flex items-start gap-3">
-              <div className="mt-0.5 shrink-0">
+            <li
+              key={idx}
+              className={`eval-step-row ${isDone ? "is-done" : isCurrent ? "is-current" : "is-pending"}`}
+            >
+              <span className="eval-step-marker" aria-hidden="true">
                 {isDone ? (
-                  <CheckCircle2 size={18} className="text-emerald-600" />
+                  <CheckCircle2 size={17} />
                 ) : isCurrent ? (
-                  <Loader2 size={18} className="text-blue-600 animate-spin" />
+                  <Loader2 size={17} className="spin" />
                 ) : (
-                  <div className="w-4.5 h-4.5 rounded-full border border-slate-300 bg-slate-50 mt-0.5" />
+                  <span className="eval-step-dot" />
                 )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p
-                  className={`text-xs font-semibold leading-tight ${
-                    isDone
-                      ? "text-slate-800"
-                      : isCurrent
-                      ? "text-blue-800"
-                      : "text-slate-400"
-                  }`}
-                >
-                  {en ? step.titleEn : step.titleFr}
-                </p>
+              </span>
+              <div>
+                <strong>{en ? step.titleEn : step.titleFr}</strong>
                 {(isCurrent || isDone) && (
-                  <p className="text-[11px] text-slate-500 mt-0.5 leading-normal">
-                    {en ? step.descEn : step.descFr}
-                  </p>
+                  <p>{en ? step.descEn : step.descFr}</p>
                 )}
               </div>
-            </div>
+            </li>
           );
         })}
-      </div>
+      </ol>
 
-      <div className="pt-2 border-t border-slate-100 flex items-center gap-2 text-[11px] text-slate-500">
-        <ShieldCheck size={14} className="text-slate-400 shrink-0" />
+      <div className="eval-stepper-foot">
+        <ShieldCheck size={15} aria-hidden="true" />
         <span>
           {en
-            ? "Your writing is permanently saved in this browser. You can safely reopen this page at any time."
-            : "Votre texte est sauvegardé de manière permanente dans ce navigateur. Vous pouvez rouvrir cette page à tout moment."}
+            ? "Your writing stays saved in this browser. Reopening this page resumes the same review."
+            : "Votre texte reste enregistré dans ce navigateur. Rouvrir cette page reprend le même bilan."}
         </span>
       </div>
-    </div>
+    </section>
   );
 };

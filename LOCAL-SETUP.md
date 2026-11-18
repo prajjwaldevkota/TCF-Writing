@@ -161,6 +161,11 @@ References: [QStash publishing](https://upstash.com/docs/qstash/api-reference/me
 
 ### Verify a deployed background review
 
+For an existing installation, first run
+[supabase/evaluation-cache.sql](supabase/evaluation-cache.sql) in the Supabase SQL
+editor, then deploy the cache-enabled code. New installations can run the updated
+`evaluation-jobs.sql`, which includes those additive columns and index.
+
 1. Open the deployed site, write a practice response, and open your browser's
    Network panel before choosing **Get my feedback**.
 2. `POST /api/evaluate` should quickly return **202** with a job ID. Subsequent
@@ -189,6 +194,43 @@ creating a job: **400** means validation was reached; **409 queue_disabled**
 means background reviews are off; **503** means configuration or a required
 service is unavailable. This probe does not verify the database migration or
 worker delivery. Use the real review above for that end-to-end check.
+
+### Verify completed-review caching
+
+The cache reuses responses from the existing jobs table; it needs no Redis or
+additional service. It is private to a verified account, or to a guest browser's
+random cache capability. Its seven-day lifetime starts only after the browser's
+evidence validator accepts a completed response. `PATCH /api/evaluate` records
+that acknowledgement using the job's existing read capability. Failed, blocked,
+truncated and unaccepted output cannot produce a server cache hit.
+
+The key includes the starting model, full request payload and rubric version.
+The payload includes the exact questions/documents, answers, task scope, feedback
+language and generation settings. Submission IDs/dates do not change the key.
+Object-key ordering does not change it; array/text ordering does. A cache hit
+keeps the original expiry, actual fallback model and key-source metadata. Cached
+payloads still pass through the normal evidence validator before display.
+
+1. Complete a review and keep the tab open until feedback appears. Its job should
+   have a non-null `cache_key` and a future `cache_expires_at` after the validation
+   acknowledgement succeeds.
+2. Request the exact same review normally. In the same browser, its completed
+   job ID is reused. For another copy of the identical writing, or another browser
+   signed into the same account, `POST /api/evaluate` can return a completed cache
+   hit with **200** and zero provider attempts, without a new QStash message.
+3. Choose **Request a new review**. The POST should include `force: true`, return
+   a new queued job, and generate a fresh assessment. Resuming an already pending
+   job always keeps that job ID, even when the resume call uses the fresh flag.
+4. Change an answer, question, language, rubric or model. The server cache should
+   miss. A different account or guest capability also cannot read the old cache.
+
+Cache expiry affects reuse, not deletion: expired jobs remain retrievable by
+their owner/capability and are retained until explicitly removed. Existing saved
+feedback continues to be reused when its model, prompt hash and rubric match.
+Concurrent requests with different new job IDs can both miss the server cache;
+the existing browser in-flight deduplication still combines identical concurrent
+requests within that tab. Cache acknowledgement failures leave valid feedback
+visible but may prevent reuse from another browser.
 
 ## Notebook cleanup
 

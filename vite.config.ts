@@ -4,7 +4,6 @@ import { handler as errorLogHandler } from "./api/error-logs";
 import { handler as evaluateHandler } from "./api/evaluate";
 import { handler as evaluationWorkerHandler } from "./api/evaluation-worker";
 import react from "@vitejs/plugin-react";
-import legacy from "@vitejs/plugin-legacy";
 import path from "path";
 
 // https://vitejs.dev/config/
@@ -84,23 +83,15 @@ export default defineConfig(({ mode }) => {
         configurePreviewServer: installGeminiRoute,
       },
       react(),
-      legacy({
-        targets: ["defaults", "Chrome >= 60", "Android >= 7", "Safari >= 12"],
-        modernTargets: [
-          "chrome >= 70",
-          "edge >= 79",
-          "firefox >= 68",
-          "safari >= 12",
-        ],
-        additionalLegacyPolyfills: ["regenerator-runtime/runtime"],
-      }),
     ],
     base: "./",
     build: {
+      target: "es2020",
       chunkSizeWarningLimit: 1200,
       rollupOptions: {
         output: {
           manualChunks: {
+            "react-vendor": ["react", "react-dom"],
             "questions-data": ["./src/data/questions.json"],
             "supabase-vendor": ["@supabase/supabase-js"],
           },

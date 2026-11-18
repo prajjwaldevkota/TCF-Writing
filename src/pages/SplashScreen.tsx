@@ -1,41 +1,45 @@
 import React, { useState, useEffect } from "react";
 import {
-  Clock,
-  Sparkles,
-  BookOpen,
   ArrowRight,
+  Check,
+  Clock3,
   Eye,
   EyeOff,
-  CheckCircle2,
+  Feather,
   Loader2,
   Lock,
   Mail,
-  User as UserIcon,
+  Moon,
   ShieldCheck,
-  Globe2,
+  Sun,
+  User as UserIcon,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
+import { useTheme } from "../context/ThemeContext";
 
 interface SplashScreenProps {
   onSuccess: () => void;
   onContinueGuest: () => void;
 }
 
-type AuthTab = "login" | "register" | "forgot";
+type AuthTab = "login" | "register" | "forgot" | "recovery";
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({
   onSuccess,
   onContinueGuest,
 }) => {
   const { language, setLanguage } = useLanguage();
+  const { theme, toggleTheme } = useTheme();
   const en = language === "en";
   const {
     signIn,
     signUp,
     resetPassword,
+    updatePassword,
     resendVerification,
-    isConfigured,
+    isPasswordRecovery,
+    clearPasswordRecovery,
   } = useAuth();
 
   const [tab, setTab] = useState<AuthTab>("login");
@@ -50,15 +54,31 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
   const [infoMsg, setInfoMsg] = useState<string | null>(null);
   const [showResend, setShowResend] = useState(false);
 
-  // Load remembered email
   useEffect(() => {
     try {
       const saved = localStorage.getItem("tcf_remembered_email");
-      if (saved) {
-        setEmail(saved);
-      }
+      if (saved) setEmail(saved);
     } catch {}
   }, []);
+
+  useEffect(() => {
+    if (isPasswordRecovery) {
+      setTab("recovery");
+      setErrorMsg(null);
+      setInfoMsg(
+        en
+          ? "Choose a new password below to restore access to your account."
+          : "Choisissez votre nouveau mot de passe ci-dessous pour réactiver votre accès.",
+      );
+    }
+  }, [isPasswordRecovery, en]);
+
+  const switchTab = (next: AuthTab) => {
+    setTab(next);
+    setErrorMsg(null);
+    setInfoMsg(null);
+    setShowResend(false);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,8 +89,8 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
     if (!email || !password) {
       setErrorMsg(
         en
-          ? "Please provide your email and password."
-          : "Veuillez renseigner votre adresse e-mail et votre mot de passe.",
+          ? "Enter your email address and password."
+          : "Saisissez votre adresse e-mail et votre mot de passe.",
       );
       return;
     }
@@ -81,14 +101,11 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
       const res = await signIn(cleanEmail, password);
       if (res.error) {
         const msg = res.error.message.toLowerCase();
-        if (
-          msg.includes("email not confirmed") ||
-          msg.includes("not confirmed")
-        ) {
+        if (msg.includes("email not confirmed") || msg.includes("not confirmed")) {
           setErrorMsg(
             en
-              ? "Your email has not been confirmed yet. Please check your inbox for the activation link."
-              : "Votre adresse e-mail n'a pas encore été confirmée. Veuillez vérifier votre boîte de réception.",
+              ? "Your email has not been confirmed yet. Open the activation link sent to your inbox."
+              : "Votre adresse e-mail n’a pas encore été confirmée. Cliquez sur le lien reçu dans votre messagerie.",
           );
           setShowResend(true);
         } else if (
@@ -97,22 +114,24 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
         ) {
           setErrorMsg(
             en
-              ? "Incorrect credentials. Please check your email and password."
-              : "Identifiants incorrects. Veuillez vérifier votre adresse e-mail et votre mot de passe.",
+              ? "Incorrect email or password."
+              : "Adresse e-mail ou mot de passe incorrect.",
           );
         } else {
           setErrorMsg(res.error.message);
         }
       } else {
-        if (rememberMe) {
-          localStorage.setItem("tcf_remembered_email", cleanEmail);
-        } else {
-          localStorage.removeItem("tcf_remembered_email");
-        }
+        try {
+          if (rememberMe) localStorage.setItem("tcf_remembered_email", cleanEmail);
+          else localStorage.removeItem("tcf_remembered_email");
+        } catch {}
         onSuccess();
       }
     } catch (err: any) {
-      setErrorMsg(err.message || (en ? "An unexpected error occurred." : "Une erreur inattendue est survenue."));
+      setErrorMsg(
+        err.message ||
+          (en ? "Unable to sign in right now." : "Connexion impossible pour le moment."),
+      );
     } finally {
       setLoading(false);
     }
@@ -127,8 +146,8 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
     if (!fullName.trim() || !email || !password || !confirmPassword) {
       setErrorMsg(
         en
-          ? "Please fill in all required fields."
-          : "Veuillez renseigner tous les champs obligatoires.",
+          ? "Complete all required fields."
+          : "Renseignez tous les champs demandés.",
       );
       return;
     }
@@ -136,8 +155,8 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
     if (password.length < 6) {
       setErrorMsg(
         en
-          ? "Password must be at least 6 characters."
-          : "Le mot de passe doit comporter au moins 6 caractères.",
+          ? "Use at least 6 characters for your password."
+          : "Votre mot de passe doit contenir au moins 6 caractères.",
       );
       return;
     }
@@ -146,7 +165,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
       setErrorMsg(
         en
           ? "Passwords do not match."
-          : "Les mots de passe ne correspondent pas.",
+          : "Les deux mots de passe ne correspondent pas.",
       );
       return;
     }
@@ -159,8 +178,8 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
         if (res.alreadyExists) {
           setErrorMsg(
             en
-              ? "An account with this email already exists. Please sign in."
-              : "Un compte existe déjà avec cette adresse. Veuillez vous connecter.",
+              ? "An account already exists for this email. Sign in below."
+              : "Un compte existe déjà pour cette adresse. Connectez-vous ci-dessous.",
           );
           setTab("login");
         } else {
@@ -169,8 +188,8 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
       } else if (res.needsVerification) {
         setInfoMsg(
           en
-            ? `A confirmation link was sent to ${cleanEmail}. Please check your inbox and confirm your email before signing in.`
-            : `Un lien de confirmation a été envoyé à ${cleanEmail}. Cliquez sur le lien pour valider votre compte.`,
+            ? `Confirmation link sent to ${cleanEmail}. Verify your email before signing in.`
+            : `Lien de validation envoyé à ${cleanEmail}. Confirmez votre adresse avant de vous connecter.`,
         );
         setShowResend(true);
         setTab("login");
@@ -180,7 +199,10 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
         onSuccess();
       }
     } catch (err: any) {
-      setErrorMsg(err.message || (en ? "Registration failed." : "L'inscription a échoué."));
+      setErrorMsg(
+        err.message ||
+          (en ? "Account creation failed." : "La création du compte a échoué."),
+      );
     } finally {
       setLoading(false);
     }
@@ -194,8 +216,8 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
     if (!email) {
       setErrorMsg(
         en
-          ? "Please enter your email address."
-          : "Veuillez saisir votre adresse e-mail.",
+          ? "Enter your email address first."
+          : "Saisissez d’abord votre adresse e-mail.",
       );
       return;
     }
@@ -208,455 +230,603 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
       } else {
         setInfoMsg(
           en
-            ? "A password reset link has been sent to your email address."
-            : "Un lien de réinitialisation vous a été envoyé par e-mail.",
+            ? "If an account matches this email, a reset link is on its way."
+            : "Si un compte correspond à cette adresse, un lien de réinitialisation vient d’être envoyé.",
         );
       }
     } catch (err: any) {
-      setErrorMsg(err.message || (en ? "Request failed." : "La demande a échoué."));
+      setErrorMsg(
+        err.message || (en ? "Request failed." : "La demande n’a pas abouti."),
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRecovery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setInfoMsg(null);
+
+    if (!password || !confirmPassword) {
+      setErrorMsg(
+        en
+          ? "Enter and confirm your new password."
+          : "Saisissez et confirmez votre nouveau mot de passe.",
+      );
+      return;
+    }
+
+    if (password.length < 6) {
+      setErrorMsg(
+        en
+          ? "Use at least 6 characters for your new password."
+          : "Le nouveau mot de passe doit contenir au moins 6 caractères.",
+      );
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setErrorMsg(
+        en
+          ? "Passwords do not match."
+          : "Les deux mots de passe ne correspondent pas.",
+      );
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await updatePassword(password);
+      if (res.error) {
+        setErrorMsg(res.error.message);
+      } else {
+        clearPasswordRecovery();
+        onSuccess();
+      }
+    } catch (err: any) {
+      setErrorMsg(
+        err.message ||
+          (en ? "Password update failed." : "La mise à jour du mot de passe a échoué."),
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-between selection:bg-blue-600 selection:text-white">
-      {/* Top Navbar */}
-      <header className="px-6 py-4 flex items-center justify-between border-b border-slate-800/80 max-w-7xl mx-auto w-full">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl" role="img" aria-label="Canada">
-            🍁
-          </span>
-          <div>
-            <h1 className="text-base font-black tracking-tight text-white flex items-center gap-2">
-              TCF Canada
-              <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                Writing Lab
-              </span>
-            </h1>
+    <div className="splash-shell">
+      {/* Left Column: Studio Identity & Authentic Exam Specimen */}
+      <section className="splash-showcase">
+        <div className="splash-showcase-top">
+          <div className="splash-brand">
+            <span className="splash-brand-icon" aria-hidden="true">
+              <Feather size={22} />
+            </span>
+            <div>
+              <strong>écriture</strong>
+              <span>L’atelier TCF Canada</span>
+            </div>
+          </div>
+          <span className="splash-goal-pill">Objectif NCLC 7+</span>
+        </div>
+
+        <div className="splash-hero-copy">
+          <p className="splash-kicker">
+            {en
+              ? "Expression écrite · Exam simulation & evidence-based review"
+              : "Expression écrite · Simulation officielle et bilan étayé"}
+          </p>
+          <h1>
+            {en
+              ? "Practise TCF Canada writing in a quiet, realistic studio."
+              : "Préparez l’écrit du TCF Canada dans le calme d’un vrai atelier."}
+          </h1>
+          <p className="splash-lead">
+            {en
+              ? "Work through real exam combinations under the 60-minute timer, then review quoted evidence, official length checks, and targeted rewrites."
+              : "Travaillez sur des combinaisons réelles chronométrées sur 60 minutes, puis relisez vos phrases avec citations vérifiées, contrôle des longueurs et pistes de réécriture."}
+          </p>
+        </div>
+
+        {/* Centerpiece: Official 3-Task Exam Sheet Specimen */}
+        <div className="splash-specimen" aria-label={en ? "Exam format overview" : "Aperçu du format de l’épreuve"}>
+          <div className="splash-specimen-head">
+            <span>{en ? "Official 3-task structure" : "Structure officielle en 3 tâches"}</span>
+            <span>
+              <Clock3 size={13} aria-hidden="true" />
+              60 min
+            </span>
+          </div>
+          <ul className="splash-task-list">
+            <li>
+              <span className="splash-task-num">1</span>
+              <div>
+                <strong>{en ? "Message & practical details" : "Message et renseignements"}</strong>
+                <small>{en ? "Clear purpose, adapted tone" : "Destinataire clair, registre adapté"}</small>
+              </div>
+              <span className="splash-word-pill">60–120 {en ? "words" : "mots"}</span>
+            </li>
+            <li>
+              <span className="splash-task-num">2</span>
+              <div>
+                <strong>{en ? "Experience & personal view" : "Récit d’expérience et avis"}</strong>
+                <small>{en ? "Structured account, concrete impressions" : "Narration structurée, impressions précises"}</small>
+              </div>
+              <span className="splash-word-pill">120–150 {en ? "words" : "mots"}</span>
+            </li>
+            <li>
+              <span className="splash-task-num">3</span>
+              <div>
+                <strong>{en ? "Synthesis & reasoned argument" : "Synthèse et prise de position"}</strong>
+                <small>{en ? "Two source texts compared in your words" : "Deux documents confrontés avec vos mots"}</small>
+              </div>
+              <span className="splash-word-pill">120–180 {en ? "words" : "mots"}</span>
+            </li>
+          </ul>
+          <div className="splash-specimen-foot">
+            <Check size={14} aria-hidden="true" />
+            <span>
+              {en
+                ? "Spell-check locked in mock mode · French accent bar included · CEFR / NCLC feedback"
+                : "Correcteur désactivé en examen blanc · Barre d’accents intégrée · Bilan CECRL / NCLC"}
+            </span>
           </div>
         </div>
 
-        <button
-          onClick={() => setLanguage(en ? "fr" : "en")}
-          className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-white bg-slate-800/60 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700/60 transition-colors"
-        >
-          <Globe2 size={14} />
-          <span>{en ? "Français" : "English"}</span>
-        </button>
-      </header>
-
-      {/* Main Hero & Auth Split */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-8 sm:py-12 grid lg:grid-cols-12 gap-10 lg:gap-12 items-center">
-        {/* Left Column: Hero & Value Proposition */}
-        <section className="lg:col-span-7 space-y-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs font-semibold">
-            <span>🎯</span>
-            <span>
-              {en
-                ? "Target NCLC 7+ (B2/C1) for Canadian Express Entry"
-                : "Objectif NCLC 7+ (B2/C1) pour l'Entrée Express"}
-            </span>
-          </div>
-
-          <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-[1.15]">
-            {en ? (
-              <>
-                Master TCF Canada Writing in{" "}
-                <span className="text-blue-400">real exam conditions</span>.
-              </>
-            ) : (
-              <>
-                Maîtrisez l'Expression Écrite du TCF dans les{" "}
-                <span className="text-blue-400">conditions réelles</span>.
-              </>
-            )}
-          </h2>
-
-          <p className="text-base sm:text-lg text-slate-300 leading-relaxed max-w-2xl">
+        <footer className="splash-showcase-foot">
+          <span>
+            <ShieldCheck size={14} aria-hidden="true" />
             {en
-              ? "The dedicated preparation environment for Canadian immigration: official 60-minute simulation, daily synced past topics, and deep pedagogical feedback powered by AI."
-              : "La plateforme d'entraînement dédiée à l'immigration canadienne : simulation officielle 60 minutes, sujets d'examen synchronisés quotidiennement et bilans pédagogiques basés sur le CECRL."}
-          </p>
+              ? "Drafts autosaved locally · Cloud sync with free account"
+              : "Brouillons sauvegardés localement · Synchronisation cloud avec compte"}
+          </span>
+        </footer>
+      </section>
 
-          {/* Key Feature Pillars */}
-          <div className="grid sm:grid-cols-3 gap-4 pt-4">
-            <div className="bg-slate-800/40 border border-slate-800 p-4 rounded-xl space-y-2">
-              <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center">
-                <Clock size={18} />
-              </div>
-              <h3 className="font-bold text-sm text-white">
-                {en ? "60-Min Mock Exam" : "Examen Blanc 60 min"}
-              </h3>
-              <p className="text-xs text-slate-400 leading-normal">
-                {en
-                  ? "All 3 tasks chained with real test center constraints (spell-check locked)."
-                  : "Les 3 tâches enchaînées en conditions réelles avec gestion libre du temps."}
-              </p>
-            </div>
+      {/* Right Column: Controls & Authentication Sheet */}
+      <main className="splash-auth-pane">
+        <header className="splash-auth-topbar">
+          <button
+            type="button"
+            className="theme-toggle"
+            onClick={toggleTheme}
+            aria-pressed={theme === "dark"}
+            aria-label={
+              theme === "dark"
+                ? en
+                  ? "Switch to light mode"
+                  : "Activer le mode clair"
+                : en
+                  ? "Switch to dark mode"
+                  : "Activer le mode sombre"
+            }
+          >
+            {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+            <span>
+              {theme === "dark"
+                ? en
+                  ? "Light"
+                  : "Clair"
+                : en
+                  ? "Dark"
+                  : "Sombre"}
+            </span>
+          </button>
 
-            <div className="bg-slate-800/40 border border-slate-800 p-4 rounded-xl space-y-2">
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                <Sparkles size={18} />
-              </div>
-              <h3 className="font-bold text-sm text-white">
-                {en ? "Pedagogical AI" : "Bilan Pédagogique IA"}
-              </h3>
-              <p className="text-xs text-slate-400 leading-normal">
-                {en
-                  ? "Evidence-based CEFR analysis, word-count penalty checks, and Level-Up toolbox."
-                  : "Citations vérifiées, contrôle des pénalités de longueur et boîte à outils B2/C1."}
-              </p>
-            </div>
-
-            <div className="bg-slate-800/40 border border-slate-800 p-4 rounded-xl space-y-2">
-              <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
-                <BookOpen size={18} />
-              </div>
-              <h3 className="font-bold text-sm text-white">
-                {en ? "Daily Topic Sync" : "Sujets Actualisés"}
-              </h3>
-              <p className="text-xs text-slate-400 leading-normal">
-                {en
-                  ? "Daily automated GitHub sync of real exam questions categorized by themes."
-                  : "Banque authentique de sujets récents classés par thématiques d'examen."}
-              </p>
-            </div>
+          <div
+            className="language-switch"
+            aria-label={en ? "Interface language" : "Langue de l’interface"}
+          >
+            {(["fr", "en"] as const).map((l) => (
+              <button
+                key={l}
+                type="button"
+                onClick={() => setLanguage(l)}
+                aria-pressed={language === l}
+              >
+                {l.toUpperCase()}
+              </button>
+            ))}
           </div>
-        </section>
+        </header>
 
-        {/* Right Column: Auth Card */}
-        <section className="lg:col-span-5">
-          <div className="bg-slate-800/90 backdrop-blur-md border border-slate-700/80 rounded-2xl p-6 sm:p-8 shadow-2xl">
-            {/* Tab Switcher */}
-            <div className="flex rounded-xl bg-slate-900/80 p-1 mb-6 border border-slate-700/50">
-              <button
-                type="button"
-                onClick={() => {
-                  setTab("login");
-                  setErrorMsg(null);
-                  setInfoMsg(null);
-                }}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                  tab === "login"
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                {en ? "Sign In" : "Connexion"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setTab("register");
-                  setErrorMsg(null);
-                  setInfoMsg(null);
-                }}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                  tab === "register"
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                {en ? "Create Account" : "Créer un compte"}
-              </button>
+        <div className="splash-auth-card-wrap">
+          <div className="splash-auth-card panel">
+            <div className="splash-auth-header">
+              <h2>
+                {tab === "register"
+                  ? en
+                    ? "Create your account"
+                    : "Créer votre compte"
+                  : tab === "forgot"
+                    ? en
+                      ? "Reset your password"
+                      : "Réinitialiser le mot de passe"
+                    : tab === "recovery"
+                      ? en
+                        ? "Set a new password"
+                        : "Choisir un nouveau mot de passe"
+                      : en
+                        ? "Sign in to your workspace"
+                        : "Accéder à votre espace"}
+              </h2>
+              <p>
+                {tab === "register"
+                  ? en
+                    ? "Unlock AI pedagogical reviews, NCLC estimates, and cloud backup across devices."
+                    : "Débloquez les bilans pédagogiques IA, l’estimation NCLC et la synchronisation de vos séances."
+                  : tab === "forgot"
+                    ? en
+                      ? "Enter your email address to receive a password reset link."
+                      : "Saisissez votre adresse e-mail pour recevoir un lien de réinitialisation."
+                    : tab === "recovery"
+                      ? en
+                        ? "Enter a new password of at least 6 characters."
+                        : "Saisissez un nouveau mot de passe d’au moins 6 caractères."
+                      : en
+                        ? "Sign in to generate AI reviews and sync your saved writing."
+                        : "Connectez-vous pour obtenir vos bilans IA et synchroniser vos rédactions."}
+              </p>
             </div>
 
-            {/* Error or Info Feedback */}
-            {errorMsg && (
-              <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-xs">
-                {errorMsg}
-                {showResend && (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (!email) return;
-                      await resendVerification(email.trim().toLowerCase());
-                      setInfoMsg(
-                        en
-                          ? "Confirmation email resent."
-                          : "E-mail de confirmation renvoyé.",
-                      );
-                    }}
-                    className="block mt-2 underline font-semibold text-red-200"
-                  >
-                    {en
-                      ? "Resend confirmation email"
-                      : "Renvoyer l'e-mail de confirmation"}
-                  </button>
-                )}
-              </div>
-            )}
-            {infoMsg && (
-              <div className="mb-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs leading-relaxed">
-                {infoMsg}
+            {tab !== "forgot" && tab !== "recovery" && (
+              <div className="segmented splash-tabs" role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === "login"}
+                  aria-pressed={tab === "login"}
+                  onClick={() => switchTab("login")}
+                >
+                  {en ? "Sign in" : "Connexion"}
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === "register"}
+                  aria-pressed={tab === "register"}
+                  onClick={() => switchTab("register")}
+                >
+                  {en ? "Create account" : "Créer un compte"}
+                </button>
               </div>
             )}
 
-            {/* Login Form */}
-            {tab === "login" && (
-              <form onSubmit={handleLogin} className="space-y-4">
+            {errorMsg && (
+              <div className="notice warning splash-feedback" role="alert">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                    {en ? "Email Address" : "Adresse e-mail"}
-                  </label>
-                  <div className="relative">
-                    <Mail
-                      size={16}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
-                    />
+                  <p>{errorMsg}</p>
+                  {showResend && (
+                    <button
+                      type="button"
+                      className="text-button"
+                      onClick={async () => {
+                        if (!email) return;
+                        await resendVerification(email.trim().toLowerCase());
+                        setInfoMsg(
+                          en
+                            ? "Confirmation email sent again."
+                            : "E-mail de confirmation renvoyé.",
+                        );
+                      }}
+                    >
+                      {en
+                        ? "Resend confirmation email"
+                        : "Renvoyer l’e-mail de confirmation"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {infoMsg && (
+              <div className="notice success splash-feedback" role="status">
+                <Check size={17} />
+                <p>{infoMsg}</p>
+              </div>
+            )}
+
+            {tab === "login" && (
+              <form onSubmit={handleLogin} className="splash-form">
+                <label className="splash-field">
+                  <span>{en ? "Email address" : "Adresse e-mail"}</span>
+                  <div className="splash-input-wrap">
+                    <Mail size={16} aria-hidden="true" />
                     <input
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="nom@exemple.com"
+                      autoComplete="email"
                       required
-                      className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-slate-900/80 border border-slate-700 text-white text-sm placeholder:text-slate-500 focus:outline-hidden focus:border-blue-500"
                     />
                   </div>
-                </div>
+                </label>
 
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-semibold text-slate-300">
+                <div className="splash-field">
+                  <div className="row between">
+                    <label htmlFor="splash-login-password">
                       {en ? "Password" : "Mot de passe"}
                     </label>
                     <button
                       type="button"
-                      onClick={() => setTab("forgot")}
-                      className="text-[11px] text-blue-400 hover:underline"
+                      className="splash-inline-link"
+                      onClick={() => switchTab("forgot")}
                     >
                       {en ? "Forgot password?" : "Mot de passe oublié ?"}
                     </button>
                   </div>
-                  <div className="relative">
-                    <Lock
-                      size={16}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
-                    />
+                  <div className="splash-input-wrap">
+                    <Lock size={16} aria-hidden="true" />
                     <input
+                      id="splash-login-password"
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
+                      autoComplete="current-password"
                       required
-                      className="w-full pl-9 pr-10 py-2.5 rounded-lg bg-slate-900/80 border border-slate-700 text-white text-sm placeholder:text-slate-500 focus:outline-hidden focus:border-blue-500"
                     />
                     <button
                       type="button"
+                      className="splash-eye-btn"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                      aria-label={
+                        showPassword
+                          ? en
+                            ? "Hide password"
+                            : "Masquer le mot de passe"
+                          : en
+                            ? "Show password"
+                            : "Afficher le mot de passe"
+                      }
                     >
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 pt-1">
+                <label className="checkbox-inline">
                   <input
                     type="checkbox"
-                    id="remember"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
-                    className="rounded border-slate-700 bg-slate-900 text-blue-600 focus:ring-0"
                   />
-                  <label htmlFor="remember" className="text-xs text-slate-400">
-                    {en ? "Remember me on this browser" : "Se souvenir de moi"}
-                  </label>
-                </div>
+                  <span>
+                    {en ? "Remember my email on this device" : "Mémoriser mon adresse sur cet appareil"}
+                  </span>
+                </label>
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md mt-2"
+                  className="button primary full-width"
                 >
-                  {loading && <Loader2 size={16} className="animate-spin" />}
-                  <span>{en ? "Sign In" : "Se connecter"}</span>
+                  {loading && <Loader2 size={16} className="spin" />}
+                  <span>{en ? "Sign in" : "Se connecter"}</span>
                 </button>
               </form>
             )}
 
-            {/* Registration Form */}
             {tab === "register" && (
-              <form onSubmit={handleRegister} className="space-y-3.5">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    {en ? "Full Name" : "Nom complet"}
-                  </label>
-                  <div className="relative">
-                    <UserIcon
-                      size={16}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
-                    />
+              <form onSubmit={handleRegister} className="splash-form">
+                <label className="splash-field">
+                  <span>{en ? "Full name" : "Nom complet"}</span>
+                  <div className="splash-input-wrap">
+                    <UserIcon size={16} aria-hidden="true" />
                     <input
                       type="text"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      placeholder="Marie Curie"
+                      placeholder={en ? "Camille Tremblay" : "Camille Tremblay"}
+                      autoComplete="name"
                       required
-                      className="w-full pl-9 pr-3 py-2 rounded-lg bg-slate-900/80 border border-slate-700 text-white text-sm placeholder:text-slate-500 focus:outline-hidden focus:border-blue-500"
                     />
                   </div>
-                </div>
+                </label>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    {en ? "Email Address" : "Adresse e-mail"}
-                  </label>
-                  <div className="relative">
-                    <Mail
-                      size={16}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
-                    />
+                <label className="splash-field">
+                  <span>{en ? "Email address" : "Adresse e-mail"}</span>
+                  <div className="splash-input-wrap">
+                    <Mail size={16} aria-hidden="true" />
                     <input
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="nom@exemple.com"
+                      autoComplete="email"
                       required
-                      className="w-full pl-9 pr-3 py-2 rounded-lg bg-slate-900/80 border border-slate-700 text-white text-sm placeholder:text-slate-500 focus:outline-hidden focus:border-blue-500"
                     />
                   </div>
-                </div>
+                </label>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    {en ? "Password (min. 6 characters)" : "Mot de passe (min. 6 car.)"}
-                  </label>
-                  <div className="relative">
-                    <Lock
-                      size={16}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
-                    />
+                <label className="splash-field">
+                  <span>
+                    {en
+                      ? "Password (6 characters minimum)"
+                      : "Mot de passe (6 caractères minimum)"}
+                  </span>
+                  <div className="splash-input-wrap">
+                    <Lock size={16} aria-hidden="true" />
                     <input
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
+                      autoComplete="new-password"
                       required
-                      className="w-full pl-9 pr-10 py-2 rounded-lg bg-slate-900/80 border border-slate-700 text-white text-sm placeholder:text-slate-500 focus:outline-hidden focus:border-blue-500"
                     />
                     <button
                       type="button"
+                      className="splash-eye-btn"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                      aria-label={
+                        showPassword
+                          ? en
+                            ? "Hide password"
+                            : "Masquer le mot de passe"
+                          : en
+                            ? "Show password"
+                            : "Afficher le mot de passe"
+                      }
                     >
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
-                </div>
+                </label>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    {en ? "Confirm Password" : "Confirmer le mot de passe"}
-                  </label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    className="w-full px-3 py-2 rounded-lg bg-slate-900/80 border border-slate-700 text-white text-sm placeholder:text-slate-500 focus:outline-hidden focus:border-blue-500"
-                  />
-                </div>
+                <label className="splash-field">
+                  <span>{en ? "Confirm password" : "Confirmer le mot de passe"}</span>
+                  <div className="splash-input-wrap">
+                    <Lock size={16} aria-hidden="true" />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="••••••••"
+                      autoComplete="new-password"
+                      required
+                    />
+                  </div>
+                </label>
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md mt-1"
+                  className="button primary full-width"
                 >
-                  {loading && <Loader2 size={16} className="animate-spin" />}
-                  <span>{en ? "Create My Account" : "Créer mon compte"}</span>
+                  {loading && <Loader2 size={16} className="spin" />}
+                  <span>{en ? "Create account" : "Créer mon compte"}</span>
                 </button>
               </form>
             )}
 
-            {/* Forgot Password */}
             {tab === "forgot" && (
-              <form onSubmit={handleForgot} className="space-y-4">
-                <p className="text-xs text-slate-400">
-                  {en
-                    ? "Enter your email address and we will send you a reset link."
-                    : "Saisissez votre e-mail pour recevoir un lien de réinitialisation."}
-                </p>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                    {en ? "Email Address" : "Adresse e-mail"}
-                  </label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="nom@exemple.com"
-                    required
-                    className="w-full px-3 py-2.5 rounded-lg bg-slate-900/80 border border-slate-700 text-white text-sm placeholder:text-slate-500 focus:outline-hidden focus:border-blue-500"
-                  />
-                </div>
+              <form onSubmit={handleForgot} className="splash-form">
+                <label className="splash-field">
+                  <span>{en ? "Email address" : "Adresse e-mail"}</span>
+                  <div className="splash-input-wrap">
+                    <Mail size={16} aria-hidden="true" />
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="nom@exemple.com"
+                      autoComplete="email"
+                      required
+                    />
+                  </div>
+                </label>
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md"
+                  className="button primary full-width"
                 >
-                  {loading && <Loader2 size={16} className="animate-spin" />}
-                  <span>{en ? "Send Reset Link" : "Envoyer le lien"}</span>
+                  {loading && <Loader2 size={16} className="spin" />}
+                  <span>{en ? "Send reset link" : "Envoyer le lien"}</span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setTab("login")}
-                  className="w-full text-center text-xs text-slate-400 hover:text-white pt-1"
+                  className="button secondary full-width"
+                  onClick={() => switchTab("login")}
                 >
-                  {en ? "Back to Sign In" : "Retour à la connexion"}
+                  {en ? "Back to sign in" : "Retour à la connexion"}
                 </button>
               </form>
             )}
 
-            {/* Divider */}
-            <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-700/60" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-slate-800 px-3 text-slate-500 font-bold">
-                  {en ? "or" : "ou"}
-                </span>
-              </div>
-            </div>
+            {tab === "recovery" && (
+              <form onSubmit={handleRecovery} className="splash-form">
+                <label className="splash-field">
+                  <span>{en ? "New password" : "Nouveau mot de passe"}</span>
+                  <div className="splash-input-wrap">
+                    <Lock size={16} aria-hidden="true" />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      autoComplete="new-password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="splash-eye-btn"
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label={
+                        showPassword
+                          ? en
+                            ? "Hide password"
+                            : "Masquer le mot de passe"
+                          : en
+                            ? "Show password"
+                            : "Afficher le mot de passe"
+                      }
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </label>
 
-            {/* Guest Action */}
-            <button
-              type="button"
-              onClick={onContinueGuest}
-              className="w-full py-2.5 px-4 rounded-lg bg-slate-700/60 hover:bg-slate-700 border border-slate-600/70 text-slate-200 text-sm font-semibold flex items-center justify-center gap-2 transition-all"
-            >
-              <span>{en ? "Continue as Guest" : "Continuer en mode invité"}</span>
-              <ArrowRight size={15} />
-            </button>
-            <p className="text-[11px] text-center text-slate-400 mt-2">
-              {en
-                ? "Free practice mode · Account required to unlock AI evaluation"
-                : "Mode pratique libre · Compte requis pour débloquer l'évaluation IA"}
-            </p>
+                <label className="splash-field">
+                  <span>{en ? "Confirm new password" : "Confirmer le nouveau mot de passe"}</span>
+                  <div className="splash-input-wrap">
+                    <Lock size={16} aria-hidden="true" />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="••••••••"
+                      autoComplete="new-password"
+                      required
+                    />
+                  </div>
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="button primary full-width"
+                >
+                  {loading && <Loader2 size={16} className="spin" />}
+                  <span>{en ? "Save new password" : "Enregistrer le mot de passe"}</span>
+                </button>
+              </form>
+            )}
+
+            {tab !== "recovery" && (
+              <div className="splash-guest-block">
+                <div className="splash-divider">
+                  <span>{en ? "or practise without signing in" : "ou pratiquer sans compte"}</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={onContinueGuest}
+                  className="button secondary full-width"
+                >
+                  <span>
+                    {en ? "Continue in guest mode" : "Continuer en mode invité"}
+                  </span>
+                  <ArrowRight size={16} />
+                </button>
+
+                <p className="splash-guest-note">
+                  <Lock size={12} aria-hidden="true" />
+                  <span>
+                    {en
+                      ? "All writing topics & mock timer included · Free account required for AI review"
+                      : "Sujets et examen blanc inclus · Compte gratuit requis pour le bilan IA"}
+                  </span>
+                </p>
+              </div>
+            )}
           </div>
-        </section>
-      </main>
-
-      {/* Footer */}
-      <footer className="px-6 py-4 border-t border-slate-800/80 max-w-7xl mx-auto w-full flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
-        <p>
-          © {new Date().getFullYear()} TCF Canada Writing Simulator · All rights
-          reserved.
-        </p>
-        <div className="flex items-center gap-4">
-          <span className="flex items-center gap-1.5">
-            <ShieldCheck size={14} className="text-emerald-500" />
-            {en ? "Safe Local Storage" : "Stockage local sécurisé"}
-          </span>
-          <span>·</span>
-          <span>CEFR / NCLC Benchmark</span>
         </div>
-      </footer>
+      </main>
     </div>
   );
 };

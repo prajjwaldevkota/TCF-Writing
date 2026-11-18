@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   BookOpen,
@@ -10,6 +11,7 @@ import {
   Pause,
   Play,
   Save,
+  ShieldCheck,
   Maximize2,
   Minimize2,
 } from "lucide-react";
@@ -65,6 +67,126 @@ const CHECKS_EN = {
     "My conclusion follows my argument.",
   ],
 };
+const SessionTimerControls: React.FC<{
+  session: PracticeSession;
+  en: boolean;
+  onToggleTimer: () => void;
+  onExpire: () => void;
+}> = React.memo(({ session, en, onToggleTimer, onExpire }) => {
+  const isExam = session.mode === "exam";
+  const isTicking = isExam || Boolean(session.runningSince);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    setNow(Date.now());
+    if (!isTicking) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [isTicking, session.runningSince, session.elapsedSeconds]);
+
+  const elapsed = sessionElapsed(session, now);
+  const timeLeft = Math.max(0, 3600 - elapsed);
+
+  useEffect(() => {
+    if (isExam && timeLeft === 0) onExpire();
+  }, [isExam, timeLeft, onExpire]);
+
+  return (
+    <div className={`writing-clock ${isExam && timeLeft < 300 ? "urgent" : ""}`}>
+      <Clock3 size={22} aria-hidden="true" />
+      <span>{formatTime(isExam ? timeLeft : elapsed)}</span>
+      <small>
+        {isExam
+          ? en
+            ? "Time left"
+            : "Temps restant"
+          : en
+            ? "optional timer"
+            : "chrono facultatif"}
+      </small>
+      {!isExam && (
+        <button
+          className="icon-button"
+          onClick={onToggleTimer}
+          aria-label={
+            session.runningSince
+              ? en
+                ? "Pause timer"
+                : "Mettre le chrono en pause"
+              : en
+                ? "Start timer"
+                : "Démarrer le chrono"
+          }
+        >
+          {session.runningSince ? <Pause size={16} /> : <Play size={16} />}
+        </button>
+      )}
+    </div>
+  );
+});
+
+const ExamStatusBanner: React.FC<{
+  session: PracticeSession;
+  en: boolean;
+}> = React.memo(({ session, en }) => {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const timeLeft = Math.max(0, 3600 - sessionElapsed(session, now));
+
+  return (
+    <div
+      role="status"
+      className={`exam-simulation-banner ${
+        timeLeft <= 300 ? "critical" : timeLeft <= 900 ? "warning" : "normal"
+      }`}
+    >
+      <div className="exam-banner-left">
+        <span className="exam-badge">
+          <ShieldCheck size={15} aria-hidden="true" />
+          <span>
+            {en ? "TCF Canada mock conditions" : "Conditions d’examen TCF Canada"}
+          </span>
+        </span>
+        <span className="exam-conditions-tag">
+          {en
+            ? "60 min shared · Spell-check & paste disabled"
+            : "60 min globales · Correcteur et collage désactivés"}
+        </span>
+      </div>
+      <div className="exam-banner-right">
+        {timeLeft <= 300 ? (
+          <span className="exam-urgency-alert pulse">
+            <AlertTriangle size={14} aria-hidden="true" />
+            <span>
+              {en
+                ? "Final 5 minutes — check agreements and accents."
+                : "Dernières 5 minutes — relisez les accords et accents."}
+            </span>
+          </span>
+        ) : timeLeft <= 900 ? (
+          <span className="exam-urgency-alert">
+            <Clock3 size={14} aria-hidden="true" />
+            <span>
+              {en
+                ? "15 minutes left — reserve time for Task 3."
+                : "15 minutes restantes — gardez du temps pour la tâche 3."}
+            </span>
+          </span>
+        ) : (
+          <span className="exam-hint">
+            {en
+              ? "Divide your 60 minutes freely across all three tasks."
+              : "Répartissez librement vos 60 minutes entre les trois tâches."}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+});
+
 export function Simulator({
   initialSession,
   onFinishExam,
@@ -79,7 +201,6 @@ export function Simulator({
   const { language } = useLanguage();
   const en = language === "en";
   const [session, setSession] = useState(initialSession);
-  const [now, setNow] = useState(Date.now());
   const [saved, setSaved] = useState(true);
   const [focusWriting, setFocusWriting] = useState(false);
   const [mobilePromptOpen, setMobilePromptOpen] = useState(true);
@@ -93,21 +214,59 @@ export function Simulator({
   const finishButtonRef = useRef<HTMLButtonElement>(null);
   const finished = useRef(false);
   const textRef = useRef<HTMLTextAreaElement>(null);
+  const sessionRef = useRef(initialSession);
+  const dirtyRef = useRef(false);
+  const debounceTimerRef = useRef<number | null>(null);
+  const onDraftChangeRef = useRef(onDraftChange);
+  onDraftChangeRef.current = onDraftChange;
+
+  const flushDraft = useCallback(() => {
+    if (debounceTimerRef.current !== null) {
+      window.clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    if (!dirtyRef.current || finished.current) return true;
+    const ok = savePracticeSession(sessionRef.current);
+    setSaved(ok);
+    dirtyRef.current = false;
+    onDraftChangeRef.current(sessionRef.current);
+    return ok;
+  }, []);
 
   const task = session.activeTask;
   const info = TASK_INFO[task];
   const requirement = session.combination.tasks[task];
-  const elapsed = sessionElapsed(session, now);
   const isExam = session.mode === "exam";
-  const timeLeft = Math.max(0, 3600 - elapsed);
-  const words = countFrenchWords(session.answers[task]);
+
+  const count1 = useMemo(() => countFrenchWords(session.answers.task1), [session.answers.task1]);
+  const count2 = useMemo(() => countFrenchWords(session.answers.task2), [session.answers.task2]);
+  const count3 = useMemo(() => countFrenchWords(session.answers.task3), [session.answers.task3]);
+  const wordCounts = useMemo(
+    () => ({ task1: count1, task2: count2, task3: count3 }),
+    [count1, count2, count3],
+  );
+  const words = wordCounts[task];
   const inRange =
     words >= requirement.minWords && words <= requirement.maxWords;
   const withinRangeCount = session.keys.filter((key) => {
-    const count = countFrenchWords(session.answers[key]);
+    const count = wordCounts[key];
     const target = session.combination.tasks[key];
     return count >= target.minWords && count <= target.maxWords;
   }).length;
+
+  const cleanedPrompt = useMemo(
+    () => normalizeParagraphText(requirement.instruction || requirement.title),
+    [requirement.instruction, requirement.title],
+  );
+  const cleanedDoc1 = useMemo(
+    () => (requirement.document1 ? cleanDocumentText(requirement.document1) : ""),
+    [requirement.document1],
+  );
+  const cleanedDoc2 = useMemo(
+    () => (requirement.document2 ? cleanDocumentText(requirement.document2) : ""),
+    [requirement.document2],
+  );
+
   const responseHint = en
     ? {
         task1:
@@ -125,35 +284,74 @@ export function Simulator({
         task3:
           "Comparez les deux documents avec vos propres mots, puis expliquez et justifiez votre opinion. Rédigez un seul texte structuré.",
       }[task];
-  const update = (patch: Partial<PracticeSession>) => {
-    const next = { ...session, ...patch, savedAt: new Date().toISOString() };
-    setSaved(savePracticeSession(next));
-    setSession(next);
-    onDraftChange(next);
-  };
-  const complete = () => {
+
+  const update = useCallback(
+    (patch: Partial<PracticeSession>, immediate = true) => {
+      const next: PracticeSession = {
+        ...sessionRef.current,
+        ...patch,
+        savedAt: new Date().toISOString(),
+      };
+      sessionRef.current = next;
+      setSession(next);
+
+      if (immediate) {
+        if (debounceTimerRef.current !== null) {
+          window.clearTimeout(debounceTimerRef.current);
+          debounceTimerRef.current = null;
+        }
+        dirtyRef.current = false;
+        setSaved(savePracticeSession(next));
+        onDraftChangeRef.current(next);
+      } else {
+        dirtyRef.current = true;
+        if (debounceTimerRef.current !== null) {
+          window.clearTimeout(debounceTimerRef.current);
+        }
+        debounceTimerRef.current = window.setTimeout(() => {
+          debounceTimerRef.current = null;
+          if (!dirtyRef.current || finished.current) return;
+          dirtyRef.current = false;
+          setSaved(savePracticeSession(sessionRef.current));
+          onDraftChangeRef.current(sessionRef.current);
+        }, 250);
+      }
+    },
+    [],
+  );
+
+  const complete = useCallback(() => {
     if (finished.current) return;
+    if (debounceTimerRef.current !== null) {
+      window.clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    dirtyRef.current = false;
+    const current = sessionRef.current;
+    const currentIsExam = current.mode === "exam";
+    const totalElapsed = sessionElapsed(current, Date.now());
     const counts = Object.fromEntries(
-      TASK_KEYS.map((k) => [k, countFrenchWords(session.answers[k])]),
+      TASK_KEYS.map((k) => [k, countFrenchWords(current.answers[k])]),
     ) as ExamResult["wordCounts"];
     const result: ExamResult = {
-      id: session.sessionId,
+      id: current.sessionId,
       createdAt: new Date().toISOString(),
-      combination: session.combination,
-      year: session.year,
-      month: session.month,
-      answers: session.answers,
+      combination: current.combination,
+      year: current.year,
+      month: current.month,
+      answers: current.answers,
       wordCounts: counts,
-      timeUsedSeconds: isExam ? Math.min(elapsed, 3600) : elapsed,
-      isPracticeMode: !isExam,
-      practiceTask: session.keys.join(","),
-      practiceTasks: session.keys,
-      allocatedMinutes: isExam ? 60 : undefined,
-      revisionOf: session.revisionOf,
+      timeUsedSeconds: currentIsExam ? Math.min(totalElapsed, 3600) : totalElapsed,
+      isPracticeMode: !currentIsExam,
+      practiceTask: current.keys.join(","),
+      practiceTasks: current.keys,
+      allocatedMinutes: currentIsExam ? 60 : undefined,
+      revisionOf: current.revisionOf,
     };
     if (onFinishExam(result)) finished.current = true;
     else setSaveFailure(true);
-  };
+  }, [onFinishExam]);
+
   useEffect(() => {
     if (!finish) return;
     const before = finishButtonRef.current;
@@ -184,43 +382,71 @@ export function Simulator({
       before?.focus();
     };
   }, [finish]);
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-  useEffect(() => {
-    if (isExam && timeLeft === 0 && !finished.current) complete();
-  }, [timeLeft]);
+
   useEffect(() => {
     const before = (event: BeforeUnloadEvent) => {
-      if (!savePracticeSession(session)) {
+      if (finished.current) return;
+      if (!savePracticeSession(sessionRef.current)) {
         event.preventDefault();
         event.returnValue = "";
       }
     };
+    const onHide = () => {
+      if (!finished.current) void flushDraft();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden" && !finished.current) {
+        void flushDraft();
+      }
+    };
     window.addEventListener("beforeunload", before);
-    return () => window.removeEventListener("beforeunload", before);
-  }, [session]);
-  const toggleTimer = () =>
+    window.addEventListener("pagehide", onHide);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("beforeunload", before);
+      window.removeEventListener("pagehide", onHide);
+      document.removeEventListener("visibilitychange", onVisibility);
+      if (!finished.current && dirtyRef.current) {
+        savePracticeSession(sessionRef.current);
+      }
+      if (debounceTimerRef.current !== null) {
+        window.clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [flushDraft]);
+
+  const toggleTimer = useCallback(() => {
+    const current = sessionRef.current;
     update(
-      session.runningSince
-        ? { elapsedSeconds: sessionElapsed(session), runningSince: null }
+      current.runningSince
+        ? { elapsedSeconds: sessionElapsed(current), runningSince: null }
         : { runningSince: Date.now() },
+      true,
     );
+  }, [update]);
+
+  const handleCancel = () => {
+    flushDraft();
+    onCancelExam();
+  };
+
   const insert = (character: string) => {
     const editor = textRef.current;
     if (!editor) return;
     const a = editor.selectionStart;
     const b = editor.selectionEnd;
-    update({
-      answers: {
-        ...session.answers,
-        [task]:
-          session.answers[task].slice(0, a) +
-          character +
-          session.answers[task].slice(b),
+    update(
+      {
+        answers: {
+          ...sessionRef.current.answers,
+          [task]:
+            sessionRef.current.answers[task].slice(0, a) +
+            character +
+            sessionRef.current.answers[task].slice(b),
+        },
       },
-    });
+      false,
+    );
     requestAnimationFrame(() => {
       editor.focus();
       editor.setSelectionRange(a + character.length, a + character.length);
@@ -234,7 +460,7 @@ export function Simulator({
         <div className="writing-session-title">
           <button
             className="writing-back icon-button"
-            onClick={onCancelExam}
+            onClick={handleCancel}
             aria-label={
               en
                 ? "Save and leave writing"
@@ -277,108 +503,44 @@ export function Simulator({
             </p>
           </div>
         </div>
-        <div
-          className={`writing-clock ${isExam && timeLeft < 300 ? "urgent" : ""}`}
-        >
-          <Clock3 size={22} aria-hidden="true" />
-          <span>{formatTime(isExam ? timeLeft : elapsed)}</span>
-          <small>
-            {isExam
-              ? en
-                ? "Time left"
-                : "Temps restant"
-              : en
-                ? "optional timer"
-                : "chrono facultatif"}
-          </small>
-          {!isExam && (
-            <button
-              className="icon-button"
-              onClick={toggleTimer}
-              aria-label={
-                session.runningSince
-                  ? en
-                    ? "Pause timer"
-                    : "Mettre le chrono en pause"
-                  : en
-                    ? "Start timer"
-                    : "Démarrer le chrono"
-              }
-            >
-              {session.runningSince ? <Pause size={16} /> : <Play size={16} />}
-            </button>
-          )}
-        </div>
+        <SessionTimerControls
+          session={session}
+          en={en}
+          onToggleTimer={toggleTimer}
+          onExpire={complete}
+        />
       </header>
-      {isExam && (
-        <div
-          role="status"
-          className={`exam-simulation-banner ${
-            timeLeft <= 300
-              ? "critical"
-              : timeLeft <= 900
-              ? "warning"
-              : "normal"
-          }`}
-        >
-          <div className="exam-banner-left">
-            <span className="exam-badge">
-              🇨🇦 {en ? "OFFICIAL TCF CANADA SIMULATION" : "SIMULATION OFFICIELLE TCF CANADA"}
-            </span>
-            <span className="exam-conditions-tag">
-              {en
-                ? "60 min global · Spell-check & Paste locked"
-                : "60 min global · Correcteur & Copier-coller verrouillés"}
-            </span>
-          </div>
-          <div className="exam-banner-right">
-            {timeLeft <= 300 ? (
-              <span className="exam-urgency-alert pulse">
-                🚨 {en ? "Final 5 minutes! Review agreements and accents." : "Dernières 5 minutes ! Relisez les accords et accents."}
-              </span>
-            ) : timeLeft <= 900 ? (
-              <span className="exam-urgency-alert">
-                ⏳ {en ? "15 minutes remaining — allocate time for Task 3." : "Plus que 15 minutes — gardez du temps pour la tâche 3."}
-              </span>
-            ) : (
-              <span className="exam-hint">
-                {en ? "Manage your time freely between Tasks 1, 2, and 3." : "Gérez librement vos 60 minutes entre les 3 tâches."}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
+      {isExam && <ExamStatusBanner session={session} en={en} />}
       <div className="writing-session-bar">
         {session.keys.length > 1 ? (
           <div
             className="writing-task-switch"
             aria-label={en ? "Writing tasks" : "Tâches de rédaction"}
           >
-            {session.keys.map((key) => (
-              <button
-                key={key}
-                aria-pressed={task === key}
-                onClick={() => update({ activeTask: key })}
-              >
-                Tâche {TASK_INFO[key].number}
-                <small>
-                  {countFrenchWords(session.answers[key])}{" "}
-                  {en ? "words" : "mots"}
-                </small>
-                {(() => {
-                  const n = countFrenchWords(session.answers[key]);
-                  const r = session.combination.tasks[key];
-                  return n >= r.minWords && n <= r.maxWords ? (
+            {session.keys.map((key) => {
+              const n = wordCounts[key];
+              const r = session.combination.tasks[key];
+              return (
+                <button
+                  key={key}
+                  aria-pressed={task === key}
+                  onClick={() => update({ activeTask: key }, true)}
+                >
+                  Tâche {TASK_INFO[key].number}
+                  <small>
+                    {n} {en ? "words" : "mots"}
+                  </small>
+                  {n >= r.minWords && n <= r.maxWords ? (
                     <Check
                       size={14}
                       aria-label={
                         en ? "Word target reached" : "Nombre de mots respecté"
                       }
                     />
-                  ) : null;
-                })()}
-              </button>
-            ))}
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
         ) : (
           <span className="writing-task-label">
@@ -505,9 +667,7 @@ export function Simulator({
                       : "Lisez la consigne"}
                 </h3>
                 <p lang="fr">
-                  {normalizeParagraphText(
-                    requirement.instruction || requirement.title,
-                  )}
+                  {cleanedPrompt}
                 </p>
               </section>
               {task === "task3" && (
@@ -517,18 +677,17 @@ export function Simulator({
                       ? "Read both documents. Use them to compare the viewpoints in your response."
                       : "Lisez les deux documents pour comparer leurs points de vue dans votre réponse."}
                   </p>
-                  {[requirement.document1, requirement.document2].map(
+                  {[cleanedDoc1, cleanedDoc2].map(
                     (doc, i) => (
                       <section key={i}>
                         <h3>
                           <span>{i + 1}</span>Document {i + 1}
                         </h3>
                         <p lang="fr">
-                          {doc
-                            ? cleanDocumentText(doc)
-                            : en
+                          {doc ||
+                            (en
                               ? "This source document is missing. Source comparison cannot be graded."
-                              : "Document manquant : la comparaison des sources ne peut pas être évaluée."}
+                              : "Document manquant : la comparaison des sources ne peut pas être évaluée.")}
                         </p>
                       </section>
                     ),
@@ -721,9 +880,12 @@ export function Simulator({
             }
             value={session.answers[task]}
             onChange={(e) =>
-              update({
-                answers: { ...session.answers, [task]: e.target.value },
-              })
+              update(
+                {
+                  answers: { ...session.answers, [task]: e.target.value },
+                },
+                false,
+              )
             }
             onPaste={isExam ? (e) => e.preventDefault() : undefined}
             spellCheck={!isExam}
@@ -840,7 +1002,7 @@ export function Simulator({
             )}
             <div className="finish-counts">
               {session.keys.map((k) => {
-                const n = countFrenchWords(session.answers[k]);
+                const n = wordCounts[k];
                 const r = session.combination.tasks[k];
                 return (
                   <div key={k}>

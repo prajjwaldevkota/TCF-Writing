@@ -44,7 +44,7 @@ export async function reviewSubmission(
   const key = model + ":" + hash;
   const running = pending.get(key);
   if (running) return running;
-  const request = evaluateTcfSubmissionWithGemini(result, undefined, model);
+  const request = evaluateTcfSubmissionWithGemini(result, undefined, model, force);
   pending.set(key, request);
   try {
     return await request;

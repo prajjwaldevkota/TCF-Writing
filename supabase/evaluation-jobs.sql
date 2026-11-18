@@ -21,6 +21,13 @@ create table if not exists public.evaluation_jobs (
   updated_at timestamptz not null default now()
 );
 alter table public.evaluation_jobs add column if not exists dead_letter_id text;
+-- Private completed-response caching; also available as evaluation-cache.sql
+-- for projects that already applied the original jobs migration.
+alter table public.evaluation_jobs add column if not exists cache_scope text;
+alter table public.evaluation_jobs add column if not exists cache_key text;
+alter table public.evaluation_jobs add column if not exists cache_expires_at timestamptz;
+create index if not exists evaluation_jobs_cache_idx on public.evaluation_jobs(cache_scope, cache_key, created_at desc)
+  where status = 'completed' and cache_key is not null;
 create index if not exists evaluation_jobs_owner_idx on public.evaluation_jobs(user_id, created_at desc);
 create index if not exists evaluation_jobs_failed_idx on public.evaluation_jobs(created_at desc) where status = 'failed';
 alter table public.evaluation_jobs enable row level security;

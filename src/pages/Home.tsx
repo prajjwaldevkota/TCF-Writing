@@ -15,6 +15,7 @@ import {
   TASK_KEYS,
 } from "../utils/practice";
 import { selectRandomCombination } from "../utils/randomCombination";
+import { loadQuestions } from "../utils/questionsLoader";
 import { normalizeParagraphText } from "../utils/cleanText";
 import { SessionList } from "../components/SessionList";
 import { PracticeTracker } from "../components/PracticeTracker";
@@ -44,8 +45,10 @@ export const Home: React.FC<{
   const { language } = useLanguage();
   const en = language === "en";
   const [selected, setSelected] = useState<QuestionEntry | null>(null);
-  const draw = () =>
-    setSelected(selectRandomCombination(questions, selected?.id));
+  const draw = async () => {
+    const pool = questions.length ? questions : await loadQuestions();
+    setSelected(selectRandomCombination(pool, selected?.id));
+  };
   return (
     <div className="page-enter simple-home">
       <div className="page-heading">

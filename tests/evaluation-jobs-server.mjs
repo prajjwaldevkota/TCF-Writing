@@ -28,6 +28,9 @@ const enqueue = (body, headers = {}) => runtime.evaluate(new Request("https://ap
 const status = (body, token = body.token) => runtime.evaluate(new Request(`https://app.example/api/evaluate?id=${body.id}`, {
   headers: { "X-TCF-Job-Token": token },
 }));
+const acceptCache = (body, token = body.token) => runtime.evaluate(new Request("https://app.example/api/evaluate", {
+  method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: body.id, token }),
+}));
 const work = (id, authorized = true) => runtime.worker(new Request("https://app.example/api/evaluation-worker", {
   method: "POST", headers: authorized ? { Authorization: `Bearer ${process.env.EVALUATION_WORKER_SECRET}` } : {},
   body: JSON.stringify({ id }),
@@ -60,7 +63,7 @@ try {
       return typeof next === "function" ? next() : next;
     }
     assert.equal(url.hostname, "database.example");
-    if (url.pathname === "/auth/v1/user") return response({ id: "verified-user" }, options.headers.Authorization === "Bearer valid-session" ? 200 : 401);
+    if (url.pathname === "/auth/v1/user") return response({ id: options.headers.Authorization === "Bearer other-session" ? "other-user" : "verified-user" }, ["Bearer valid-session", "Bearer other-session"].includes(options.headers.Authorization) ? 200 : 401);
     if (url.pathname === "/rest/v1/error_logs") return response([]);
     if (url.pathname === "/rest/v1/rpc/claim_evaluation_job") {
       if (claimFails) return response({}, 503);
@@ -72,18 +75,26 @@ try {
     }
     assert.equal(url.pathname, "/rest/v1/evaluation_jobs");
     if (options.method === "POST") {
-      if (!jobs.has(body.id)) jobs.set(body.id, { ...body, status: "queued", attempts: 0, next_step: 0, message_id: null, lease_token: null, lease_until: null, response: null, error_code: null });
+      if (!jobs.has(body.id)) jobs.set(body.id, { status: "queued", attempts: 0, next_step: 0, message_id: null, lease_token: null, lease_until: null, response: null, error_code: null, ...body });
       return response([]);
     }
     const id = url.searchParams.get("id")?.slice(3);
     const job = jobs.get(id);
     if (options.method === "PATCH") {
       if (!job || (url.searchParams.has("lease_token") && url.searchParams.get("lease_token") !== `eq.${job.lease_token}`) ||
-        (url.searchParams.has("status") && ["completed", "failed"].includes(job.status))) return response([]);
+        (url.searchParams.get("status") === "in.(queued,running,retrying)" && ["completed", "failed"].includes(job.status)) ||
+        (url.searchParams.get("status") === "eq.completed" && job.status !== "completed") ||
+        (url.searchParams.get("cache_expires_at") === "is.null" && job.cache_expires_at)) return response([]);
       Object.assign(job, body);
       return response([clone(job)]);
     }
     const selection = url.searchParams.get("select");
+    if (url.searchParams.has("cache_key")) {
+      const matches = [...jobs.values()].filter(item => item.cache_key === url.searchParams.get("cache_key").slice(3) &&
+        item.cache_scope === url.searchParams.get("cache_scope").slice(3) && item.status === "completed" &&
+        Date.parse(item.cache_expires_at) > Date.parse(url.searchParams.get("cache_expires_at").slice(3))).reverse();
+      return response(matches.slice(0, 1).map(item => Object.fromEntries(selection.split(",").map(field => [field, item[field]]))));
+    }
     if (selection) {
       statusSelections.push(selection.split(","));
       return response(job ? [Object.fromEntries(selection.split(",").map(field => [field, job[field]]))] : []);
@@ -193,6 +204,68 @@ try {
   claimFails = true;
   assert.equal((await work(ownerJob.id)).status, 503, "Storage errors must not acknowledge queue delivery");
   claimFails = false;
+
+  const cachePayload = { candidates: [{ finishReason: "STOP", content: { parts: [{ text: JSON.stringify({ feedback_language: "en", tasks: { task1: { feedback: "Clear writing" } } }) }] } }] };
+  const privateCache = { "X-TCF-Cache-Token": randomUUID() };
+  const cacheRequest = { ...requestBody(), rubricVersion: "rubric-v1" };
+  await enqueue(cacheRequest, privateCache);
+  providerResponses = [response(cachePayload)];
+  await work(cacheRequest.id);
+  const completedCache = jobs.get(cacheRequest.id);
+  assert(completedCache.cache_key);
+  assert.equal(completedCache.cache_expires_at, null, "Provider output must not be cached before browser validation");
+  assert.equal((await acceptCache(cacheRequest, randomUUID())).status, 404);
+  assert.equal(completedCache.cache_expires_at, null);
+  assert.equal((await enqueue({ ...cacheRequest, id: randomUUID(), token: randomUUID() }, privateCache)).status, 202, "Unvalidated output must not be reused");
+  assert.equal((await acceptCache(cacheRequest)).status, 200);
+  assert(completedCache.cache_expires_at);
+  const beforeCache = publications.length;
+  const providerCount = providerCalls.length;
+  const duplicate = { ...cacheRequest, id: randomUUID(), token: randomUUID(), submission: { ...cacheRequest.submission, id: "another-copy" } };
+  const hit = await enqueue(duplicate, privateCache);
+  assert.equal(hit.status, 200);
+  assert.deepEqual((await hit.json()).response, cachePayload);
+  assert.equal(publications.length, beforeCache, "A cache hit must not publish another queue message");
+  assert.equal(providerCalls.length, providerCount, "A cache hit must not call Gemini");
+  assert.equal(jobs.get(duplicate.id).attempts, 0);
+  assert.equal(jobs.get(duplicate.id).cache_expires_at, completedCache.cache_expires_at, "Reading a cache entry must not extend its lifetime");
+  await acceptCache(duplicate);
+  assert.equal(jobs.get(duplicate.id).cache_expires_at, completedCache.cache_expires_at);
+  assert.equal((await status(duplicate)).status, 200, "Cached jobs retain their own read capability");
+  assert.equal((await status(duplicate, cacheRequest.token)).status, 404);
+
+  for (const change of [
+    { request: { contents: [{ role: "user", parts: [{ text: "changed essay or question" }] }] } },
+    { model: "gemini-3.5-flash-lite" },
+    { rubricVersion: "rubric-v2" },
+    { request: { ...cacheRequest.request, generationConfig: { temperature: 0.9 } } },
+    { request: { ...cacheRequest.request, systemInstruction: { parts: [{ text: "Reply in French" }] } } },
+    { force: true },
+  ]) {
+    const changed = { ...cacheRequest, ...change, id: randomUUID(), token: randomUUID() };
+    assert.equal((await enqueue(changed, privateCache)).status, 202, "Changed input and explicit fresh requests must bypass completed cache entries");
+  }
+  assert.equal((await enqueue({ ...cacheRequest, id: randomUUID(), token: randomUUID() }, { "X-TCF-Cache-Token": randomUUID() })).status, 202, "Another guest must not read the cache");
+  completedCache.cache_expires_at = new Date(Date.now() - 1000).toISOString();
+  jobs.get(duplicate.id).cache_expires_at = completedCache.cache_expires_at;
+  assert.equal((await enqueue({ ...cacheRequest, id: randomUUID(), token: randomUUID() }, privateCache)).status, 202, "Expired cache entries must not be used");
+
+  const ownerCache = { ...requestBody(), rubricVersion: "rubric-v1" };
+  await enqueue(ownerCache, { Authorization: "Bearer valid-session" });
+  providerResponses = [response(cachePayload)];
+  await work(ownerCache.id);
+  await acceptCache(ownerCache);
+  assert.equal((await enqueue({ ...ownerCache, id: randomUUID(), token: randomUUID() }, { Authorization: "Bearer valid-session" })).status, 200, "A signed-in owner can reuse cached output across browser capabilities");
+  assert.equal((await enqueue({ ...ownerCache, id: randomUUID(), token: randomUUID() }, { Authorization: "Bearer other-session" })).status, 202, "Owners must not share private cache entries");
+  assert.equal((await enqueue({ ...ownerCache, id: randomUUID(), token: randomUUID() }, { Authorization: "Bearer forged-session" })).status, 401);
+
+  const blocked = { ...requestBody(), rubricVersion: "blocked-rubric" };
+  await enqueue(blocked, privateCache);
+  providerResponses = [response({ candidates: [{ finishReason: "MAX_TOKENS", content: cachePayload.candidates[0].content }] })];
+  await work(blocked.id);
+  assert.equal(jobs.get(blocked.id).cache_key, null, "Truncated or blocked provider output must not enter the cache");
+  assert.equal((await enqueue({ ...blocked, id: randomUUID(), token: randomUUID() }, privateCache)).status, 202);
+
   process.env.EVALUATION_QUEUE_ENABLED = "false";
   assert.equal((await enqueue(requestBody())).headers.get("X-TCF-Queue-Disabled"), "1");
   assert.equal((await status(first)).status, 200, "Existing jobs remain readable when new queued jobs are disabled");

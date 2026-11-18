@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import ts from "typescript";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 
 const original = { fetch: globalThis.fetch, localStorage: globalThis.localStorage, setTimeout: globalThis.setTimeout, document: globalThis.document };
 const stored = new Map();
@@ -20,6 +20,7 @@ globalThis.__jobClient = {
     removeChannel: () => { removeCount++; },
   },
   createLogRequestId: randomUUID,
+  instructionFingerprint: async value => createHash("sha256").update(value).digest("hex"),
 };
 globalThis.localStorage = {
   get length() { return stored.size; },
@@ -41,12 +42,13 @@ const source = ts.transpileModule(fs.readFileSync("src/services/evaluationJobs.t
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
 }).outputText.replace(/^import .*;\n/gm, "");
 const { queueEvaluation, hasPendingEvaluationJob, pendingEvaluationJobMatches } = await import(
-  "data:text/javascript;base64," + Buffer.from("const {supabase,createLogRequestId}=globalThis.__jobClient;\n" + source).toString("base64"),
+  "data:text/javascript;base64," + Buffer.from("const {supabase,createLogRequestId,instructionFingerprint}=globalThis.__jobClient;\n" + source).toString("base64"),
 );
 const input = {
   result: { id: "submission-1", answers: { task1: "Essay" }, combination: { tasks: {} } },
   model: "gemini-3.6-flash", fingerprint: "essay-and-language-hash", language: "en",
   request: { contents: [] },
+  rubricVersion: "test-v1",
 };
 const response = (value, status = 200, headers = {}) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json", ...headers } });
 const done = id => ({ id, status: "completed", model: "gemini-3.6-flash", key_source: "backup", response: { candidates: [] } });
@@ -57,7 +59,9 @@ try {
   assert.equal(hasPendingEvaluationJob(input.result.id), false);
 
   let polls = 0;
+  const acknowledgements = [];
   globalThis.fetch = async (url, options) => {
+    if (options.method === "PATCH") { acknowledgements.push(JSON.parse(options.body)); return response({ ok: true }); }
     if (options.method === "POST") {
       const body = JSON.parse(options.body); references.push(body);
       assert.equal(options.headers.Authorization, "Bearer owner-session");
@@ -74,6 +78,10 @@ try {
   assert.equal(pollDelays.at(-1), 30_000, "Visible tabs poll at most once every 30 seconds");
   assert.equal(removeCount, 1, "Realtime subscriptions must be cleaned up");
   assert.equal(hasPendingEvaluationJob(input.result.id), false);
+  await complete.acceptCache();
+  assert.equal(acknowledgements.length, 1);
+  assert.equal(acknowledgements[0].id, references.at(-1).id);
+  assert.equal(acknowledgements[0].token, references.at(-1).token);
 
   globalThis.document.visibilityState = "hidden";
   await queueEvaluation({ ...input, fingerprint: "hidden-tab" });
@@ -141,6 +149,22 @@ try {
   };
   await queueEvaluation(input);
   assert.notEqual(references.at(-1).id, before, "An explicit request after failure can start a new job");
+  const cachedId = references.at(-1).id;
+  await queueEvaluation(input);
+  assert.equal(references.at(-1).id, cachedId, "Normal repeated requests reuse the completed job capability");
+  await queueEvaluation({ ...input, force: true });
+  assert.notEqual(references.at(-1).id, cachedId, "Explicit fresh review creates a new job");
+  assert.equal(references.at(-1).force, true, "Fresh-review intent reaches the server cache");
+  assert.equal(references.at(-1).rubricVersion, "test-v1");
+  const oldRubricJob = references.at(-1).id;
+  await queueEvaluation({ ...input, rubricVersion: "test-v2" });
+  assert.notEqual(references.at(-1).id, oldRubricJob, "A rubric change must invalidate browser job reuse");
+  const rejected = await queueEvaluation(input);
+  const rejectedId = references.at(-1).id;
+  rejected.rejectCache();
+  await queueEvaluation(input);
+  assert.notEqual(references.at(-1).id, rejectedId, "Rejected assessments must remain retryable");
+  assert.equal(references.at(-1).force, true, "Retry after rejected feedback must bypass the response cache");
   console.log("PASS: queue opt-in, owner Realtime/polling, persistent recovery after lost acknowledgement, exact input matching, cleanup, and no duplicate synchronous fallback.");
 } finally {
   Object.assign(globalThis, original);

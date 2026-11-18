@@ -25,6 +25,32 @@ export interface EvaluationJob {
   model: string | null;
   key_source: string | null;
   error_code: string | null;
+  cache_key?: string | null;
+  cache_scope?: string | null;
+  cache_expires_at?: string | null;
+}
+
+// Sort object keys while retaining array order. Presentation metadata such as
+// submission IDs/dates is intentionally excluded by the caller.
+export function cacheFingerprint(model: string, request: unknown, rubricVersion: string): string {
+  const canonical = (value: any): any => Array.isArray(value) ? value.map(canonical)
+    : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
+  return hash(JSON.stringify(canonical({ model, request, rubricVersion })));
+}
+export function cacheableResponse(value: any): boolean {
+  const candidate = value?.candidates?.[0];
+  if (value?.promptFeedback?.blockReason || candidate?.finishReason !== "STOP") return false;
+  const text = candidate.content?.parts?.filter((part: any) => typeof part.text === "string" && !part.thought).map((part: any) => part.text).join("");
+  try {
+    const assessment = JSON.parse(text);
+    return ["en", "fr"].includes(assessment?.feedback_language) &&
+      !!assessment.tasks && typeof assessment.tasks === "object" && !Array.isArray(assessment.tasks);
+  } catch { return false; }
+}
+export async function cachedJob(scope: string, key: string): Promise<EvaluationJob | undefined> {
+  const fields = "id,response,model,key_source,cache_expires_at";
+  const jobs = await database<EvaluationJob[]>(`evaluation_jobs?cache_scope=eq.${encodeURIComponent(scope)}&cache_key=eq.${key}&status=eq.completed&cache_expires_at=gt.${encodeURIComponent(new Date().toISOString())}&select=${fields}&order=created_at.desc&limit=1`);
+  return cacheableResponse(jobs[0]?.response) ? jobs[0] : undefined;
 }
 
 export function databaseConfig() {
@@ -53,10 +79,10 @@ export async function getJob(id: string): Promise<EvaluationJob | undefined> {
   return (await database<EvaluationJob[]>(`evaluation_jobs?id=eq.${id}&limit=1`))[0];
 }
 
-type JobStatus = Pick<EvaluationJob, "id" | "token_hash" | "status" | "attempts" | "response" | "model" | "key_source" | "error_code">;
+type JobStatus = Pick<EvaluationJob, "id" | "token_hash" | "status" | "attempts" | "response" | "model" | "key_source" | "error_code" | "cache_expires_at">;
 export async function getJobStatus(id: string): Promise<JobStatus | undefined> {
   // Polls need neither the essay/prompt nor lease and ownership metadata.
-  const fields = "id,token_hash,status,attempts,response,model,key_source,error_code";
+  const fields = "id,token_hash,status,attempts,response,model,key_source,error_code,cache_expires_at";
   return (await database<JobStatus[]>(`evaluation_jobs?id=eq.${id}&select=${fields}&limit=1`))[0];
 }
 
@@ -65,6 +91,7 @@ export function publicJob(job: Omit<JobStatus, "token_hash">) {
     id: job.id, status: job.status, attempts: job.attempts,
     response: job.status === "completed" ? job.response : null,
     model: job.model, key_source: job.key_source, error_code: job.error_code,
+    cache_expires_at: job.cache_expires_at || null,
   };
 }
 

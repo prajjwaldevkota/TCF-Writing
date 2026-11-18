@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   UUID, json, database, getJob, terminal, workerAuthorized, attemptPlan,
   type EvaluationJob,
+  cacheableResponse,
 } from "../server/evaluationJobs.js";
 import { persistErrorLog, errorType, providerCode, retrySeconds } from "../server/errorLogs.js";
 
@@ -82,7 +83,12 @@ export async function handler(request: Request): Promise<Response> {
       code = type === "TimeoutError" || type === "AbortError" ? "timeout" : "network_error";
     }
     if (payload && typeof payload === "object") {
-      await update({ status: "completed", response: payload, model: attempt.model, key_source: attempt.source, error_code: null });
+      await update({ status: "completed", response: payload, model: attempt.model, key_source: attempt.source, error_code: null,
+        cache_key: cacheableResponse(payload) ? job.cache_key || null : null,
+        // The browser must accept the evidence-validated assessment before
+        // this completed provider response becomes a reusable cache entry.
+        cache_expires_at: null,
+      });
       return json({ ok: true });
     }
     await persistErrorLog({

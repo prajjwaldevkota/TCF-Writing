@@ -1,14 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { ThemeProvider } from "./context/ThemeContext";
 import { Home } from "./pages/Home";
-import { PracticeLibrary, allQuestions } from "./pages/PracticeLibrary";
-import { Simulator } from "./pages/Simulator";
-import { Results } from "./pages/Results";
-import { Templates } from "./pages/Templates";
-import { Progress } from "./pages/Progress";
-import { Notebook } from "./pages/Notebook";
-import { Settings } from "./pages/Settings";
-import { Login } from "./pages/Login";
 import { SplashScreen } from "./pages/SplashScreen";
 import { AppLayout, AppView } from "./components/AppLayout";
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -24,6 +16,34 @@ import {
   resultTimestamp,
   practicedKeys,
 } from "./utils/practice";
+import {
+  getCachedQuestions,
+  loadQuestions,
+  prefetchQuestionsIdle,
+  useQuestions,
+} from "./utils/questionsLoader";
+
+const PracticeLibrary = lazy(() =>
+  import("./pages/PracticeLibrary").then((m) => ({ default: m.PracticeLibrary })),
+);
+const Simulator = lazy(() =>
+  import("./pages/Simulator").then((m) => ({ default: m.Simulator })),
+);
+const Results = lazy(() =>
+  import("./pages/Results").then((m) => ({ default: m.Results })),
+);
+const Templates = lazy(() =>
+  import("./pages/Templates").then((m) => ({ default: m.Templates })),
+);
+const Progress = lazy(() =>
+  import("./pages/Progress").then((m) => ({ default: m.Progress })),
+);
+const Notebook = lazy(() =>
+  import("./pages/Notebook").then((m) => ({ default: m.Notebook })),
+);
+const Settings = lazy(() =>
+  import("./pages/Settings").then((m) => ({ default: m.Settings })),
+);
 import {
   getStoredSubmissions,
   saveSubmission,
@@ -59,9 +79,12 @@ function route() {
   };
 }
 function MainRouter() {
-  const { user, userName, isConfigured } = useAuth();
+  const { user, userName, isConfigured, isPasswordRecovery, loading: authLoading } = useAuth();
   const { language } = useLanguage();
   const en = language === "en";
+  useEffect(() => {
+    prefetchQuestionsIdle();
+  }, []);
   const [view, setView] = useState<AppView>(() => route().view);
   const [submissions, setSubmissions] = useState(() =>
     getStoredSubmissions().sort(
@@ -86,6 +109,11 @@ function MainRouter() {
   const [active, setActive] = useState<ExamResult | null>(
     () => getStoredSubmissions().find((s) => s.id === route().id) || null,
   );
+  const showSplash =
+    isPasswordRecovery ||
+    view === "login" ||
+    (!authLoading && !user && !guestDismissed && view === "home");
+  const { questions } = useQuestions(!showSplash);
   const [notice, setNotice] = useState("");
   const [syncStatus, setSyncStatus] = useState("");
   const syncedUser = useRef("");
@@ -169,8 +197,9 @@ function MainRouter() {
     setNotice("");
     navigate("simulator");
   };
-  const quickStart = (task: TaskKey | "exam") => {
-    const available = allQuestions.filter(
+  const quickStart = async (task: TaskKey | "exam") => {
+    const pool = getCachedQuestions() || (await loadQuestions());
+    const available = pool.filter(
       (q) =>
         (task !== "exam" && task !== "task3") ||
         Boolean(
@@ -186,7 +215,7 @@ function MainRouter() {
               s.year === q.year &&
               s.month === q.month &&
               s.combination.combinationNumber ===
-                q.combination.combinationNumber &&
+              q.combination.combinationNumber &&
               (task === "exam"
                 ? !s.isPracticeMode
                 : practicedKeys(s).includes(task)),
@@ -347,7 +376,7 @@ function MainRouter() {
           onContinueGuest={() => {
             try {
               sessionStorage.setItem("tcf_splash_dismissed", "1");
-            } catch {}
+            } catch { }
             setGuestDismissed(true);
             navigate("home");
           }}
@@ -360,7 +389,7 @@ function MainRouter() {
         draft={draft}
         onResume={() => navigate("simulator")}
         onPractice={quickStart}
-        questions={allQuestions}
+        questions={questions}
         onProgress={() => navigate("dashboard")}
         onStart={start}
         onLibrary={() => navigate("library")}
@@ -369,7 +398,7 @@ function MainRouter() {
     );
   };
 
-  if ((!user && !guestDismissed && (view === "home" || view === "login")) || view === "login") {
+  if (showSplash) {
     return (
       <SplashScreen
         onSuccess={() => {
@@ -379,7 +408,7 @@ function MainRouter() {
         onContinueGuest={() => {
           try {
             sessionStorage.setItem("tcf_splash_dismissed", "1");
-          } catch {}
+          } catch { }
           setGuestDismissed(true);
           navigate("home");
         }}
@@ -397,7 +426,17 @@ function MainRouter() {
           </button>
         </div>
       )}
-      {content()}
+      <Suspense
+        fallback={
+          <div className="panel" role="status" aria-live="polite">
+            <p className="muted text-small">
+              {en ? "Loading workspace…" : "Chargement de l’espace…"}
+            </p>
+          </div>
+        }
+      >
+        {content()}
+      </Suspense>
     </AppLayout>
   );
 }

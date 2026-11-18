@@ -1,5 +1,15 @@
 import { PedagogicalEvaluationView } from './PedagogicalEvaluationView';
 import React, { useState } from 'react';
+import {
+  AlertTriangle,
+  BookOpen,
+  Check,
+  CheckCircle2,
+  Copy,
+  PenLine,
+  Search,
+  Sparkles,
+} from 'lucide-react';
 import { AIEvaluation, CefrLevel, MistakeItem, TaskEvaluation } from '../types/aiEvaluation';
 import { ExamAnswers, ExamCombination, TaskKey } from '../types/exam';
 import { cleanDocumentText, normalizeParagraphText } from '../utils/cleanText';
@@ -111,7 +121,7 @@ const LegacyAIEvaluationView: React.FC<AIEvaluationViewProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4 mb-4">
           <div>
             <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-xl">🤖</span>
+              <Sparkles size={18} className="text-blue-600" />
               <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">
                 {t('Évaluation Détaillée par l’IA')}
               </h2>
@@ -198,13 +208,13 @@ const LegacyAIEvaluationView: React.FC<AIEvaluationViewProps> = ({
             </div>
 
             <div className="flex items-center gap-2 self-start sm:self-center pl-8 sm:pl-0">
-              <span className={`text-xs font-semibold px-2 py-0.5 rounded border ${
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded border inline-flex items-center gap-1 ${
                 currentWordCount === 0 || !userText.trim()
                   ? 'bg-red-50 text-red-700 border-red-300'
                   : 'text-slate-600 bg-slate-100 border-slate-200'
               }`}>
                 {currentWordCount === 0 || !userText.trim()
-                  ? (language === 'en' ? '⚠️ 0 words (Failed)' : '⚠️ 0 mot (Non réalisé)')
+                  ? (language === 'en' ? '0 words (Failed)' : '0 mot (Non réalisé)')
                   : `${currentWordCount} ${t('mots rédigés')}`}
               </span>
               {taskReq && (
@@ -219,18 +229,18 @@ const LegacyAIEvaluationView: React.FC<AIEvaluationViewProps> = ({
           </div>
 
           {/* User Submitted Response for THIS active task only */}
-          <div className="bg-white border border-slate-300 rounded-xl p-4 sm:p-5 shadow-xs space-y-3">
+          <div className="bg-white border border-slate-300 rounded-xl p-4 sm:p-5 space-y-3">
             <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
               <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                <span>✍️</span>
+                <PenLine size={15} className="text-slate-600" />
                 <span>{t('Votre texte rédigé')} ({t(taskShortLabel[activeTaskKey])})</span>
               </h4>
               <button
                 type="button"
                 onClick={() => handleCopyUser(userText)}
-                className="px-2.5 py-1 rounded bg-slate-50 hover:bg-slate-100 border border-slate-300 text-slate-700 font-semibold text-xs transition-colors cursor-pointer flex items-center gap-1"
+                className="px-2.5 py-1 rounded bg-slate-50 hover:bg-slate-100 border border-slate-300 text-slate-700 font-semibold text-xs transition-colors cursor-pointer flex items-center gap-1.5"
               >
-                <span>📋</span>
+                {copiedUser ? <Check size={13} /> : <Copy size={13} />}
                 <span>{copiedUser ? t('Copié !') : t('Copier votre texte')}</span>
               </button>
             </div>
@@ -271,10 +281,10 @@ const LegacyAIEvaluationView: React.FC<AIEvaluationViewProps> = ({
           </div>
 
           {/* Section: Mistakes Breakdown (Compact list with English explanation) */}
-          <div className="bg-white border border-slate-300 rounded-xl p-4 sm:p-5 shadow-xs space-y-3">
+          <div className="bg-white border border-slate-300 rounded-xl p-4 sm:p-5 space-y-3">
             <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
               <h4 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
-                <span>🔍</span>
+                <Search size={16} className="text-slate-600" />
                 <span>{t('Fautes détectées')}</span>
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
                   {currentTask.mistakes.length}
@@ -287,7 +297,7 @@ const LegacyAIEvaluationView: React.FC<AIEvaluationViewProps> = ({
 
             {currentWordCount === 0 || !userText.trim() ? (
               <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-900 text-xs sm:text-sm flex items-start gap-3">
-                <span className="text-xl shrink-0">⚠️</span>
+                <AlertTriangle size={18} className="text-red-700 shrink-0 mt-0.5" />
                 <div className="space-y-1">
                   <h5 className="font-bold text-red-800 text-sm">
                     {language === 'en'
@@ -303,13 +313,13 @@ const LegacyAIEvaluationView: React.FC<AIEvaluationViewProps> = ({
               </div>
             ) : currentTask.mistakes.length === 0 ? (
               <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs sm:text-sm flex items-center gap-2">
-                <span>🎉</span>
+                <CheckCircle2 size={16} className="shrink-0" />
                 <span className="font-semibold">
                   {t('Excellent travail ! Aucune faute majeure de grammaire ou d’orthographe détectée.')}
                 </span>
               </div>
             ) : (
-              <div className="border border-slate-200 rounded-lg overflow-hidden bg-white divide-y divide-slate-100 shadow-2xs">
+              <div className="border border-slate-200 rounded-lg overflow-hidden bg-white divide-y divide-slate-100">
                 {currentTask.mistakes.map((m: MistakeItem, idx: number) => (
                   <div key={idx} className="p-3 hover:bg-slate-50/70 transition-colors text-xs sm:text-sm space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -329,7 +339,7 @@ const LegacyAIEvaluationView: React.FC<AIEvaluationViewProps> = ({
 
                     {m.explanation && (
                       <p className="text-slate-600 text-xs leading-relaxed pl-0.5 pt-0.5">
-                        <span className="font-semibold text-slate-700">💡 {language === 'en' ? 'Rule:' : 'Règle :'} </span>
+                        <span className="font-semibold text-slate-700">{language === 'en' ? 'Rule:' : 'Règle :'} </span>
                         {m.explanation}
                       </p>
                     )}
@@ -340,11 +350,11 @@ const LegacyAIEvaluationView: React.FC<AIEvaluationViewProps> = ({
           </div>
 
           {/* Section: AI Generated Model Answer (C1-C2 only) */}
-          <div className="bg-white border border-slate-300 rounded-xl p-4 sm:p-5 shadow-xs space-y-3">
+          <div className="bg-white border border-slate-300 rounded-xl p-4 sm:p-5 space-y-3">
             <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
               <div>
                 <h4 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
-                  <span>💎</span>
+                  <BookOpen size={16} className="text-slate-600" />
                   <span>{t('Réponse modèle — Niveau C1 - C2')}</span>
                 </h4>
                 <p className="text-xs text-slate-500 mt-0.5">
@@ -355,9 +365,9 @@ const LegacyAIEvaluationView: React.FC<AIEvaluationViewProps> = ({
               <button
                 type="button"
                 onClick={() => handleCopyModel(currentTask.c1_c2_model_answer)}
-                className="px-3 py-1 rounded bg-slate-50 hover:bg-slate-100 border border-slate-300 text-slate-700 font-bold text-xs shadow-2xs cursor-pointer flex items-center gap-1.5 transition-colors shrink-0"
+                className="px-3 py-1 rounded bg-slate-50 hover:bg-slate-100 border border-slate-300 text-slate-700 font-bold text-xs cursor-pointer flex items-center gap-1.5 transition-colors shrink-0"
               >
-                <span>📋</span>
+                {copiedModel ? <Check size={13} /> : <Copy size={13} />}
                 <span>{copiedModel ? t('Copié !') : t('Copier l’exemple')}</span>
               </button>
             </div>

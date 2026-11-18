@@ -5,6 +5,7 @@ import {
   Feather,
   Home,
   Library,
+  LogIn,
   Menu,
   NotebookPen,
   Settings2,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
+import { useAuth } from "../context/AuthContext";
 export type AppView =
   | "home"
   | "library"
@@ -34,6 +36,7 @@ export const AppLayout: React.FC<{
   const { language, setLanguage } = useLanguage();
   const en = language === "en";
   const { theme, toggleTheme } = useTheme();
+  const { user } = useAuth();
   const [mobile, setMobile] = useState(false);
   const go = (next: AppView) => {
     onNavigate(next);
@@ -140,10 +143,26 @@ export const AppLayout: React.FC<{
             <div>
               <strong>{name}</strong>
               <small>
-                {en ? "Personal writing space" : "Votre espace de rédaction"}
+                {user
+                  ? en
+                    ? "AI review unlocked"
+                    : "Bilan IA activé"
+                  : en
+                    ? "Guest practice mode"
+                    : "Mode pratique invité"}
               </small>
             </div>
           </div>
+          {!user && (
+            <button
+              type="button"
+              className="lab-signin-cta"
+              onClick={() => go("login")}
+            >
+              <LogIn size={16} />
+              <span>{en ? "Sign in · Unlock AI" : "Connexion · Bilan IA"}</span>
+            </button>
+          )}
         </div>
       </aside>
       <div className="lab-body">

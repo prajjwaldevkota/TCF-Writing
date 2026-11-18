@@ -1,5 +1,6 @@
 import { supabase } from "../lib/supabase";
 import { createLogRequestId } from "./errorLogging";
+import { instructionFingerprint } from "./evaluationInstructions";
 import type { ExamResult } from "../types/exam";
 
 interface JobReference {
@@ -8,6 +9,9 @@ interface JobReference {
   fingerprint: string;
   submissionId?: string;
   pending: boolean;
+  rubricVersion?: string;
+  requestSignature?: string;
+  failed?: boolean;
 }
 interface JobStatus {
   id: string;
@@ -16,6 +20,7 @@ interface JobStatus {
   model: string;
   key_source: "primary" | "backup";
   error_code: string | null;
+  cache_expires_at?: string | null;
 }
 const prefix = "tcf_evaluation_job:";
 const referenceKey = (id: string | undefined, model: string, fingerprint: string) =>
@@ -53,13 +58,19 @@ export async function queueEvaluation(input: {
   request: Record<string, unknown>;
   fingerprint: string;
   language: "en" | "fr";
-}): Promise<{ payload: any; model: string; keySource: "primary" | "backup" } | null> {
+  rubricVersion?: string;
+  force?: boolean;
+}): Promise<{ payload: any; model: string; keySource: "primary" | "backup"; acceptCache: () => Promise<void>; rejectCache: () => void } | null> {
   const key = referenceKey(input.result.id, input.model, input.fingerprint);
   const previous = read(key);
-  const ref: JobReference = previous?.pending ? previous : {
+  const requestSignature = await instructionFingerprint(JSON.stringify(input.request));
+  const reusable = previous?.pending || (!input.force && !previous?.failed && previous?.rubricVersion === input.rubricVersion && previous?.requestSignature === requestSignature);
+  const ref: JobReference = previous && reusable ? previous : {
     id: createLogRequestId(), token: createLogRequestId(), fingerprint: input.fingerprint,
     submissionId: input.result.id, pending: true,
+    rubricVersion: input.rubricVersion, requestSignature,
   };
+  ref.pending = true;
   const save = () => { try { localStorage.setItem(key, JSON.stringify(ref)); } catch { /* Keep the in-memory capability. */ } };
   // Save the id before POST: a lost acknowledgement must never start another job.
   save();
@@ -87,12 +98,25 @@ export async function queueEvaluation(input: {
     } finally { clearTimeout(timer); }
   }
   let response: Response;
+  // A browser capability scopes guest cache entries without exposing writing
+  // to other guests. It is separate from each job's read capability.
+  let cacheToken: string | null = null;
+  try {
+    cacheToken = localStorage.getItem("tcf_review_cache_token_v1");
+    if (!cacheToken || !uuid.test(cacheToken)) {
+      cacheToken = createLogRequestId();
+      localStorage.setItem("tcf_review_cache_token_v1", cacheToken);
+    }
+  } catch { cacheToken = null; }
   try {
     const r = input.result;
     response = await fetch("/api/evaluate", {
-      method: "POST", headers: { "Content-Type": "application/json", ...auth },
+      method: "POST", headers: { "Content-Type": "application/json", ...auth,
+        ...(cacheToken ? { "X-TCF-Cache-Token": cacheToken } : {}),
+      },
       body: JSON.stringify({
         id: ref.id, token: ref.token, model: input.model, request: input.request,
+        rubricVersion: input.rubricVersion, force: input.force === true || previous?.failed === true,
         submission: {
           id: r.id, answers: r.answers, combination: r.combination,
           isPracticeMode: r.isPracticeMode, practiceTask: r.practiceTask, practiceTasks: r.practiceTasks,
@@ -161,11 +185,24 @@ export async function queueEvaluation(input: {
       } catch { throw interrupted(); }
     }
     ref.pending = false;
+    ref.failed = current.status === "failed";
     save();
     if (current.status === "failed") throw new Error(en
       ? `The review could not finish (${current.error_code || "job_failed"}). Your writing is saved; you can request a new review.`
       : `La correction n’a pas abouti (${current.error_code || "job_failed"}). Votre texte est sauvegardé ; vous pouvez demander un nouveau bilan.`);
-    return { payload: current.response, model: current.model, keySource: current.key_source };
+    return {
+      payload: current.response, model: current.model, keySource: current.key_source,
+      acceptCache: async () => {
+        if (current.cache_expires_at) return;
+        try {
+          await fetch("/api/evaluate", { method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: ref.id, token: ref.token }), signal: AbortSignal.timeout(5000),
+          });
+        } catch { /* Cache acknowledgement must not fail a valid review. */ }
+      },
+      rejectCache: () => { ref.failed = true; save(); },
+    };
   } finally {
     if (channel) void supabase?.removeChannel(channel);
   }

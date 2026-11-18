@@ -21,6 +21,7 @@ let calls = 0,
   release;
 let hash = "same";
 let model = "gemini-test";
+let lastForce = false;
 const review = {
   id: "review",
   model: "gemini-test",
@@ -37,7 +38,8 @@ globalThis.__reviewFixture = {
   getActiveEvaluatedTasks: () => ["task1"],
   getGeminiModel: () => model,
   matchingJob: false,
-  evaluateTcfSubmissionWithGemini: () => {
+  evaluateTcfSubmissionWithGemini: (_result, _key, _model, force) => {
+    lastForce = force;
     calls++;
     return new Promise((resolve) => {
       release = () => resolve(review);
@@ -79,6 +81,7 @@ try {
   const force = reviewSubmission(result, true);
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(calls, 2);
+  assert.equal(lastForce, true, "Explicit fresh reviews must bypass the durable response cache");
   release();
   await force;
   hash = "changed";

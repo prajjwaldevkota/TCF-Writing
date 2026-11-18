@@ -264,16 +264,21 @@ try {
   await evaluate(input, "explicit-diagnostic-key");
   assert.equal(calls[0].key, "explicit-diagnostic-key");
   arrange("", "", []);
+  let acceptedCache = 0, rejectedCache = 0;
   globalThis.__geminiFixture.queued = {
     payload: await success().json(), model: "gemini-3.5-flash-lite", keySource: "backup",
+    acceptCache: () => { acceptedCache++; }, rejectCache: () => { rejectedCache++; },
   };
   const queuedReview = await evaluate(input);
   assert.equal(queuedReview.model, "gemini-3.5-flash-lite");
   assert.equal(queuedReview.requested_model, "gemini-3.6-flash");
   assert.equal(queuedReview.key_source, "backup");
   assert.equal(calls.length, 0, "A completed background job must not call Gemini again");
+  assert.equal(acceptedCache, 1);
   globalThis.__geminiFixture.queued.payload = await success('{"invalid":true}').json();
   await assert.rejects(evaluate(input), /Invalid evidence/, "Background output must still pass the evidence validator");
+  assert.equal(acceptedCache, 1, "Invalid feedback must never acknowledge cache eligibility");
+  assert.equal(rejectedCache, 1);
   delete globalThis.__geminiFixture.queued;
   console.log(
     "PASS: server reviews without browser keys, stale-key isolation, primary/backup metadata, deployment diagnostics, model fallback, cooldowns and no ambiguous replay.",

@@ -18,13 +18,13 @@ export interface TopicTheme {
 }
 
 export const TOPIC_THEMES: TopicTheme[] = [
-  { key: "all", fr: "Tous les thèmes", en: "All Themes", icon: "🌐" },
-  { key: "work", fr: "Travail & Entreprise", en: "Work & Career", icon: "💼" },
-  { key: "ecology", fr: "Écologie & Climat", en: "Environment & Climate", icon: "🌱" },
-  { key: "education", fr: "Éducation & Jeunesse", en: "Education & Youth", icon: "🎓" },
-  { key: "tech", fr: "Numérique & IA", en: "Tech & AI", icon: "💻" },
-  { key: "society", fr: "Société & Vie quotidienne", en: "Society & Daily Life", icon: "👥" },
-  { key: "culture", fr: "Culture & Loisirs", en: "Culture & Leisure", icon: "✈️" },
+  { key: "all", fr: "Tous les thèmes", en: "All themes", icon: "layers" },
+  { key: "work", fr: "Travail et entreprise", en: "Work & career", icon: "briefcase" },
+  { key: "ecology", fr: "Écologie et climat", en: "Environment & climate", icon: "leaf" },
+  { key: "education", fr: "Éducation et jeunesse", en: "Education & youth", icon: "graduation" },
+  { key: "tech", fr: "Numérique et IA", en: "Digital & AI", icon: "cpu" },
+  { key: "society", fr: "Société et quotidien", en: "Society & daily life", icon: "users" },
+  { key: "culture", fr: "Culture et loisirs", en: "Culture & leisure", icon: "compass" },
 ];
 
 export function detectTopicTheme(text: string): TopicThemeKey {

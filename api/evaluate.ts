@@ -1,11 +1,12 @@
 import {
   UUID, MODELS, hash, json, database, getJob, getJobStatus, publicJob, queueConfig,
   publishJob, credentials, terminal, databaseConfig,
+  cacheFingerprint, cachedJob, cacheableResponse,
 } from "../server/evaluationJobs.js";
 
 export const config = { maxDuration: 300 };
 export async function handler(request: Request): Promise<Response> {
-  if (!["GET", "POST"].includes(request.method)) return json({ error: "method_not_allowed" }, 405);
+  if (!["GET", "POST", "PATCH"].includes(request.method)) return json({ error: "method_not_allowed" }, 405);
   const origin = request.headers.get("Origin");
   if (origin && origin !== new URL(request.url).origin) return json({ error: "forbidden" }, 403);
   try {
@@ -16,6 +17,22 @@ export async function handler(request: Request): Promise<Response> {
       const job = await getJobStatus(id);
       if (!job || job.token_hash !== hash(token)) return json({ error: "not_found" }, 404);
       return json(publicJob(job));
+    }
+    if (request.method === "PATCH") {
+      const text = await request.text();
+      if (text.length > 1024) return json({ error: "invalid_request" }, 400);
+      let body;
+      try { body = JSON.parse(text); } catch { return json({ error: "invalid_request" }, 400); }
+      if (!UUID.test(body?.id) || !UUID.test(body?.token)) return json({ error: "not_found" }, 404);
+      const job = await getJob(body.id);
+      if (!job || job.token_hash !== hash(body.token)) return json({ error: "not_found" }, 404);
+      // Only the holder of this completed job's capability can acknowledge
+      // browser validation. Reading a cache hit never extends its lifetime.
+      if (job.status === "completed" && job.cache_key && !job.cache_expires_at && cacheableResponse(job.response))
+        await database(`evaluation_jobs?id=eq.${job.id}&status=eq.completed&cache_expires_at=is.null`, {
+          method: "PATCH", body: JSON.stringify({ cache_expires_at: new Date(Date.now() + 7 * 86400_000).toISOString() }),
+        });
+      return json({ ok: true });
     }
     if (process.env.EVALUATION_QUEUE_ENABLED !== "true")
       return json({ error: "queue_disabled" }, 409, { "X-TCF-Queue-Disabled": "1" });
@@ -45,11 +62,23 @@ export async function handler(request: Request): Promise<Response> {
         if (!verified.ok) return json({ error: "unauthorized" }, 401);
         userId = (await verified.json()).id;
       }
+      const guestToken = request.headers.get("X-TCF-Cache-Token") || "";
+      // Cache lookups require verified ownership or possession of a browser's
+      // random guest cache capability. Never share assessments across users.
+      const scope = userId ? `user:${userId}` : UUID.test(guestToken) ? `guest:${hash(guestToken)}` : null;
+      const rubricVersion = typeof body.rubricVersion === "string" && body.rubricVersion.length <= 100 ? body.rubricVersion : null;
+      const cacheKey = scope && rubricVersion ? cacheFingerprint(body.model, body.request, rubricVersion) : null;
+      const cached = cacheKey && body.force !== true ? await cachedJob(scope!, cacheKey) : undefined;
       // Ignore a concurrent insert of the same id, then verify its capability
       // and input below. Never overwrite another job or reset running work.
       await database("evaluation_jobs?on_conflict=id", {
         method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=representation" },
-        body: JSON.stringify({ id: body.id, token_hash: hash(body.token), input_hash: inputHash, input, user_id: userId }),
+        body: JSON.stringify({
+          id: body.id, token_hash: hash(body.token), input_hash: inputHash, input, user_id: userId,
+          ...(cacheKey ? { cache_key: cacheKey, cache_scope: scope } : {}),
+          ...(cached ? { status: "completed", response: cached.response, model: cached.model,
+            key_source: cached.key_source, cache_expires_at: cached.cache_expires_at } : {}),
+        }),
       });
       job = await getJob(body.id);
       if (!job || job.token_hash !== hash(body.token) || job.input_hash !== inputHash)

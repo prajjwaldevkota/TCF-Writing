@@ -72,6 +72,7 @@ export async function evaluateTcfSubmissionWithGemini(
   result: ExamResult,
   customApiKey?: string,
   requestedModel = getGeminiModel(),
+  force = false,
 ): Promise<AIEvaluation> {
   const requestId = createLogRequestId();
   try {
@@ -80,6 +81,7 @@ export async function evaluateTcfSubmissionWithGemini(
       customApiKey,
       requestedModel,
       requestId,
+      force,
     );
   } catch (error) {
     const message =
@@ -96,6 +98,7 @@ async function evaluateGeminiRequest(
   customApiKey: string | undefined,
   requestedModel: string,
   requestId: string,
+  force: boolean,
 ): Promise<AIEvaluation> {
   const started = Date.now();
   let assessmentCode:
@@ -132,7 +135,7 @@ async function evaluateGeminiRequest(
     generationConfig: { responseMimeType: "application/json", temperature: 0.15 },
   };
   const queued = customApiKey?.trim() ? null : await queueEvaluation({
-    result, model: requestedModel, request: requestBody, fingerprint: promptHash, language: feedbackLanguage,
+    result, model: requestedModel, request: requestBody, fingerprint: promptHash, language: feedbackLanguage, rubricVersion, force,
   });
   let payload: any = queued?.payload;
   let keySource: "primary" | "backup" = queued?.keySource || "primary";
@@ -364,7 +367,7 @@ async function evaluateGeminiRequest(
         c1_c2_model_answer: task.model_answer,
       };
     }
-    return {
+    const evaluation: AIEvaluation = {
       id: `eval_${Date.now()}`,
       created_at: new Date().toISOString(),
       evaluated_tasks: activeTaskKeys,
@@ -382,7 +385,10 @@ async function evaluateGeminiRequest(
       pedagogical: assessment,
       tasks,
     };
+    void queued?.acceptCache?.();
+    return evaluation;
   } catch (error) {
+    queued?.rejectCache?.();
     reportReviewError({
       request_id: requestId,
       stage: "assessment",
