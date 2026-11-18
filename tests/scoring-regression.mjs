@@ -69,4 +69,13 @@ const badProjection=projection();badProjection.tasks.task1.level_evidence=[];ass
 const missingCorrections=payload();missingCorrections.tasks.task1.mistakes=null;assert.equal(pedagogical.validatePedagogicalAssessment(missingCorrections,['task1'],full).tasks.task1.corrections_incomplete,true);
 assert.equal(pedagogical.findOriginalExcerpt("j'ai re\u0301pondu",'j’ai répondu'),"j'ai re\u0301pondu");
 assert.equal(pedagogical.findOriginalExcerpt('bonjour mon ami','bonjour mon frère'),null);
+const singleTaskRewrite=payload();
+singleTaskRewrite.tasks.task1.limiting_evidence=[{quote:'Bonjour',explanation:'Simple opening.'},{text:'Limited connector range.'},null,''];
+singleTaskRewrite.tasks.task1.priorities=[{priority:'Vary connectors.'}];
+singleTaskRewrite.tasks.task1.risks=null;
+singleTaskRewrite.tasks.task2=null;
+const normalizedSingle=pedagogical.validatePedagogicalAssessment(singleTaskRewrite,['task1'],full);
+assert.deepEqual(normalizedSingle.tasks.task1.limiting_evidence,['« Bonjour » — Simple opening.','Limited connector range.']);
+assert.deepEqual(normalizedSingle.tasks.task1.priorities,['Vary connectors.']);
+assert.equal(normalizedSingle.tasks.task2,undefined);
 console.log('PASS: unverified corrections omitted with warnings, verified feedback retained, unsupported levels/NCLC withheld, and Unicode-equivalent excerpts matched.');

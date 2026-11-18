@@ -53,8 +53,47 @@ export function findOriginalExcerpt(original:string,quote:string):string|null {
   return index<0?null:original.slice(source.starts[index],source.ends[index+target.length-1]);
 }
 
+function normalizeStringList(value: unknown, fieldName: string): string[] {
+  if (value == null) return [];
+  if (typeof value === 'string') return value.trim() ? [value.trim()] : [];
+  if (!Array.isArray(value)) throw new Error(`Invalid ${fieldName}`);
+  const out: string[] = [];
+  for (const item of value) {
+    if (item == null) continue;
+    if (typeof item === 'string') {
+      if (item.trim()) out.push(item.trim());
+      continue;
+    }
+    if (typeof item === 'object') {
+      const obj = item as Record<string, unknown>;
+      const quote = typeof obj.quote === 'string' ? obj.quote.trim() : '';
+      const detail =
+        ['explanation', 'text', 'description', 'reason', 'priority', 'risk', 'point', 'message', 'summary']
+          .map(k => (typeof obj[k] === 'string' ? (obj[k] as string).trim() : ''))
+          .find(Boolean) ||
+        Object.values(obj)
+          .filter((v): v is string => typeof v === 'string' && Boolean(v.trim()))
+          .map(v => v.trim())
+          .join(' — ');
+      if (quote && detail && detail !== quote) {
+        out.push(`« ${quote} » — ${detail}`);
+      } else if (detail) {
+        out.push(detail);
+      } else if (quote) {
+        out.push(quote);
+      }
+      continue;
+    }
+    throw new Error(`Invalid ${fieldName}`);
+  }
+  return out;
+}
+
 export function validatePedagogicalAssessment(raw: any, keys: TaskKey[], result: ExamResult): PedagogicalAssessment {
-  if (!raw || !['en', 'fr'].includes(raw.feedback_language) || !raw.tasks) throw new Error('Incomplete AI assessment.');
+  if (!raw || !['en', 'fr'].includes(raw.feedback_language) || !raw.tasks || typeof raw.tasks !== 'object') throw new Error('Incomplete AI assessment.');
+  for (const k of Object.keys(raw.tasks)) {
+    if (!keys.includes(k as TaskKey) && raw.tasks[k] == null) delete raw.tasks[k];
+  }
   if (Object.keys(raw.tasks).some(k => !keys.includes(k as TaskKey))) throw new Error('AI assessed an unrequested task.');
   if (['overall_score', 'clb_level', 'nclc_level', 'official_score', 'overall_indicative_score'].some(k => raw[k] != null)) throw new Error('AI must not return official or numerical results.');
 
@@ -65,12 +104,13 @@ export function validatePedagogicalAssessment(raw: any, keys: TaskKey[], result:
     if (!task || typeof task.feedback !== 'string' || !task.feedback.trim()) throw new Error(`Missing feedback: ${key}`);
     for (const name of ['communication_pass', 'language_pass']) if (typeof task[name] !== 'string' || !task[name].trim()) throw new Error(`Missing evidence: ${key}/${name}`);
     for (const name of ['linguistic', 'pragmatic', 'sociolinguistic']) if (typeof task.domains?.[name] !== 'string' || !task.domains[name].trim()) throw new Error(`Missing domain: ${name}`);
-    for (const name of ['limiting_evidence', 'priorities', 'risks']) if (!Array.isArray(task[name]) || task[name].some((v: unknown) => typeof v !== 'string')) throw new Error(`Invalid ${name}`);
+    for (const name of ['limiting_evidence', 'priorities', 'risks'] as const) {
+      task[name] = normalizeStringList(task[name], name);
+    }
     if (task.priorities.length > 5) throw new Error('At most five priorities are allowed.');
 
     // Validate strengths (new field, graceful fallback)
-    if (!Array.isArray(task.strengths)) task.strengths = [];
-    task.strengths = task.strengths.filter((s: unknown) => typeof s === 'string' && (s as string).trim());
+    task.strengths = normalizeStringList(task.strengths, 'strengths');
 
     // Legacy display fields remain readable, but new assessments cannot invent points.
     if ((Array.isArray(task.dimension_scores) && task.dimension_scores.length) || task.indicative_score != null) throw new Error('Numerical domain scoring is not allowed.');
