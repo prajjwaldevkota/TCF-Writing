@@ -13,6 +13,7 @@ import type { ErrorLogEntry } from "../src/types/errorLog.js";
 export const config = { maxDuration: 300 };
 const allowedModels = new Set([
   "gemini-3.6-flash",
+  "gemini-4-hydrogen",
   "gemini-3.5-flash-lite",
   "gemini-3.1-flash-lite",
 ]);

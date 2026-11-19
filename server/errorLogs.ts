@@ -6,6 +6,7 @@ import {
 } from "../src/types/errorLog.js";
 
 const models = new Set([
+  "gemini-4-hydrogen",
   "gemini-3.6-flash",
   "gemini-3.5-flash-lite",
   "gemini-3.1-flash-lite",

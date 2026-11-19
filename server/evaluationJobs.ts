@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-export const MODELS = ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
+export const MODELS = ["gemini-4-hydrogen", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
 export const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 export const terminal = (status: string) => status === "completed" || status === "failed";
 export const json = (value: unknown, status = 200, extra: Record<string, string> = {}) =>
@@ -155,8 +155,7 @@ export function credentials() {
 }
 
 export function attemptPlan(initial: string) {
-  const chain = MODELS.slice(0, 3);
-  const start = chain.indexOf(initial);
-  const models = start < 0 ? [initial] : chain.slice(start);
+  const start = MODELS.indexOf(initial);
+  const models = start < 0 ? [initial] : MODELS.slice(start);
   return models.flatMap(model => credentials().map(key => ({ model, ...key })));
 }

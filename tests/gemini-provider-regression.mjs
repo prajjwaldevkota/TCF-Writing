@@ -99,11 +99,11 @@ function arrange(primary, backup, responses) {
   };
 }
 try {
-  assert.equal(settings.getGeminiModel(), "gemini-3.6-flash");
+  assert.equal(settings.getGeminiModel(), "gemini-4-hydrogen");
   settings.setGeminiModel("gemini-3.1-flash-lite");
   assert.equal(
     settings.getGeminiModel(),
-    "gemini-3.6-flash",
+    "gemini-4-hydrogen",
     "Ignore obsolete manual model choices",
   );
   globalThis.__geminiEnv.VITE_GEMINI_MODEL = "gemini-3.5-flash-lite";
@@ -116,7 +116,7 @@ try {
   ]) {
     arrange(primary, backup, [success()]);
     const result = await evaluate(input);
-    assert.equal(result.model, "gemini-3.6-flash");
+    assert.equal(result.model, "gemini-4-hydrogen");
     assert.equal(result.key_source, "primary");
     assert.equal(calls.length, 1);
     assert.equal(calls[0].endpoint, "/api/gemini");
@@ -125,7 +125,7 @@ try {
       undefined,
       "Browser sends no provider credentials",
     );
-    assert.equal(calls[0].body.model, "gemini-3.6-flash");
+    assert.equal(calls[0].body.model, "gemini-4-hydrogen");
     assert.equal(
       calls[0].body.request.generationConfig.responseMimeType,
       "application/json",
@@ -176,7 +176,7 @@ try {
   await assert.rejects(evaluate(input), /déploiement \/api\/gemini/);
   for (const status of [404, 429, 503]) {
     arrange("", "", [new Response("{}", { status }), success()]);
-    assert.equal((await evaluate(input)).model, "gemini-3.5-flash-lite");
+    assert.equal((await evaluate(input)).model, "gemini-3.6-flash");
     assert.deepEqual(
       calls.map((call) => call.endpoint),
       ["/api/gemini", "/api/gemini"],
@@ -185,24 +185,24 @@ try {
   arrange(
     "",
     "",
-    Array.from({ length: 3 }, () => new Response("{}", { status: 404 })),
+    Array.from({ length: 4 }, () => new Response("{}", { status: 404 })),
   );
   await assert.rejects(evaluate(input), /gemini-3.1-flash-lite.*HTTP 404/);
-  assert.equal(calls.length, 3);
+  assert.equal(calls.length, 4);
   assert.deepEqual(
     calls.map((call) => call.body.model),
-    ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"],
+    ["gemini-4-hydrogen", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"],
   );
   const providerTimeout = () => new Response("{}", {
     status: 504,
     headers: { "X-TCF-Error-Source": "provider", "X-TCF-Model-Unavailable": "1" },
   });
   arrange("", "", [providerTimeout(), success()]);
-  assert.equal((await evaluate(input)).model, "gemini-3.5-flash-lite");
+  assert.equal((await evaluate(input)).model, "gemini-3.6-flash");
   assert.equal(calls.length, 2);
-  arrange("", "", Array.from({ length: 3 }, providerTimeout));
+  arrange("", "", Array.from({ length: 4 }, providerTimeout));
   await assert.rejects(evaluate(input), /gemini-3.1-flash-lite.*HTTP 504/);
-  assert.equal(calls.length, 3, "Provider deadline fallback is bounded");
+  assert.equal(calls.length, 4, "Provider deadline fallback is bounded");
   for (const headers of [{}, { "Content-Type": "text/html" }]) {
     arrange("", "", [new Response("Gateway timeout", { status: 504, headers })]);
     await assert.rejects(evaluate(input), /délai dépassé.*aucun autre modèle/);
@@ -210,7 +210,7 @@ try {
     assert.equal(globalThis.__reviewErrors.at(-1).code, "timeout");
   }
   arrange("", "", [providerTimeout(), success()]);
-  assert.equal((await evaluate(input, "explicit-diagnostic-key")).model, "gemini-3.5-flash-lite");
+  assert.equal((await evaluate(input, "explicit-diagnostic-key")).model, "gemini-3.6-flash");
   assert.equal(calls.length, 2, "Direct provider deadlines can advance models");
   arrange("", "", [
     new Response("{}", { status: 502, headers: { "X-TCF-No-Retry": "1" } }),
@@ -251,7 +251,7 @@ try {
     "",
     "",
     Array.from(
-      { length: 3 },
+      { length: 4 },
       () =>
         new Response("{}", { status: 429, headers: { "Retry-After": "120" } }),
     ),
@@ -271,7 +271,7 @@ try {
   };
   const queuedReview = await evaluate(input);
   assert.equal(queuedReview.model, "gemini-3.5-flash-lite");
-  assert.equal(queuedReview.requested_model, "gemini-3.6-flash");
+  assert.equal(queuedReview.requested_model, "gemini-4-hydrogen");
   assert.equal(queuedReview.key_source, "backup");
   assert.equal(calls.length, 0, "A completed background job must not call Gemini again");
   assert.equal(acceptedCache, 1);

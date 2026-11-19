@@ -47,7 +47,7 @@ const entry = {
   source: "server",
   stage: "provider_http",
   code: "http_error",
-  model: "gemini-3.6-flash",
+  model: "gemini-4-hydrogen",
   key_source: "primary",
   attempt: 1,
   http_status: 429,
@@ -159,7 +159,7 @@ try {
     source: "server",
     stage: "client_network",
     code: "timeout",
-    model: "gemini-3.6-flash",
+    model: "gemini-4-hydrogen",
     request_id: reference,
   };
   const accepted = await handler(request(client));

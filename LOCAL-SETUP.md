@@ -7,13 +7,13 @@
 3. For feedback, configure `GEMINI_API_KEY` in `.env.local` before starting Vite.
    The development server provides the same `/api/gemini` route as Vercel.
    Learners do not enter keys in Settings. The model chain is automatic:
-   3.6 Flash → 3.5 Flash-Lite → 3.1 Flash-Lite.
+   4 Hydrogen → 3.6 Flash → 3.5 Flash-Lite → 3.1 Flash-Lite.
 4. Write a guided task or a full mock. Request feedback only when ready.
 5. Export your writing from Settings regularly. Clearing browser data removes
    local submissions, correction review status, and drafts.
 
 Copy `.env.example` to `.env.local` for local feedback credentials or optional
-account storage. `GEMINI_MODEL` optionally overrides the chain starting point (default: gemini-3.6-flash).
+account storage. `GEMINI_MODEL` optionally overrides the chain starting point (default: gemini-4-hydrogen).
 Model accessibility must match your own provider account. These identifiers are
 public configuration and do not establish grading accuracy.
 
@@ -72,8 +72,8 @@ Vercel project’s environment for the relevant deployment, then redeploy. For e
 ```env
 GEMINI_API_KEY=your-primary-gemini-key
 GEMINI_BACKUP_KEY=your-backup-gemini-key
-# Optional: omit to use gemini-3.6-flash automatically
-GEMINI_MODEL=gemini-3.6-flash
+# Optional: omit to use gemini-4-hydrogen automatically
+GEMINI_MODEL=gemini-4-hydrogen
 ```
 
 The current UI and practice flow are documented in [README.md](README.md).
@@ -150,9 +150,9 @@ another Gemini request or QStash delivery. The visible-tab interval uses 90%
 fewer periodic status requests than the previous 3-second interval. Guest
 results may take up to one polling interval to appear after completion.
 
-The default model is `gemini-3.6-flash`, followed by `gemini-3.5-flash-lite` and
+The default model is `gemini-4-hydrogen`, followed by `gemini-3.6-flash`, `gemini-3.5-flash-lite` and
 `gemini-3.1-flash-lite`. If the Vercel project explicitly sets `GEMINI_MODEL`,
-change that override to `gemini-3.6-flash` (or remove it), then redeploy so the
+change that override to `gemini-4-hydrogen` (or remove it), then redeploy so the
 browser build picks up the new starting model.
 
 References: [QStash publishing](https://upstash.com/docs/qstash/api-reference/messages/publish-a-message),

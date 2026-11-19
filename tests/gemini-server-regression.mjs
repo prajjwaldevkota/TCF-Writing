@@ -32,7 +32,7 @@ delete process.env.SUPABASE_SERVICE_ROLE_KEY;
 let logged = [];
 console.warn = (_label, row) => logged.push(JSON.parse(row));
 const body = {
-  model: "gemini-3.6-flash",
+  model: "gemini-4-hydrogen",
   request: { contents: [{ role: "user", parts: [{ text: "Test" }] }] },
 };
 const request = (value = body) =>
@@ -81,7 +81,7 @@ try {
     assert.equal(response.headers.get("X-TCF-Key-Source"), source);
     assert.equal(calls.length, 1);
     assert.equal(calls[0].options.headers["x-goog-api-key"], key);
-    assert(calls[0].url.includes("gemini-3.6-flash:generateContent"));
+    assert(calls[0].url.includes("gemini-4-hydrogen:generateContent"));
     assert(!JSON.stringify([...response.headers]).includes("sentinel"));
     assert(!(await response.text()).includes("sentinel"));
   }

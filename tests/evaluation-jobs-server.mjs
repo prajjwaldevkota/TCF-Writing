@@ -18,7 +18,7 @@ let claimFails = false;
 const response = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 const clone = value => JSON.parse(JSON.stringify(value));
 const requestBody = () => ({
-  id: randomUUID(), token: randomUUID(), model: "gemini-3.6-flash",
+  id: randomUUID(), token: randomUUID(), model: "gemini-4-hydrogen",
   request: { contents: [{ role: "user", parts: [{ text: "private essay" }] }] },
   submission: { id: "local-submission", answers: { task1: "private essay" } },
 });
@@ -146,7 +146,7 @@ try {
   assert.equal((await work(timeoutJob.id)).status, 503);
   assert.equal(jobs.get(timeoutJob.id).next_step, 2, "Deadline skips the same model's backup key");
   assert.equal((await work(timeoutJob.id)).status, 200);
-  assert(providerCalls.at(-1).url.includes("gemini-3.5-flash-lite"));
+  assert(providerCalls.at(-1).url.includes("gemini-3.6-flash"));
 
   // Headers can arrive before the provider's body finishes. A 200 header
   // must not turn a body deadline into a permanent job failure.
@@ -160,7 +160,7 @@ try {
   assert.equal(jobs.get(stalledBodyJob.id).status, "retrying");
   assert.equal(jobs.get(stalledBodyJob.id).next_step, 2);
   assert.equal((await work(stalledBodyJob.id)).status, 200);
-  assert.equal(jobs.get(stalledBodyJob.id).model, "gemini-3.5-flash-lite");
+  assert.equal(jobs.get(stalledBodyJob.id).model, "gemini-3.6-flash");
 
   const concurrent = requestBody();
   await enqueue(concurrent);
@@ -180,8 +180,8 @@ try {
     assert.equal(jobs.get(invalid.id).status, "failed", "Permanent failures do not retry generation");
   }
   const exhausted = requestBody(); await enqueue(exhausted);
-  providerResponses = Array.from({ length: 6 }, () => response({}, 503));
-  for (let i = 0; i < 6; i++) await work(exhausted.id);
+  providerResponses = Array.from({ length: 8 }, () => response({}, 503));
+  for (let i = 0; i < 8; i++) await work(exhausted.id);
   assert.equal(jobs.get(exhausted.id).status, "failed");
   assert.equal(providerResponses.length, 0);
   assert.equal((await work(exhausted.id)).status, 200);
@@ -236,7 +236,7 @@ try {
 
   for (const change of [
     { request: { contents: [{ role: "user", parts: [{ text: "changed essay or question" }] }] } },
-    { model: "gemini-3.5-flash-lite" },
+    { model: "gemini-3.6-flash" },
     { rubricVersion: "rubric-v2" },
     { request: { ...cacheRequest.request, generationConfig: { temperature: 0.9 } } },
     { request: { ...cacheRequest.request, systemInstruction: { parts: [{ text: "Reply in French" }] } } },

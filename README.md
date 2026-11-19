@@ -22,7 +22,7 @@ target.
   exports the prompts, source documents and original answers for another AI or tutor,
   with a manual copy fallback when clipboard access is blocked. Read evidence, corrections and
   revision priorities alongside the original text, then rewrite the same task.
-  Both versions remain in your journal. Gemini 3.6 Flash is selected automatically; an optional backup key is read on the Vercel server.
+  Both versions remain in your journal. Gemini 4 Hydrogen is selected automatically; an optional backup key is read on the Vercel server.
 - **My corrections:** practise correcting your own sentences before revealing
   saved corrections. The reviewed status is self-reported, not a mastery score.
 - **My progress:** session counts, revisions, task balance, and supported full-mock
@@ -52,7 +52,7 @@ Configure `GEMINI_API_KEY` and optionally `GEMINI_BACKUP_KEY` in Vercel (or
 `.env.local` for local development). The function also accepts the existing
 `VITE_GEMINI_API_KEY` and `GEMINI_BACKUP_API_KEY` names for compatibility; their
 values are excluded from browser builds. Existing browser-entered keys are ignored.
-`GEMINI_MODEL` selects the starting model, defaulting to `gemini-3.6-flash`.
+`GEMINI_MODEL` selects the starting model, defaulting to `gemini-4-hydrogen`.
 
 See [LOCAL-SETUP.md](LOCAL-SETUP.md) for optional account storage and Vercel setup.
 
@@ -79,13 +79,13 @@ only when the requested starting model, answer fingerprint and rubric match.
 A successful fallback review is reused rather than restarting the chain. The actual
 model and original requested model are saved separately and shown with the review. Concurrent identical
 requests share one in-flight call. For each model, the optional backup key is tried at most once after a supported
-HTTP error. The model chain runs automatically: **3.6 Flash → 3.5 Flash-Lite →
+HTTP error. The model chain runs automatically: **4 Hydrogen → 3.6 Flash → 3.5 Flash-Lite →
 3.1 Flash-Lite**. HTTP 404 (model unavailable), 429 (quota), and 503 (temporary
 unavailability) move to the next model after available keys are exhausted. A confirmed
 provider HTTP 504 (deadline exceeded) moves directly to the next model without
 repeating the slow request with a backup key. Hosting gateway 504 responses are
 logged as timeouts and stop with a saved-writing message. There
-are at most three models and two keys per model. It stops on the first successful
+are at most four models and two keys per model. It stops on the first successful
 response. A server-observed 120-second provider deadline also advances directly
 to the next model; invalid assessments and ambiguous connection failures do not
 trigger more calls.
@@ -121,7 +121,7 @@ responses are excluded. Matching completed browser jobs are also reused directly
 [supabase/evaluation-cache.sql](supabase/evaluation-cache.sql) before deploying
 this feature on an existing database.
 
-The automatic default chain is Gemini 3.6 Flash, 3.5 Flash-Lite, then 3.1 Flash-Lite.
+The automatic default chain is Gemini 4 Hydrogen, 3.6 Flash, 3.5 Flash-Lite, then 3.1 Flash-Lite.
 `GEMINI_MODEL` may override its starting point; no browser selection is needed. These have published [free API tiers](https://ai.google.dev/gemini-api/docs/pricing),
 checked November 14, 2026. Project access and limits vary; a model selection does
 not change billing settings. [Google quotas](https://ai.google.dev/gemini-api/docs/rate-limits)
