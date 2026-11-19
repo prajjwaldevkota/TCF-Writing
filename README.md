@@ -80,10 +80,8 @@ A successful fallback review is reused rather than restarting the chain. The act
 model and original requested model are saved separately and shown with the review. Concurrent identical
 requests share one in-flight call. For each model, the optional backup key is tried at most once after a supported
 HTTP error. The model chain runs automatically: **4 Hydrogen → 3.6 Flash → 3.5 Flash-Lite →
-3.1 Flash-Lite**. HTTP 404 (model unavailable), 429 (quota), and 503 (temporary
-unavailability) move to the next model after available keys are exhausted. A confirmed
-provider HTTP 504 (deadline exceeded) moves directly to the next model without
-repeating the slow request with a backup key. Hosting gateway 504 responses are
+3.1 Flash-Lite**. HTTP 404 (model unavailable) and 429 (quota) advance after available keys are exhausted.
+A confirmed provider 502, 503 or 504 moves directly to the next model. Hosting gateway 504 responses are
 logged as timeouts and stop with a saved-writing message. There
 are at most four models and two keys per model. It stops on the first successful
 response. A server-observed 120-second provider deadline also advances directly

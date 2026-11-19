@@ -115,12 +115,13 @@ export async function handler(request: Request): Promise<Response> {
         retry_after_seconds: retrySeconds(response.headers.get("Retry-After")),
         provider_code: providerCode(text),
       });
-      if ([404, 429, 503, 504].includes(response.status)) modelUnavailable = true;
+      if ([404, 429, 502, 503, 504].includes(response.status)) modelUnavailable = true;
+      // Provider gateway, availability and deadline errors advance models.
       // A provider deadline is model-specific; another key does not make the
       // same request faster. Let the client advance to the next model instead.
       // Only a definitive HTTP rejection can trigger a backup attempt.
       if (
-        [401, 403, 404, 429, 500, 502, 503].includes(response.status) &&
+        [401, 403, 404, 429, 500].includes(response.status) &&
         index + 1 < keys.length
       )
         continue;

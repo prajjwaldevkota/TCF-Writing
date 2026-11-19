@@ -132,7 +132,8 @@ try {
   assert.equal(jobs.get(first.id).status, "retrying");
   assert.equal((await work(first.id)).status, 200);
   assert.equal(jobs.get(first.id).status, "completed");
-  assert.equal(providerCalls.at(-1).options.headers["x-goog-api-key"], "backup-sentinel");
+  assert.equal(providerCalls.at(-1).options.headers["x-goog-api-key"], "primary-sentinel");
+  assert.equal(jobs.get(first.id).model, "gemini-3.6-flash");
   assert.equal((await work(first.id)).status, 200);
   assert.equal(providerCalls.length, 2, "Duplicate completed delivery does not spend quota");
   await failureCallback(first.id);
@@ -180,7 +181,7 @@ try {
     assert.equal(jobs.get(invalid.id).status, "failed", "Permanent failures do not retry generation");
   }
   const exhausted = requestBody(); await enqueue(exhausted);
-  providerResponses = Array.from({ length: 8 }, () => response({}, 503));
+  providerResponses = Array.from({ length: 8 }, () => response({}, 429));
   for (let i = 0; i < 8; i++) await work(exhausted.id);
   assert.equal(jobs.get(exhausted.id).status, "failed");
   assert.equal(providerResponses.length, 0);

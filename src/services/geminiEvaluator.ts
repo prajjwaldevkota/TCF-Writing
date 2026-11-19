@@ -237,6 +237,8 @@ async function evaluateGeminiRequest(
               : "Connexion au serveur Gemini interrompue ou délai dépassé. Votre rédaction est sauvegardée ; aucun autre modèle n’a été essayé. Vous pouvez demander un nouveau bilan.",
           );
         }
+        const providerBadGateway = response.status === 502 &&
+          (!server || response.headers.get("X-TCF-Error-Source") === "provider");
         if (response.headers.get("X-TCF-Model-Unavailable") === "1")
           modelUnavailable = true;
         const until =
@@ -267,7 +269,7 @@ async function evaluateGeminiRequest(
         )
           continue;
         if (
-          [404, 429, 503, 504].includes(response.status) ||
+          providerBadGateway || [404, 429, 503, 504].includes(response.status) ||
           (modelUnavailable && [401, 403, 409].includes(response.status))
         )
           continue modelAttempts;

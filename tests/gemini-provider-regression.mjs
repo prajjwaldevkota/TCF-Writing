@@ -197,6 +197,17 @@ try {
     status: 504,
     headers: { "X-TCF-Error-Source": "provider", "X-TCF-Model-Unavailable": "1" },
   });
+  const providerGatewayError = () => new Response("{}", {
+    status: 502, headers: { "X-TCF-Error-Source": "provider" },
+  });
+  for (const key of [undefined, "explicit-diagnostic-key"]) {
+    arrange("", "", [providerGatewayError(), success()]);
+    assert.equal((await evaluate(input, key)).model, "gemini-3.6-flash");
+    assert.equal(calls.length, 2);
+  }
+  arrange("", "", [new Response("Bad Gateway", { status: 502 })]);
+  await assert.rejects(evaluate(input), /HTTP 502/);
+  assert.equal(calls.length, 1, "An unmarked hosting 502 must not replay a review");
   arrange("", "", [providerTimeout(), success()]);
   assert.equal((await evaluate(input)).model, "gemini-3.6-flash");
   assert.equal(calls.length, 2);

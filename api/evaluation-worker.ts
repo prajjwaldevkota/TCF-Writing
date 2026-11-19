@@ -104,8 +104,8 @@ export async function handler(request: Request): Promise<Response> {
     const retryable = code === "timeout" || code === "network_error" ||
       (code === "http_error" && [401, 403, 404, 429, 500, 502, 503, 504].includes(status));
     let next = job.next_step + 1;
-    // A timeout skips the rest of this model instead of repeating slow work.
-    if (code === "timeout" || status === 504)
+    // Advance past both keys when the provider cannot serve this model.
+    if (code === "timeout" || [502, 503, 504].includes(status))
       while (plan[next]?.model === attempt.model) next++;
     const exhausted = !retryable || next >= plan.length || job.attempts >= 8;
     await update({ status: exhausted ? "failed" : "retrying", next_step: next,
