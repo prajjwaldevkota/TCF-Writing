@@ -1,3 +1,4 @@
+import { reviewAccount } from "../server/reviewAuth.js";
 import { errorLogStorageStatus, persistErrorLog } from "../server/errorLogs.js";
 import type { ErrorLogEntry } from "../src/types/errorLog.js";
 export async function handler(request: Request): Promise<Response> {
@@ -14,6 +15,8 @@ export async function handler(request: Request): Promise<Response> {
   const origin = request.headers.get("Origin");
   if (origin && origin !== new URL(request.url).origin)
     return new Response(null, { status: 403, headers });
+  const account = await reviewAccount(request);
+  if (account instanceof Response) return account;
   try {
     if (Number(request.headers.get("Content-Length")) > 4096)
       return new Response(null, { status: 413, headers });

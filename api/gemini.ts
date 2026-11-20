@@ -1,4 +1,5 @@
 import { prepareGeminiRequest } from "../server/geminiRequest.js";
+import { reviewAccount } from "../server/reviewAuth.js";
 import {
   persistErrorLog,
   requestId,
@@ -13,8 +14,8 @@ import type { ErrorLogEntry } from "../src/types/errorLog.js";
 // initial-response deadline. Keep room for two 120s attempts and diagnostics.
 export const config = { maxDuration: 300 };
 const allowedModels = new Set([
-  "gemini-3.6-flash",
   "gemini-4-hydrogen",
+  "gemini-3.6-flash",
   "gemini-3.5-flash-lite",
   "gemini-3.1-flash-lite",
 ]);
@@ -39,6 +40,8 @@ export async function handler(request: Request): Promise<Response> {
       client_context: context,
     });
   if (request.method !== "POST") return jsonError("Method not allowed", 405);
+  const account = await reviewAccount(request);
+  if (account instanceof Response) return account;
   // Support the previous deployment variable while moving to an unprefixed secret.
   const primary =
     process.env.GEMINI_API_KEY?.trim() ||

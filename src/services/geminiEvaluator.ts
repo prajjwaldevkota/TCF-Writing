@@ -1,4 +1,5 @@
 import { prepareGeminiRequest } from "../../server/geminiRequest";
+import { supabase } from "../lib/supabase";
 import {
   createLogRequestId,
   getClientDiagnostics,
@@ -158,6 +159,9 @@ async function evaluateGeminiRequest(
         continue;
       }
       const server = "server" in key && key.server;
+      const sessionToken = server ? (await supabase?.auth.getSession())?.data.session?.access_token : undefined;
+      if (server && !sessionToken) throw new Error(feedbackLanguage === "en"
+        ? "Please sign in again to request a review." : "Reconnectez-vous pour demander une correction.");
       // A timeout or network failure can follow accepted work. Do not replay it.
       let response: Response;
       try {
@@ -171,6 +175,7 @@ async function evaluateGeminiRequest(
               "Content-Type": "application/json",
               ...(server
                 ? {
+                    Authorization: `Bearer ${sessionToken}`,
                     "X-TCF-Request-ID": requestId,
                     "X-TCF-Client-Context": JSON.stringify(
                       getClientDiagnostics(),

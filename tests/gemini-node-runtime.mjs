@@ -45,8 +45,11 @@ try {
   assert.equal(deployment.functions["api/**/*.ts"].maxDuration, 300);
 
   process.env.GEMINI_API_KEY = "runtime-test-key";
+  process.env.SUPABASE_URL = "https://auth.example";
+  process.env.VITE_SUPABASE_ANON_KEY = "public-fixture";
   let calls = 0;
   globalThis.fetch = async (url, options) => {
+    if (url === "https://auth.example/auth/v1/user") return Response.json({ id: "fixture" });
     calls++;
     assert.match(url, /generativelanguage\.googleapis\.com/);
     // Exercise the Web entry point while no response is available for >25s.
@@ -57,7 +60,7 @@ try {
   };
   const response = await entry.fetch(new Request("https://fixture/api/gemini", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { Authorization: "Bearer fixture", "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "gemini-3.6-flash",
       request: { contents: [{ role: "user", parts: [{ text: "Test" }] }] },

@@ -137,8 +137,7 @@ rows using your project's data-retention policy; deleting a job removes its
 stored essay snapshot and raw response.
 
 The browser watches for up to 30 minutes, then keeps its reference for a later
-visit; closing the page does not cancel the worker. Guests should return in the
-same browser. Queue setup or delivery failures preserve the saved writing and
+visit; closing the page does not cancel the worker. Return in the same browser to resume a pending job. Queue setup or delivery failures preserve the saved writing and
 job reference. The browser uses the synchronous route only when the queue is
 explicitly disabled and there is no pending job to duplicate.
 
@@ -147,7 +146,7 @@ Status polling runs every **30 seconds** while the tab is visible and every
 trigger an immediate status check. Intermediate job updates do not trigger
 extra requests. Polling only reads the existing database job; it never creates
 another Gemini request or QStash delivery. The visible-tab interval uses 90%
-fewer periodic status requests than the previous 3-second interval. Guest
+fewer periodic status requests than the previous 3-second interval. Polled
 results may take up to one polling interval to appear after completion.
 
 Standalone Task 1 starts at `gemini-3.5-flash-lite`. For other reviews the default model is `gemini-4-hydrogen`, followed by `gemini-3.6-flash`, `gemini-3.5-flash-lite` and
@@ -189,7 +188,7 @@ editor, then deploy the cache-enabled code. New installations can run the update
    **200** when the job already completed.
 
 An empty JSON POST to `/api/evaluate` safely checks configuration without
-creating a job: **400** means validation was reached; **409 queue_disabled**
+creating a job: **401** means the route requires a signed-in session; **409 queue_disabled**
 means background reviews are off; **503** means configuration or a required
 service is unavailable. This probe does not verify the database migration or
 worker delivery. Use the real review above for that end-to-end check.
@@ -197,8 +196,7 @@ worker delivery. Use the real review above for that end-to-end check.
 ### Verify completed-review caching
 
 The cache reuses responses from the existing jobs table; it needs no Redis or
-additional service. It is private to a verified account, or to a guest browser's
-random cache capability. Its seven-day lifetime starts only after the browser's
+additional service. It is private to the verified account. Its seven-day lifetime starts only after the browser's
 evidence validator accepts a completed response. `PATCH /api/evaluate` records
 that acknowledgement using the job's existing read capability. Failed, blocked,
 truncated and unaccepted output cannot produce a server cache hit.
@@ -221,7 +219,7 @@ payloads still pass through the normal evidence validator before display.
    a new queued job, and generate a fresh assessment. Resuming an already pending
    job always keeps that job ID, even when the resume call uses the fresh flag.
 4. Change an answer, question, language, rubric or model. The server cache should
-   miss. A different account or guest capability also cannot read the old cache.
+   miss. A different account also cannot read the old cache.
 
 Cache expiry affects reuse, not deletion: expired jobs remain retrievable by
 their owner/capability and are retained until explicitly removed. Existing saved

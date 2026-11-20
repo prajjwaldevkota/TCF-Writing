@@ -59,6 +59,7 @@ const {buildEvaluationInstructions,instructionFingerprint,validatePedagogicalAss
 const createLogRequestId=()=>crypto.randomUUID();
 const getClientDiagnostics=()=>({browser:"chrome",platform:"windows",viewport_width:1536,viewport_height:740,online:true});
 const reportReviewError=entry=>globalThis.__reviewErrors.push(entry);
+const supabase={auth:{getSession:async()=>({data:{session:{access_token:"fixture"}}})}};
 const queueEvaluation=async()=>globalThis.__geminiFixture.queued||null;
 `;
 const { evaluateTcfSubmissionWithGemini: evaluate } = await import(
@@ -89,6 +90,7 @@ function arrange(primary, backup, responses) {
   stored.set("tcf_gemini_backup_api_key", backup);
   calls = [];
   globalThis.fetch = async (endpoint, options) => {
+    assert.equal(options.headers.Authorization, endpoint === "/api/gemini" ? "Bearer fixture" : undefined);
     calls.push({
       endpoint,
       key: options.headers["x-goog-api-key"],

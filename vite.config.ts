@@ -38,6 +38,7 @@ export default defineConfig(({ mode }) => {
             "SUPABASE_SERVICE_ROLE_KEY",
             "SUPABASE_URL",
             "VITE_SUPABASE_URL",
+            "VITE_SUPABASE_ANON_KEY",
             "EVALUATION_QUEUE_ENABLED",
             "EVALUATION_PUBLIC_URL",
             "EVALUATION_WORKER_SECRET",
@@ -67,8 +68,10 @@ export default defineConfig(({ mode }) => {
   return {
     // Only public Supabase settings may be read from VITE-prefixed environment
     // variables. Even the legacy VITE_GEMINI_API_KEY stays out of browser builds.
-    envPrefix: ["VITE_SUPABASE_"],
+    envPrefix: [],
     define: {
+      "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(process.env.VITE_SUPABASE_URL || env.VITE_SUPABASE_URL || ""),
+      "import.meta.env.VITE_SUPABASE_ANON_KEY": JSON.stringify(process.env.VITE_SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || ""),
       "import.meta.env.VITE_GEMINI_MODEL": JSON.stringify(model),
     },
     resolve: {

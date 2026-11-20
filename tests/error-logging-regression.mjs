@@ -11,11 +11,11 @@ const { default: { fetch: handler } } = await import(
     compile("api/error-logs.ts").replace(
       /(["'])\.\.\/server\/errorLogs\.js\1/,
       JSON.stringify(errorLogsUrl),
-    ),
+    ).replace("../server/reviewAuth.js", moduleUrl(compile("server/reviewAuth.ts"))),
   )
 );
 const clientLogger = await import(
-  moduleUrl(compile("src/services/errorLogging.ts"))
+  moduleUrl(compile("src/services/errorLogging.ts").replace(/^import .*;$/m, "const supabase = null;"))
 );
 assert.match(
   clientLogger.createLogRequestId(),
@@ -113,6 +113,7 @@ try {
   assert.equal(await logger.errorLogStorageStatus(), "missing_server_key");
   process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-sentinel";
   globalThis.fetch = async (url, options) => {
+    if (url.endsWith("/auth/v1/user")) return Response.json({ id: "fixture" });
     calls.push({ url, options });
     return new Response(null, { status: 201 });
   };
@@ -141,6 +142,7 @@ try {
   assert.equal(await logger.errorLogStorageStatus(), "database_unreachable");
   assert(!JSON.stringify(warnings).includes("service-role-sentinel"));
   globalThis.fetch = async (url, options) => {
+    if (url.endsWith("/auth/v1/user")) return Response.json({ id: "fixture" });
     calls.push({ url, options });
     return new Response(null, { status: 201 });
   };
@@ -150,6 +152,7 @@ try {
       headers: {
         "Content-Type": "application/json",
         Origin: "https://app.fixture",
+        Authorization: "Bearer fixture",
         ...headers,
       },
       body: JSON.stringify(body),
@@ -162,6 +165,7 @@ try {
     model: "gemini-4-hydrogen",
     request_id: reference,
   };
+  assert.equal((await handler(request(client, { Authorization: "" }))).status, 401);
   const accepted = await handler(request(client));
   assert.equal(accepted.status, 201);
   assert.deepEqual(await accepted.json(), { stored: true });
@@ -190,7 +194,7 @@ try {
     405,
   );
   assert.equal(calls.length, before);
-  globalThis.fetch = async () => new Response("secret-sentinel", { status: 403 });
+  globalThis.fetch = async url => url.endsWith("/auth/v1/user") ? Response.json({ id: "fixture" }) : new Response("secret-sentinel", { status: 403 });
   const rejected = await handler(request(client));
   assert.equal(rejected.status, 503, "Never acknowledge a failed database insert");
   assert.deepEqual(await rejected.json(), { stored: false });
@@ -198,7 +202,7 @@ try {
   delete process.env.SUPABASE_SERVICE_ROLE_KEY;
   const unconfigured = await handler(request(client));
   assert.equal(unconfigured.status, 503);
-  assert.deepEqual(await unconfigured.json(), { stored: false });
+  assert.equal((await unconfigured.json()).error, "authentication_unavailable");
   const sql = fs.readFileSync("supabase/error-logs.sql", "utf8");
   assert(sql.includes("enable row level security"));
   assert(

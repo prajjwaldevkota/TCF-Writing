@@ -1,3 +1,4 @@
+import { supabase } from "../lib/supabase";
 import type { ClientDiagnostics, ErrorLogEntry } from "../types/errorLog";
 export function createLogRequestId(): string {
   if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
@@ -38,23 +39,25 @@ export function getClientDiagnostics(): ClientDiagnostics {
   };
 }
 // Never send exception messages, stack traces, prompts, responses, keys or tokens.
-export function reportReviewError(
+export async function reportReviewError(
   entry: Pick<
     ErrorLogEntry,
     "request_id" | "stage" | "code" | "model" | "duration_ms"
   >,
-): void {
+): Promise<void> {
   try {
-    void fetch("/api/error-logs", {
+    const token = (await supabase?.auth.getSession())?.data.session?.access_token;
+    if (!token) return;
+    await fetch("/api/error-logs", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({
         ...entry,
         client_context: getClientDiagnostics(),
       }),
       keepalive: true,
       signal: AbortSignal.timeout(8000),
-    }).catch(() => {});
+    });
   } catch {
     /* Offline or older browsers must still display the original error. */
   }

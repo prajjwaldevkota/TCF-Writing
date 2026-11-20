@@ -33,3 +33,8 @@ dist-ssr
 # Python
 __pycache__/
 *.py[cod]
+
+# Local security review
+/security-findings.md
+.vercel
+.env*

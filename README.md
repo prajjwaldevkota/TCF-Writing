@@ -111,8 +111,8 @@ Completed reviews also have a private **7-day response cache** in the existing
 Supabase job store. It matches the exact model request (including answers,
 questions, language and generation settings) and rubric version. A cache hit
 returns saved output without publishing a QStash message or calling Gemini.
-Signed-in caches belong to the verified account; guest caches belong to a random
-capability saved in that browser. Output becomes cacheable only after the browser
+Both review endpoints verify a Supabase session before generating feedback.
+The cache belongs to the verified account. Output becomes cacheable only after the browser
 accepts it through the existing evidence validator. Failed, blocked and truncated
 responses are excluded. Matching completed browser jobs are also reused directly.
 **Request a new review** bypasses the completed-response cache. Apply

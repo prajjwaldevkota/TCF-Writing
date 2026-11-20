@@ -96,6 +96,34 @@ try {
   assert.equal(pollDelays.length, beforeRealtime + 1, "Intermediate Realtime events must not trigger extra status reads");
   eventOnSubscribe = null;
 
+  for (const [name, steps, succeeds] of [
+    ["recovers", ["offline", 503, 200], true],
+    ["bounded", [503, 503, 503], false],
+    ["invalid capability", [404], false],
+  ]) {
+    let posts = 0;
+    let reads = 0;
+    let jobId;
+    globalThis.fetch = async (url, options) => {
+      if (options.method === "POST") {
+        posts++;
+        jobId = JSON.parse(options.body).id;
+        return response({ id: jobId, status: "queued" }, 202);
+      }
+      assert.equal(url, `/api/evaluate?id=${jobId}`);
+      const step = steps[reads++];
+      if (step === "offline") throw new TypeError("offline");
+      return response(done(jobId), step);
+    };
+    const review = queueEvaluation({ ...input, fingerprint: name });
+    if (succeeds) await review;
+    else await assert.rejects(review, /reopen/i);
+    assert.equal(posts, 1);
+    assert.equal(reads, steps.length);
+    assert.equal(pendingEvaluationJobMatches(input.result.id, input.model, name), !succeeds);
+    stored.clear();
+  }
+
   // A failed POST acknowledgement keeps its capability, even before success
   // is known. Reopening must submit exactly the same id, not spend new quota.
   globalThis.fetch = async (_url, options) => {
@@ -150,7 +178,9 @@ try {
   await queueEvaluation(input);
   assert.notEqual(references.at(-1).id, before, "An explicit request after failure can start a new job");
   const cachedId = references.at(-1).id;
+  const removedBeforeCacheHit = removeCount;
   await queueEvaluation(input);
+  assert.equal(removeCount, removedBeforeCacheHit, "A completed response needs no Realtime subscription");
   assert.equal(references.at(-1).id, cachedId, "Normal repeated requests reuse the completed job capability");
   await queueEvaluation({ ...input, force: true });
   assert.notEqual(references.at(-1).id, cachedId, "Explicit fresh review creates a new job");

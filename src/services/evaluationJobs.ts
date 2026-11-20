@@ -98,22 +98,10 @@ export async function queueEvaluation(input: {
     } finally { clearTimeout(timer); }
   }
   let response: Response;
-  // A browser capability scopes guest cache entries without exposing writing
-  // to other guests. It is separate from each job's read capability.
-  let cacheToken: string | null = null;
-  try {
-    cacheToken = localStorage.getItem("tcf_review_cache_token_v1");
-    if (!cacheToken || !uuid.test(cacheToken)) {
-      cacheToken = createLogRequestId();
-      localStorage.setItem("tcf_review_cache_token_v1", cacheToken);
-    }
-  } catch { cacheToken = null; }
   try {
     const r = input.result;
     response = await fetch("/api/evaluate", {
-      method: "POST", headers: { "Content-Type": "application/json", ...auth,
-        ...(cacheToken ? { "X-TCF-Cache-Token": cacheToken } : {}),
-      },
+      method: "POST", headers: { "Content-Type": "application/json", ...auth },
       body: JSON.stringify({
         id: ref.id, token: ref.token, model: input.model, request: input.request,
         rubricVersion: input.rubricVersion, force: input.force === true || previous?.failed === true,
@@ -137,6 +125,9 @@ export async function queueEvaluation(input: {
       return null;
     }
   }
+  if (response.status === 401) throw new Error(en
+    ? "Please sign in again to request your review. Your writing is saved."
+    : "Reconnectez-vous pour demander une correction. Votre texte est sauvegardé.");
   if (!response.ok) throw new Error(en
     ? "The background review service is unavailable. Your writing is saved; reopen this submission to try resuming the same job."
     : "Le service de correction en arrière-plan est indisponible. Votre texte est sauvegardé ; rouvrez cette rédaction pour reprendre la même demande.");
@@ -148,7 +139,8 @@ export async function queueEvaluation(input: {
   let completionNotified = false;
   // Authenticated owners receive Realtime notifications under RLS. Guests and
   // disconnected sockets use capability-protected short polling requests.
-  const channel = auth.Authorization && supabase
+  const waitingForWorker = current.status !== "completed" && current.status !== "failed";
+  const channel = waitingForWorker && auth.Authorization && supabase
     ? supabase.channel(`evaluation:${ref.id}`)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "evaluation_jobs", filter: `id=eq.${ref.id}` }, event => {
         // Intermediate worker updates do not need another status request.
@@ -163,6 +155,7 @@ export async function queueEvaluation(input: {
     // Stop actively watching after 30 minutes. The durable job keeps running;
     // the saved capability resumes it later without another provider request.
     const until = Date.now() + 30 * 60_000;
+    let consecutiveReadFailures = 0;
     while (current.status !== "completed" && current.status !== "failed") {
       if (!completionNotified) {
         await new Promise<void>(resolve => {
@@ -177,12 +170,21 @@ export async function queueEvaluation(input: {
       }
       completionNotified = false;
       if (Date.now() > until) throw interrupted();
+      let status: Response;
       try {
-        const status = await fetch(`/api/evaluate?id=${ref.id}`, {
+        status = await fetch(`/api/evaluate?id=${ref.id}`, {
           headers: { "X-TCF-Job-Token": ref.token }, signal: AbortSignal.timeout(10_000), cache: "no-store",
         });
-        current = await readStatus(status);
-      } catch { throw interrupted(); }
+      } catch {
+        if (++consecutiveReadFailures >= 3) throw interrupted();
+        continue;
+      }
+      if (status.status === 408 || status.status >= 500) {
+        if (++consecutiveReadFailures >= 3) throw interrupted();
+        continue;
+      }
+      current = await readStatus(status);
+      consecutiveReadFailures = 0;
     }
     ref.pending = false;
     ref.failed = current.status === "failed";

@@ -22,7 +22,7 @@ const requestBody = () => ({
   request: { contents: [{ role: "user", parts: [{ text: "private essay" }] }] },
   submission: { id: "local-submission", answers: { task1: "private essay" } },
 });
-const enqueue = (body, headers = {}) => runtime.evaluate(new Request("https://app.example/api/evaluate", {
+const enqueue = (body, headers = { Authorization: "Bearer valid-session" }) => runtime.evaluate(new Request("https://app.example/api/evaluate", {
   method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body),
 }));
 const status = (body, token = body.token) => runtime.evaluate(new Request(`https://app.example/api/evaluate?id=${body.id}`, {
@@ -102,6 +102,7 @@ try {
     return response(job ? [clone(job)] : []);
   };
   const first = requestBody();
+  assert.equal((await enqueue(first, {})).status, 401);
   assert.equal((await enqueue(first)).status, 202);
   assert.equal(providerCalls.length, 0, "Enqueue must never wait for Gemini");
   assert.equal(jobs.get(first.id).input.submission.answers.task1, "private essay");
@@ -209,7 +210,7 @@ try {
   claimFails = false;
 
   const cachePayload = { candidates: [{ finishReason: "STOP", content: { parts: [{ text: JSON.stringify({ feedback_language: "en", tasks: { task1: { feedback: "Clear writing" } } }) }] } }] };
-  const privateCache = { "X-TCF-Cache-Token": randomUUID() };
+  const privateCache = { Authorization: "Bearer valid-session" };
   const cacheRequest = { ...requestBody(), rubricVersion: "rubric-v1" };
   await enqueue(cacheRequest, privateCache);
   providerResponses = [response(cachePayload)];
@@ -248,7 +249,7 @@ try {
     const changed = { ...cacheRequest, ...change, id: randomUUID(), token: randomUUID() };
     assert.equal((await enqueue(changed, privateCache)).status, 202, "Changed input and explicit fresh requests must bypass completed cache entries");
   }
-  assert.equal((await enqueue({ ...cacheRequest, id: randomUUID(), token: randomUUID() }, { "X-TCF-Cache-Token": randomUUID() })).status, 202, "Another guest must not read the cache");
+  assert.equal((await enqueue({ ...cacheRequest, id: randomUUID(), token: randomUUID() }, { "X-TCF-Cache-Token": randomUUID() })).status, 401, "A guest capability cannot authorize a review");
   completedCache.cache_expires_at = new Date(Date.now() - 1000).toISOString();
   jobs.get(duplicate.id).cache_expires_at = completedCache.cache_expires_at;
   assert.equal((await enqueue({ ...cacheRequest, id: randomUUID(), token: randomUUID() }, privateCache)).status, 202, "Expired cache entries must not be used");

@@ -12,7 +12,7 @@ const source = ts
   .outputText.replace(
     /(["'])\.\.\/server\/errorLogs\.js\1/,
     JSON.stringify(errorLogsUrl),
-  ).replace("../server/geminiRequest.js", moduleUrl(compile("server/geminiRequest.ts")));
+  ).replace("../server/geminiRequest.js", moduleUrl(compile("server/geminiRequest.ts"))).replace("../server/reviewAuth.js", moduleUrl(compile("server/reviewAuth.ts")));
 const { default: { fetch: handler } } = await import(
   "data:text/javascript;base64," + Buffer.from(source).toString("base64")
 );
@@ -25,6 +25,8 @@ const names = [
 const saved = Object.fromEntries(
   names.map((name) => [name, process.env[name]]),
 );
+process.env.SUPABASE_URL = "https://auth.example";
+process.env.VITE_SUPABASE_ANON_KEY = "public-fixture";
 const oldFetch = globalThis.fetch;
 const oldWarn = console.warn;
 const oldLogKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -38,7 +40,7 @@ const body = {
 const request = (value = body) =>
   new Request("https://fixture/api/gemini", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Authorization: "Bearer fixture" },
     body: JSON.stringify(value),
   });
 let calls = [];
@@ -50,6 +52,8 @@ function arrange(primary, backup, responses, legacy = "") {
   calls = [];
   logged = [];
   globalThis.fetch = async (url, options) => {
+    if (url === "https://auth.example/auth/v1/user")
+      return Response.json({ id: "verified-user" }, { status: options.headers.Authorization === "Bearer fixture" ? 200 : 401 });
     calls.push({ url, options });
     const response = responses.shift();
     assert(response, "No unexpected provider request");
@@ -60,6 +64,11 @@ function arrange(primary, backup, responses, legacy = "") {
 const success = () => new Response('{"candidates":[]}', { status: 200 });
 try {
   arrange("", "", []);
+  for (const headers of [{}, { Authorization: "Bearer expired" }]) {
+    const denied = await handler(new Request("https://fixture/api/gemini", { method: "POST", headers }));
+    assert.equal(denied.status, 401);
+    assert.equal(calls.length, 0);
+  }
   const missing = await handler(request());
   assert.equal(missing.status, 503);
   assert.equal(missing.headers.get("X-TCF-Error"), "server_not_configured");
@@ -155,6 +164,7 @@ try {
       await handler(
         new Request("https://fixture/api/gemini", {
           method: "POST",
+          headers: { Authorization: "Bearer fixture" },
           body: "invalid",
         }),
       )

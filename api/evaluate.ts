@@ -1,6 +1,7 @@
+import { reviewAccount } from "../server/reviewAuth.js";
 import {
   UUID, MODELS, hash, json, database, getJob, getJobStatus, publicJob, queueConfig,
-  publishJob, credentials, terminal, databaseConfig,
+  publishJob, credentials, terminal,
   cacheFingerprint, cachedJob, cacheableResponse,
 } from "../server/evaluationJobs.js";
 
@@ -36,6 +37,8 @@ export async function handler(request: Request): Promise<Response> {
     }
     if (process.env.EVALUATION_QUEUE_ENABLED !== "true")
       return json({ error: "queue_disabled" }, 409, { "X-TCF-Queue-Disabled": "1" });
+    const userId = await reviewAccount(request);
+    if (userId instanceof Response) return userId;
     queueConfig();
     if (!credentials().length) return json({ error: "missing_credentials" }, 503);
     if (Number(request.headers.get("Content-Length")) > 200_000) return json({ error: "request_too_large" }, 413);
@@ -49,26 +52,13 @@ export async function handler(request: Request): Promise<Response> {
     const input = { model: body.model, request: body.request, submission: body.submission };
     const inputHash = hash(JSON.stringify(input));
     let job = await getJob(body.id);
-    if (job && (job.token_hash !== hash(body.token) || job.input_hash !== inputHash))
+    if (job && ((job.user_id && job.user_id !== userId) || job.token_hash !== hash(body.token) || job.input_hash !== inputHash))
       return json({ error: "job_conflict" }, 409);
     if (!job) {
-      let userId: string | null = null;
-      const auth = request.headers.get("Authorization");
-      if (auth) {
-        const { url, key } = databaseConfig();
-        const verified = await fetch(`${url}/auth/v1/user`, {
-          headers: { apikey: key, Authorization: auth }, signal: AbortSignal.timeout(4000),
-        });
-        if (!verified.ok) return json({ error: "unauthorized" }, 401);
-        userId = (await verified.json()).id;
-      }
-      const guestToken = request.headers.get("X-TCF-Cache-Token") || "";
-      // Cache lookups require verified ownership or possession of a browser's
-      // random guest cache capability. Never share assessments across users.
-      const scope = userId ? `user:${userId}` : UUID.test(guestToken) ? `guest:${hash(guestToken)}` : null;
+      const scope = `user:${userId}`;
       const rubricVersion = typeof body.rubricVersion === "string" && body.rubricVersion.length <= 100 ? body.rubricVersion : null;
-      const cacheKey = scope && rubricVersion ? cacheFingerprint(body.model, body.request, rubricVersion) : null;
-      const cached = cacheKey && body.force !== true ? await cachedJob(scope!, cacheKey) : undefined;
+      const cacheKey = rubricVersion ? cacheFingerprint(body.model, body.request, rubricVersion) : null;
+      const cached = cacheKey && body.force !== true ? await cachedJob(scope, cacheKey) : undefined;
       // Ignore a concurrent insert of the same id, then verify its capability
       // and input below. Never overwrite another job or reset running work.
       await database("evaluation_jobs?on_conflict=id", {
@@ -81,7 +71,7 @@ export async function handler(request: Request): Promise<Response> {
         }),
       });
       job = await getJob(body.id);
-      if (!job || job.token_hash !== hash(body.token) || job.input_hash !== inputHash)
+      if (!job || (job.user_id && job.user_id !== userId) || job.token_hash !== hash(body.token) || job.input_hash !== inputHash)
         return json({ error: "job_conflict" }, 409);
     }
     if (!job.message_id && !terminal(job.status)) {
