@@ -6650,12 +6650,12 @@
         "combinationNumber": 14,
         "tasks": {
           "task1": {
-            "instruction": "Écrivez un courriel à vos amis pour les inviter à un anniversaire surprise de votre\nmeilleur ami. (Lieu, date, heure, etc.).",
+            "instruction": "Vous voulez organiser une fête surprise pour l’anniversaire de votre meilleur(e) ami(e). Vous envoyez un message aux invités pour leur donner toutes les informations nécessaires (date, lieu, etc.).",
             "minWords": 60,
             "maxWords": 120
           },
           "task2": {
-            "instruction": "Vous avez participé à une brocante (achat / vente de produits d’occasion) dans votre\nville. Sur votre blog personnel, racontez pourquoi vous avez aimé cette activité.",
+            "instruction": "Vous avez participé à une brocante (vente et achat d’objets d’occasion entre habitants) dans votre ville. Vous racontez cette journée sur un forum Internet. Vous expliquez pourquoi vous avez aimé cette journée.",
             "minWords": 120,
             "maxWords": 150
           },
@@ -6664,8 +6664,8 @@
             "title": "Les Vols À Bas Prix",
             "minWords": 120,
             "maxWords": 180,
-            "document1": "Je fais souvent mes voyages avec des compagnies aériennes à bas prix. Les\ncompagnies low-cost mettent à disposition des prix inférieurs à ceux proposés par les\ncompagnies aériennes régulières. Cela me coûte des fois moins cher que de voyager\nen voiture ou en train. Avec ces tarifs-là, vous vous doutez qu’il y a un hic ; en effet, vous\nn’aurez droit à aucun service à bord (ni aliments, ni boissons). Je dirais donc que\nle low-cost n’est surtout pas fait pour les vols long-courriers.",
-            "document2": "Récemment, j’ai pris la décision de ne plus voyager avec les compagnies aériennes à\nbas prix. En effet, j’ai longuement réfléchi afin de prendre ma décision, mais ce choix\nétait évident : des sièges inconfortables, des conditions de travail pénibles et surtout\ndes avions vétustes qui remettent en cause la sécurité ! Dès lors, pour certains\nvoyages, je vais opter pour la voiture ou même le train, ce dernier permet même de\ndécouvrir de jolis paysages. Quant aux longs trajets, mieux vaut prendre un vol en\ncompagnie régulière."
+            "document1": "Juliette, 34 ans : « Je prends régulièrement l’avion avec des compagnies Low Cost. Elles proposent des billets très bon marché, donc cela me coûte moins cher que le train ou même la voiture. J’en profite parce que je ne pourrais pas voyager autant si je devais payer mes billets au prix fort. En revanche, je trouve cela intéressant seulement pour des vols courts parce que les services à bord sont limités : il n’y a aucune boisson gratuite, pas de repas et pas de films. »",
+            "document2": "Roméo, 28 ans : « Je ne voyage plus avec des compagnies aériennes Low Cost ! Leurs avions sont très inconfortables, et je trouve que les conditions de travail du personnel de bord sont difficiles, cela me met mal à l’aise. De plus, est-ce que la sécurité est aussi bien assurée sur ce type de vol que sur une compagnie classique ? À mon avis, quand on veut partir en vacances sans payer trop cher, il vaut mieux prendre le train ou la voiture. Bien sûr, on ne peut pas aller aussi loin qu’avec l’avion mais il y a tant de belles choses à voir près de chez soi ! »"
           }
         }
       },
@@ -7010,22 +7010,22 @@
         "combinationNumber": 29,
         "tasks": {
           "task1": {
-            "instruction": "Vous envisagez de déménager et avez trouvé un appartement. Vous souhaitez en informer un ami en lui fournissant les détails concernant le bien en question : nombre de pièces, emplacement et prix.",
+            "instruction": "Vous voulez déménager. Vous avez visité un appartement. Vous écrivez un message à un(e) ami(e). Vous décrivez l’appartement (prix, localisation, nombre de pièces, etc.).",
             "minWords": 60,
             "maxWords": 120
           },
           "task2": {
-            "instruction": "Une annonce de festival de musique gratuit a été publiée dans votre ville, et vous avez profité de cette occasion pour y assister avec votre ami. Écrivez un article de blog pour raconter l’expérience que vous avez vécue lors de cet événement musical.",
+            "instruction": "Vendredi 21 juin — Fête de la musique\n\nVous avez participé à cette fête. Racontez cette expérience sur votre site Internet et donnez vos impressions.",
             "minWords": 120,
             "maxWords": 150
           },
           "task3": {
-            "instruction": "L'emploi des jeunes : diplôme ou expérience ?",
-            "title": "L'emploi des jeunes : diplôme ou expérience ?",
+            "instruction": "Les études universitaires",
+            "title": "Les études universitaires",
             "minWords": 120,
             "maxWords": 180,
-            "document1": "De nombreux jeunes diplômés de l'université se retrouvent au chômage. La reconnaissance des formations universitaires sur le marché du travail soulève des questions. En effet, les jeunes rencontrent souvent des difficultés pour trouver un emploi : les recruteurs leur reprochent d'avoir trop de diplômes et pas assez d'expérience, ou bien leur jeunesse constitue un obstacle. Plus de 60 % des jeunes diplômés n'ont toujours pas trouvé de travail un an après la fin de leurs études. Dans ce contexte, il semble urgent de revaloriser les diplômes et de favoriser l'emploi et la croissance.",
-            "document2": "On entend souvent parler de célèbres chefs d’entreprise qui ont réussi sans aller à l’université. L’exemple de ces personnalités riches et admirées pourrait laisser croire qu’il suffit d’être brillant pour diriger une entreprise. Certains dirigeants estiment même que les études universitaires peuvent être un frein. Selon eux, l’université enseigne le conformisme et limite la créativité en incitant les étudiants à suivre des parcours classiques. Pour les futurs créateurs d’entreprise, rien ne vaudrait l’autoformation et l’expérience, sans l’aide d’aucune structure académique."
+            "document1": "On compte de nombreux jeunes diplômés de l’université au chômage. La reconnaissance des formations universitaires sur le marché du travail pose question. Les jeunes rencontrent souvent les difficultés suivantes pour trouver un emploi : les recruteurs leur reprochent d’avoir trop de diplômes et pas assez d’expérience ; ou bien leur jeunesse est un obstacle. Plus de 60 % des jeunes diplômés n’ont toujours pas trouvé de travail un an après la fin de leurs études. Dans ce contexte, il paraît urgent de revaloriser les diplômes et de développer l’emploi et la croissance.\n\nD’après humanite.fr",
+            "document2": "À quoi servent les études universitaires ? On entend souvent parler de célèbres chefs d’entreprises qui ont réussi sans aller à l’université. L’exemple de ces personnalités riches et admirées pourrait laisser croire qu’il suffit d’être brillant pour diriger une entreprise. Certains dirigeants estiment que les études universitaires peuvent même être un obstacle. En effet, selon eux, l’université enseignerait le conformisme et freinerait la créativité en incitant les étudiants à poursuivre des parcours classiques. Pour les futurs créateurs d’entreprises, rien n’égalerait l’autoformation et l’expérience, sans l’aide d’aucune structure.\n\nD’après lemonde.fr"
           }
         }
       },
@@ -7250,12 +7250,12 @@
         "combinationNumber": 39,
         "tasks": {
           "task1": {
-            "instruction": "“Bonjour, ça y est, j’ai obtenu mon visa pour le Canada. Je vais arriver le 3 mars. Est-ce que tu pourras m’aider à trouver un hôtel pour la première semaine ? Merci d’avance pour ton aide.”\nMatthias.\nVous avez trouvé un hôtel pour Matthias. Vous lui écrivez un courriel. Dans ce message vous décrivez l’hôtel et vous lui donnez toutes les informations utiles (situation, tarif…).",
+            "instruction": "Notre agence immobilière mène l’enquête. Comment est l’appartement de vos rêves ?\n\nParticipez à notre concours : postez un message de 120 mots maximum sur notre site et gagnez peut-être un séjour sur la Riviera !\n\nVous participez à ce concours, vous décrivez l’appartement de vos rêves.",
             "minWords": 60,
             "maxWords": 120
           },
           "task2": {
-            "instruction": "Vous êtes allés voir un spectacle (film, pièce de théâtre, concert, etc.) avec des amis. Vous l’avez aimé. Sur votre blog, vous racontez votre soirée et vous expliquez pourquoi vous avez aimé le spectacle.",
+            "instruction": "Vous êtes allé(e) voir un spectacle (film, pièce de théâtre, concert, etc.) avec des amis. Vous l’avez aimé. Sur votre blog, vous racontez votre soirée et vous expliquez pourquoi vous avez aimé ce spectacle.",
             "minWords": 120,
             "maxWords": 150
           },
@@ -7264,8 +7264,8 @@
             "title": "Les relations amicales au travail",
             "minWords": 120,
             "maxWords": 180,
-            "document1": "Les amitiés entre collègues au travail peuvent être extrêmement bénéfiques. Elles favorisent un climat de travail agréable et une ambiance positive au sein de l’équipe. Avoir des amis parmi ses collègues permet de renforcer les liens professionnels et de créer un sentiment de camaraderie. Cela peut contribuer à une meilleure communication, une collaboration plus étroite et une résolution plus efficace des problèmes. De plus, partager des moments de convivialité en dehors du travail, comme des déjeuners ou des activités après le bureau, peut renforcer les liens et créer une dynamique de groupe solide.",
-            "document2": "Il est important de trouver un équilibre entre amitié et professionnalisme au travail. Les amitiés excessivement proches peuvent parfois créer des tensions ou des conflits lorsque des décisions professionnelles doivent être prises. De plus, les amitiés exclusives entre certains collègues peuvent exclure les autres membres de l’équipe, ce qui peut nuire à la cohésion et à la collaboration. Il est essentiel de maintenir des limites claires et de veiller à ce que les amitiés ne compromettent pas le professionnalisme, la hiérarchie ou la productivité au sein de l’organisation."
+            "document1": "Alain, chef d’entreprise : « Pour un chef d’entreprise, il est important de bien connaître ses employés. Dans une entreprise où l’on communique plus, la productivité augmente. En effet, des activités comme des week-ends au ski ou du sport collectif en club permettent de simplifier les rapports entre employés et responsables de direction. Cela renforce non seulement les liens humains mais aussi l’attachement du personnel à son entreprise. Les employés n’hésitent plus, par exemple, à échanger avec leur supérieur hiérarchique avec qui ils ont fait équipe lors d’une compétition de football. C’est positif pour tout le monde. »",
+            "document2": "Claire, secrétaire : « Pourquoi devrait-on devenir ami avec ses collègues de bureau ? Pour moi, il est essentiel de pouvoir séparer vie professionnelle et vie privée et d’avoir des amis en dehors de son travail. Les collègues qui se voient à l’extérieur parlent souvent uniquement de problèmes de bureau ! Même si j’ai de bonnes relations avec mon patron et mes collègues, je reste très professionnelle. Je pense qu’il faut mettre des limites dans les relations au travail car on sait bien qu’il est plus difficile de refuser un service à un ami. »"
           }
         }
       },
@@ -7274,12 +7274,12 @@
         "combinationNumber": 40,
         "tasks": {
           "task1": {
-            "instruction": "Vous avez invité votre ami Cédric à votre mariage au Château de Chombony et il vous a répondu qu’il ne connait pas ce château. Décrivez à votre ami (lieu, localisation, transports, etc.).",
+            "instruction": "« Salut !\n\nMerci pour l’invitation à ton mariage. Je suis content pour toi ! La fête a lieu au château Saint-Simon ; je ne le connais pas. Est-ce que tu peux me renseigner ? Comment y aller ?\n\nÀ bientôt,\nÉric »\n\nVous répondez à Éric. Dans votre courriel, vous donnez toutes les informations pour trouver ce château (adresse, localisation, moyen de transport, etc.).",
             "minWords": 60,
             "maxWords": 120
           },
           "task2": {
-            "instruction": "Dans votre blog, Racontez votre expérience de l’apprentissage d’une langue étrangère (vous écrivez sur un forum internet en racontant votre expérience en apprenant une langue étrangère).",
+            "instruction": "Un forum Internet propose aux internautes de partager leurs expériences d’apprentissage des langues. Vous écrivez un message sur ce forum. Vous racontez comment vous avez appris une langue étrangère et vous expliquez pourquoi il est important d’apprendre des langues étrangères.",
             "minWords": 120,
             "maxWords": 150
           },
@@ -7288,8 +7288,8 @@
             "title": "Cuisinier Amateur Ou Cuisinier Professionnel ?",
             "minWords": 120,
             "maxWords": 180,
-            "document1": "Les amateurs ont fait des recettes réussies, mais ils manquent toujours des compétences et des technique, c’est pourquoi la formations et l’expérience sont nécessaires pour être un vrai cuisinier.",
-            "document2": "Il parle des cuisiniers qui ont appris le métier de cuisiniers sur internet et qui ont le buzz sur les réseaux sociaux il raconte aussi l’histoire d’une amatrice qui est devenue professionnelle et qui a rédigé plusieurs livres sur la cuisine pour les amateurs de cuisine à la maison."
+            "document1": "Gustavo, chef cuisinier dans un grand restaurant lyonnais : « Depuis quelques années, on constate que de plus en plus de personnes se passionnent pour la cuisine. Les blogs culinaires se multiplient sur Internet. Chacun partage ses expériences plus ou moins réussies... Pourtant, il y a une grande différence entre ces amateurs et les professionnels comme moi, c’est la formation ! Aujourd’hui, on a l’impression que le métier de cuisinier est accessible à tous alors qu’il demande beaucoup de compétences et de connaissances. C’est un métier difficile, mais quel bonheur et quelle fierté d’être un vrai cuisinier ! »",
+            "document2": "Document 2 : « Le Salon du blog culinaire lance sa 1re édition en Belgique : 450 blogueurs se réunissent jusqu’à dimanche pour faire des démonstrations publiques de cuisine et échanger leurs expériences. Une passion qui, pour certains, se transforme en véritable profession, comme pour Pascale Weeks, la première Française à avoir lancé son blog. Depuis, elle a signé cinq livres de recettes et teste quotidiennement des produits pour des marques. D’amateure, la voilà devenue professionnelle ! »"
           }
         }
       },
@@ -7610,22 +7610,22 @@
         "combinationNumber": 54,
         "tasks": {
           "task1": {
-            "instruction": "France Télévision prépare un reportage sur le sport amateur. Et vous, quel sportif êtes-vous ? Envoyez-nous vos témoignages sur francetélévision.fr.",
+            "instruction": "Vous prêtez votre logement à un(e) ami(e) pendant votre absence. Vous lui écrivez un message pour lui expliquer comment récupérer les clés, lui présenter les équipements disponibles et lui donner quelques conseils pour son séjour.",
             "minWords": 60,
             "maxWords": 120
           },
           "task2": {
-            "instruction": "Vous avez passé des vacances dans une belle région de votre pays. Vous écrivez un message à vos amis dans lequel vous décrivez votre expérience, vous expliquez pourquoi vous avez beaucoup aimé ce séjour.",
+            "instruction": "Pendant une promenade, vous avez découvert une activité à laquelle vous avez décidé de participer sans l’avoir prévu. Sur votre blog, racontez cette expérience et expliquez pourquoi elle vous a marqué(e).",
             "minWords": 120,
             "maxWords": 150
           },
           "task3": {
-            "instruction": "Les écoles privées ou publiques ?",
-            "title": "Les écoles privées ou publiques ?",
+            "instruction": "Le covoiturage : Pour ou contre ?",
+            "title": "Le covoiturage : Pour ou contre ?",
             "minWords": 120,
             "maxWords": 180,
-            "document1": "À la rentrée, le nombre d’élèves inscrits dans des écoles privées a augmenté en France. Le succès des établissements privés n’est pas directement lié aux bons résultats scolaires de leurs élèves. C’est la réputation de ces lieux qui explique un tel enthousiasme. Aux yeux de nombreux parents, les élèves y sont mieux encadrés, mieux surveillés et les professeurs sont plus présents. Les parents sont aussi rassurés parce que les classes sont homogènes : elles accueillent généralement des élèves de milieux sociaux favorisés. En effet, les études dans ces établissements sont payantes, ce qui n’est pas le cas dans les écoles publiques.",
-            "document2": "Dans les collèges privés, il y a peu d’élèves de milieux sociaux défavorisés. Comme les études dans ces établissements sont payantes, certaines catégories de population en sont exclues. Ce système qui oppose écoles publiques et écoles privées ne facilite pas la mixité sociale. Ainsi, les élèves du privé ont rarement l’occasion de rencontrer d’autres jeunes issus de milieux sociaux moins favorisés qu’eux et inversement. Ce modèle scolaire reproduit les inégalités sociales et renforce le sentiment d’exclusion de certains jeunes."
+            "document1": "« Depuis quelques mois, je partage mes trajets avec deux personnes qui travaillent près de mon entreprise. Nous répartissons les frais, ce qui me permet de faire des économies. Nos déplacements sont aussi plus agréables, car nous discutons pendant le voyage. En utilisant une seule voiture au lieu de trois, nous contribuons également à limiter la circulation. Pour moi, le covoiturage est une solution intéressante pour les déplacements quotidiens. »\nSarah, 34 ans",
+            "document2": "« J’ai essayé le covoiturage pour aller au travail, mais j’ai finalement arrêté. Il fallait respecter des horaires fixes et faire des détours pour récupérer les autres passagers. Lorsqu’une personne annulait au dernier moment, toute l’organisation était à revoir. Je ne pouvais plus non plus faire mes courses ou rester plus longtemps au bureau sans prévenir les autres. Je préfère donc garder mon indépendance, même si cela me coûte davantage. »\nThomas, 42 ans"
           }
         }
       },
@@ -7674,6 +7674,30 @@
             "maxWords": 180,
             "document1": "J’habite dans un pays où il y a très peu de maisons de retraite. Ici, quand une personne âgée ne peut plus être autonome, elle habite avec les générations plus jeunes, et dans l’ensemble, cela ne pose pas de problèmes majeurs. Il nous paraît étrange de confier nos parents ou grands-parents à des personnes qu’ils ne connaissent pas.",
             "document2": "Beaucoup de gens critiquent les maisons de retraite, pourtant c’est une bonne solution d’accueil pour les personnes âgées ! D’abord, pour lutter contre l’isolement puisqu’elles sont entourées de personnes de leur âge à la maison de retraite. Ensuite, pour les soins et les services médicaux offerts dans ce type d’établissement. Enfin, parce que c’est pratique et rassurant pour leurs enfants et petits-enfants. Malheureusement, ce type de logement reste encore trop cher pour certains."
+          }
+        }
+      },
+      {
+        "combination": 859,
+        "combinationNumber": 57,
+        "tasks": {
+          "task1": {
+            "instruction": "Votre meilleur(e) ami(e) prépare un grand dîner et vous souhaitez lui offrir quelque chose. Vous écrivez à un(e) collègue pour lui demander un conseil sur un cadeau à offrir. Vous décrivez les différentes possibilités (gâteau, objet, fleurs, etc.).",
+            "minWords": 60,
+            "maxWords": 120
+          },
+          "task2": {
+            "instruction": "Vous avez commencé une nouvelle activité sportive. Sur votre blog, vous racontez votre expérience. Vous expliquez pourquoi cette activité peut être recommandée pour tout le monde.",
+            "minWords": 120,
+            "maxWords": 150
+          },
+          "task3": {
+            "instruction": "Venir au bureau avec son animal de compagnie : pour ou contre ?",
+            "title": "Venir au bureau avec son animal de compagnie : pour ou contre ?",
+            "minWords": 120,
+            "maxWords": 180,
+            "document1": "Venir au bureau avec son animal de compagnie.\n\nL’intérêt de cette présence ? C’est simple : diminuer le stress des employés. La présence d’un chien ou d’un chat change l’ambiance générale d’une entreprise : elle réduit les tensions entre collègues, ce qui n’est pas négligeable car chaque année, l’État français dépense entre 2 et 3 milliards d’euros pour soigner les salariés malades du stress. Selon une enquête, un quart des employés pensent aussi que la présence des animaux permet d’être plus motivé au travail.\n\nD’après challenges.fr",
+            "document2": "Iris, 34 ans : « Dans l’entreprise où je travaille, les employés sont autorisés à venir avec leur animal de compagnie, chat ou chien. Personnellement, cela me dérange. Je ne suis pas très à l’aise avec les animaux, qui peuvent avoir des comportements imprévisibles. D’autre part, je trouve que cela peut poser des problèmes de santé. Que faire si un employé est allergique aux chats ? Sera-t-il obligé de rester enfermé dans son bureau ? Et puis c’est aussi une source de distraction. Mes collègues et moi ne serons pas plus productifs grâce à un chien ou un chat ! »"
           }
         }
       }
