@@ -50,7 +50,8 @@ globalThis.__geminiFixture = {
 const source = compile("src/services/geminiEvaluator.ts")
   .replace(/^import .*;\n/gm, "")
   .replace(/^export \{.*\} from .*;\n/gm, "");
-const setup = `import {safeParseGeminiJson} from ${JSON.stringify(parserUrl)};
+const setup = `import {prepareGeminiRequest} from ${JSON.stringify(url(compile("server/geminiRequest.ts")))};
+import {safeParseGeminiJson} from ${JSON.stringify(parserUrl)};
 import {getRateLimitDeadline,recordRateLimit,rateLimitMessage} from ${JSON.stringify(rateUrl)};
 import {getGeminiModel,getGeminiModelChain} from ${JSON.stringify(settingsUrl)};
 const {buildEvaluationInstructions,instructionFingerprint,validatePedagogicalAssessment}=globalThis.__geminiFixture;

@@ -1,3 +1,4 @@
+import { prepareGeminiRequest } from "../server/geminiRequest.js";
 import { randomUUID } from "node:crypto";
 import {
   UUID, json, database, getJob, terminal, workerAuthorized, attemptPlan,
@@ -66,7 +67,7 @@ export async function handler(request: Request): Promise<Response> {
       // Exactly one provider request per invocation; QStash owns retries/backoff.
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${attempt.model}:generateContent`, {
         method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": attempt.value },
-        body: JSON.stringify(job.input.request), signal: AbortSignal.timeout(120_000),
+        body: JSON.stringify(prepareGeminiRequest(attempt.model, job.input.request)), signal: AbortSignal.timeout(120_000),
       });
       status = response.status;
       const text = await response.text();

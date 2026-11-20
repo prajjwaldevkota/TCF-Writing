@@ -1,3 +1,4 @@
+import { prepareGeminiRequest } from "../server/geminiRequest.js";
 import {
   persistErrorLog,
   requestId,
@@ -94,7 +95,7 @@ export async function handler(request: Request): Promise<Response> {
             "Content-Type": "application/json",
             "x-goog-api-key": key.value,
           },
-          body: JSON.stringify(body.request),
+          body: JSON.stringify(prepareGeminiRequest(body.model, body.request)),
           signal: AbortSignal.timeout(120000),
         },
       );

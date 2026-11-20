@@ -1,4 +1,4 @@
-import { errorLogsUrl } from "./helpers/error-log-modules.mjs";
+import { compile, moduleUrl, errorLogsUrl } from "./helpers/error-log-modules.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import ts from "typescript";
@@ -12,7 +12,7 @@ const source = ts
   .outputText.replace(
     /(["'])\.\.\/server\/errorLogs\.js\1/,
     JSON.stringify(errorLogsUrl),
-  );
+  ).replace("../server/geminiRequest.js", moduleUrl(compile("server/geminiRequest.ts")));
 const { default: { fetch: handler } } = await import(
   "data:text/javascript;base64," + Buffer.from(source).toString("base64")
 );

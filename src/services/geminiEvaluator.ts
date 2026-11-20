@@ -1,3 +1,4 @@
+import { prepareGeminiRequest } from "../../server/geminiRequest";
 import {
   createLogRequestId,
   getClientDiagnostics,
@@ -182,7 +183,7 @@ async function evaluateGeminiRequest(
             // and logging, within the function's 300s execution budget.
             signal: AbortSignal.timeout(server ? 270000 : 120000),
             body: JSON.stringify(
-              server ? { model: modelName, request: requestBody } : requestBody,
+              server ? { model: modelName, request: requestBody } : prepareGeminiRequest(modelName, requestBody),
             ),
           },
         );

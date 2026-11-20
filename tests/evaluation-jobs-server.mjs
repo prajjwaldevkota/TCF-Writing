@@ -133,6 +133,8 @@ try {
   assert.equal((await work(first.id)).status, 200);
   assert.equal(jobs.get(first.id).status, "completed");
   assert.equal(providerCalls.at(-1).options.headers["x-goog-api-key"], "primary-sentinel");
+  assert.equal(JSON.parse(providerCalls[0].options.body).generationConfig.thinkingConfig.thinkingLevel, "LOW");
+  assert.equal(JSON.parse(providerCalls[1].options.body).generationConfig?.thinkingConfig, undefined);
   assert.equal(jobs.get(first.id).model, "gemini-3.6-flash");
   assert.equal((await work(first.id)).status, 200);
   assert.equal(providerCalls.length, 2, "Duplicate completed delivery does not spend quota");
