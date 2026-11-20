@@ -22,7 +22,7 @@ target.
   exports the prompts, source documents and original answers for another AI or tutor,
   with a manual copy fallback when clipboard access is blocked. Read evidence, corrections and
   revision priorities alongside the original text, then rewrite the same task.
-  Both versions remain in your journal. Gemini 4 Hydrogen is selected automatically; an optional backup key is read on the Vercel server.
+  Both versions remain in your journal. The starting model depends on the tasks; an optional backup key is read on the Vercel server.
 - **My corrections:** practise correcting your own sentences before revealing
   saved corrections. The reviewed status is self-reported, not a mastery score.
 - **My progress:** session counts, revisions, task balance, and supported full-mock
@@ -52,7 +52,7 @@ Configure `GEMINI_API_KEY` and optionally `GEMINI_BACKUP_KEY` in Vercel (or
 `.env.local` for local development). The function also accepts the existing
 `VITE_GEMINI_API_KEY` and `GEMINI_BACKUP_API_KEY` names for compatibility; their
 values are excluded from browser builds. Existing browser-entered keys are ignored.
-`GEMINI_MODEL` selects the starting model, defaulting to `gemini-4-hydrogen`.
+Task 1 alone starts with Gemini 3.5 Flash-Lite. All other reviews start with Gemini 4 Hydrogen. Set `GEMINI_MODEL` to override both routes.
 
 See [LOCAL-SETUP.md](LOCAL-SETUP.md) for optional account storage and Vercel setup.
 
@@ -119,7 +119,7 @@ responses are excluded. Matching completed browser jobs are also reused directly
 [supabase/evaluation-cache.sql](supabase/evaluation-cache.sql) before deploying
 this feature on an existing database.
 
-The automatic default chain is Gemini 4 Hydrogen, 3.6 Flash, 3.5 Flash-Lite, then 3.1 Flash-Lite.
+Outside standalone Task 1, the automatic default chain is Gemini 4 Hydrogen, 3.6 Flash, 3.5 Flash-Lite, then 3.1 Flash-Lite.
 `GEMINI_MODEL` may override its starting point; no browser selection is needed. These have published [free API tiers](https://ai.google.dev/gemini-api/docs/pricing),
 checked November 14, 2026. Project access and limits vary; a model selection does
 not change billing settings. [Google quotas](https://ai.google.dev/gemini-api/docs/rate-limits)

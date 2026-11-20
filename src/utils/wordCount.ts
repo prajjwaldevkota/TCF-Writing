@@ -1,6 +1,6 @@
 /**
  * Counts words in French text sensibly according to TCF writing exam standards.
- * Ignores multiple spaces, leading/trailing whitespace, and standalone punctuation.
+ * Ignores multiple spaces, leading/trailing whitespace, and counts each nonempty sequence of signs.
  */
 export function countFrenchWords(text: string): number {
   // Space-delimited signs; whitespace from editor line breaks is a separator too.

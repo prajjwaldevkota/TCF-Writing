@@ -72,7 +72,7 @@ export function mapScoreToTcfCanadaLevels(score: number): {
 export async function evaluateTcfSubmissionWithGemini(
   result: ExamResult,
   customApiKey?: string,
-  requestedModel = getGeminiModel(),
+  requestedModel = getGeminiModel(getActiveEvaluatedTasks(result)),
   force = false,
 ): Promise<AIEvaluation> {
   const requestId = createLogRequestId();
@@ -124,7 +124,7 @@ async function evaluateGeminiRequest(
   const feedbackLanguage =
     localStorage.getItem("tcf_language") === "en" ? "en" : "fr";
 
-  const { systemPrompt, userPrompt, rubricVersion } =
+  const { systemPrompt, userPrompt, rubricVersion, generationConfig } =
     buildEvaluationInstructions(result, activeTaskKeys, feedbackLanguage);
   const promptHash = await instructionFingerprint(
     systemPrompt + "\n" + userPrompt,
@@ -133,7 +133,7 @@ async function evaluateGeminiRequest(
   const requestBody = {
     systemInstruction: { parts: [{ text: systemPrompt }] },
     contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-    generationConfig: { responseMimeType: "application/json", temperature: 0.15 },
+    generationConfig,
   };
   const queued = customApiKey?.trim() ? null : await queueEvaluation({
     result, model: requestedModel, request: requestBody, fingerprint: promptHash, language: feedbackLanguage, rubricVersion, force,
@@ -354,6 +354,7 @@ async function evaluateGeminiRequest(
       parsed,
       activeTaskKeys,
       result,
+      true,
     );
     if (assessment.feedback_language !== feedbackLanguage)
       throw new Error("AI returned the wrong feedback language.");

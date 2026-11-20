@@ -79,3 +79,10 @@ assert.deepEqual(normalizedSingle.tasks.task1.limiting_evidence,['« Bonjour » 
 assert.deepEqual(normalizedSingle.tasks.task1.priorities,['Vary connectors.']);
 assert.equal(normalizedSingle.tasks.task2,undefined);
 console.log('PASS: unverified corrections omitted with warnings, verified feedback retained, unsupported levels/NCLC withheld, and Unicode-equivalent excerpts matched.');
+const diagnosed = payload();
+diagnosed.tasks.task1.task_fulfilment_audit = [{requirement:'Invite a friend',met:true,finding:'Addresses the recipient.'}];
+diagnosed.tasks.task1.syntactic_and_lexical_inventory = {structures:['Direct address'],recurrent_errors:[]};
+assert.doesNotThrow(() => pedagogical.validatePedagogicalAssessment(diagnosed,['task1'],full,true));
+assert.throws(() => pedagogical.validatePedagogicalAssessment(payload(),['task1'],full,true), /audit/);
+diagnosed.tasks.task1.syntactic_and_lexical_inventory.recurrent_errors = [null];
+assert.throws(() => pedagogical.validatePedagogicalAssessment(diagnosed,['task1'],full,true), /inventory/);

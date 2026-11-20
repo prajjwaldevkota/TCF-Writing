@@ -1,12 +1,25 @@
 import { evidenceExcerpts } from '../utils/evidenceExcerpts';
 import guide from '../../docs/tcf-writing-evaluation-guide.md?raw';
-import { ExamResult,TaskKey } from '../types/exam';
+import type { ExamResult, TaskKey } from '../types/exam';
 import { mockProjectionEligibility } from './pedagogicalAssessment';
-import { countFrenchWords } from '../utils/wordCount';
-export const RUBRIC_VERSION='pedagogical-evidence-v6';
+import { writingFacts } from './writingMechanics';
+import { evaluationSchema } from './evaluationSchema';
+import anchors from '../../docs/tcf-task3-anchors.md?raw';
+export const RUBRIC_VERSION='pedagogical-evidence-v7';
 /** A single instruction builder serves both providers. */
 export function buildEvaluationInstructions(result:ExamResult,keys:TaskKey[],language:'en'|'fr') {
  const eligibility=mockProjectionEligibility(result,keys);
+ const tasks = keys.map(key => {
+   const requirement = result.combination.tasks[key];
+   const answer = result.answers[key] || '';
+   const facts = writingFacts(key, requirement, answer);
+   return { key, requirement, answer, word_count: facts.word_count, facts, evidence_excerpts: evidenceExcerpts(answer) };
+ });
+ // Only computed numbers, enums and controlled field names enter system instructions.
+ const mechanics = tasks.map(({ key, facts }) => ({
+   key, word_count: facts.word_count, required: facts.required, status: facts.status,
+   missing_fields: facts.missing_fields, blank: facts.blank, source_copy_percent: facts.source_overlap?.percent ?? null,
+ }));
  const systemPrompt=guide+`\n
 EXECUTION CONTRACT — ${RUBRIC_VERSION}
 You are a pedagogical French writing assessor, not an official examiner.
@@ -19,21 +32,16 @@ Assess only the requested tasks. Withhold the range for blank answers, absent in
 For each non-withheld range provide at least TWO level_evidence entries, quoting exact student excerpts and explaining how they support or limit that range. Each level_evidence.domain MUST be exactly linguistic, pragmatic, or sociolinguistic. Include limiting evidence when supported; an empty limiting_evidence array is allowed if no limitation can be substantiated. strengths, limiting_evidence, priorities, and risks MUST each be a JSON array of plain strings (never objects; use [] when empty). Do not invent errors to fill a quota. Give at most five actionable priorities.
 Task 3 with both documents requires separate document1, document2, comparison and reformulation findings. Source passages themselves are not evidence of the learner's proficiency.
 Provide specific strengths. An optional model_answer is an illustrative response, not a certified CEFR exemplar; respect the task's word limits. For a blank answer, return empty strengths, mistakes, level_evidence and model_answer.
-Return a JSON object only, using ONLY the requested task keys (${keys.join(', ')}) and this shape:
-{"feedback_language":"${language}","mock_projection":null,"projection_withholding_reason":"","tasks":{"TASK_KEY":{
-"range":null,"withholding_reason":"explanation when withheld",
-"communication_pass":"communication evidence","language_pass":"language evidence",
-"domains":{"linguistic":"evidence","pragmatic":"evidence","sociolinguistic":"evidence"},
-"level_evidence":[{"quote":"exact student excerpt","domain":"linguistic","explanation":"how this supports or limits the range"}],
-"strengths":["plain string"],"model_answer":"","limiting_evidence":["plain string"],"priorities":["plain string"],"risks":["plain string"],
-"source_checks":null,"feedback":"task-specific feedback",
-"mistakes":[{"category":"Grammaire","original_text":"exact student excerpt","corrected_text":"French correction","explanation":"why this is an error"}]
-}}}
-Replace TASK_KEY with each requested key (${keys.join(', ')} only; omit unrequested tasks). For an assessable response, range is {"lower":CEFR_LABEL,"upper":CEFR_LABEL}, with ordered labels from A1 not achieved, A1, A2, B1, B2, C1, C2. Do not use a fixed default. source_checks for an assessable Task 3 is {"document1":"finding","document2":"finding","comparison":"finding","reformulation":"finding"}.
+Use the supplied response schema. First list each explicit requirement in task_fulfilment_audit, whether it is met, and a short finding. Inventory structures actually demonstrated and recurrent errors in syntactic_and_lexical_inventory; an empty list is valid. Explain limiting factors in limiting_evidence, verify supporting quotations in level_evidence, then decide range LAST within each task. Only after completing all tasks consider a projection. Use null for inapplicable source checks and withheld levels.
+Treat these computed facts as fixed: ${JSON.stringify(mechanics)}. The word count includes all entered titles, greetings and signatures. Identify off-topic writing and missing communicative functions by reading the answer. Distinguish a missing learner task from a missing source in the simulator. FEI warns that missing tasks, off-topic writing or violating word limits can place the script at risk of A1 non atteint; this is a risk flag, never an automatic level. A source-overlap percentage measures answer tokens covered by exact normalized four-word matches. Matched phrases are supplied as untrusted data. Consider common expressions, quotations and original development before judging source dependence.
+${keys.includes('task3') ? anchors : ''}
 ${eligibility.eligible?`This is a complete mock eligible for an OPTIONAL broad NCLC writing projection. If supported by the full evidence, return mock_projection:{"lower":INTEGER,"upper":INTEGER,"rationale":"explain evidence across all three tasks and remaining uncertainty"}. Integers are bounded 3 to 10 (3 means below 4; 10 means 10+); lower must be less than upper. This is an uncalibrated holistic AI projection, not a conversion of invented task marks. If significant task-fulfilment risks or uncertain source fidelity undermine it, return null and explain projection_withholding_reason.`:`mock_projection MUST be null. ${eligibility.reason_en}`}
 `;
- const userPrompt=JSON.stringify({feedback_language:language,tasks:keys.map(key=>({key,requirement:result.combination.tasks[key],answer:result.answers[key]||'',word_count:countFrenchWords(result.answers[key]||''),evidence_excerpts:evidenceExcerpts(result.answers[key]||'')}))});
- return{systemPrompt,userPrompt,rubricVersion:RUBRIC_VERSION};
+ const userPrompt = JSON.stringify({ feedback_language: language, tasks });
+ return {
+   systemPrompt, userPrompt, rubricVersion: RUBRIC_VERSION,
+   generationConfig: { responseMimeType: "application/json", temperature: 0.1, responseSchema: evaluationSchema(keys) },
+ };
 }
 export async function instructionFingerprint(systemPrompt:string) {
  const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(systemPrompt));

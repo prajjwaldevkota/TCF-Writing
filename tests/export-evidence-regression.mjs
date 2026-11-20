@@ -34,6 +34,9 @@ assert.equal(findOriginalExcerpt('Il a dit « oui ».', 'Il a dit " oui ".'), 'I
 assert.equal(findOriginalExcerpt('lʼappartement', "l'appartement"), 'lʼappartement');
 assert.equal(findOriginalExcerpt('je suis aller', 'je suis allé'), null, 'Never turn corrected wording into evidence');
 const instructionSource = compile('src/services/evaluationInstructions.ts')
+ .replace(/import anchors from [^;]+;/, () => `const anchors = ${JSON.stringify(fs.readFileSync('docs/tcf-task3-anchors.md','utf8'))};`)
+ .replace(/(['"])\.\/writingMechanics\1/, () => JSON.stringify(url(compile('src/services/writingMechanics.ts').replace(/(['"])\.\.\/utils\/wordCount\1/,JSON.stringify(wordsUrl)))))
+ .replace(/(['"])\.\/evaluationSchema\1/, () => JSON.stringify(url(compile('src/services/evaluationSchema.ts').replace(/(['"])\.\/pedagogicalAssessment\1/,JSON.stringify(pedagogicalUrl)))))
  .replace(/import guide from [^;]+;/, `const guide = ${JSON.stringify(fs.readFileSync('docs/tcf-writing-evaluation-guide.md','utf8'))};`)
  .replace(/(['"])\.\.\/utils\/evidenceExcerpts\1/, JSON.stringify(excerptsUrl))
  .replace(/(['"])\.\/pedagogicalAssessment\1/, JSON.stringify(pedagogicalUrl))
@@ -46,3 +49,21 @@ const task={range:{lower:'B1',upper:'B2'},feedback:'Bilan.',communication_pass:'
 const checked=validatePedagogicalAssessment({feedback_language:'fr',tasks:{task1:task}},['task1'],result);
 assert.equal(checked.tasks.task1.range,null,'One quote repeated across domains is not two excerpts');
 console.log('PASS: complete question/answer export, guided task scope, original formatting, real counts, exact evidence input, typography and duplicate-quote rejection.');
+const revised = buildEvaluationInstructions({
+  ...result, answers: { ...result.answers, task3: 'Un petit jardin public très calme. Merci !' },
+  combination: { tasks: { ...result.combination.tasks, task3: { ...requirement,
+    document1: 'Un petit jardin public très calme', document2: 'petit jardin public très' } } }
+}, ['task3'], 'fr');
+const fact = JSON.parse(revised.userPrompt).tasks[0].facts;
+assert.equal(fact.word_count, 8);
+assert.equal(fact.status, 'UNDER_MINIMUM');
+assert.equal(fact.source_overlap.covered_tokens, 6);
+assert.equal(fact.source_overlap.total_tokens, 7);
+assert.equal(fact.source_overlap.percent, 86);
+assert.deepEqual(Object.keys(revised.generationConfig.responseSchema.properties.tasks.properties), ['task3']);
+assert.equal(revised.generationConfig.responseSchema.properties.tasks.properties.task3.propertyOrdering.at(-1), 'range');
+assert(!buildEvaluationInstructions(result,['task1'],'fr').systemPrompt.includes('Le premier document parle des personnes'));
+const missing = buildEvaluationInstructions({...result, combination: {tasks: {task3: {...requirement, instruction:'', document1:'', document2:' '}}}}, ['task3'], 'en');
+const missingFacts = JSON.parse(missing.userPrompt).tasks[0].facts;
+assert.deepEqual(missingFacts.missing_fields, ['instruction','document1','document2']);
+assert.equal(missingFacts.source_overlap, null);

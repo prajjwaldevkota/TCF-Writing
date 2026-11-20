@@ -35,6 +35,7 @@ globalThis.__geminiFixture = {
     systemPrompt: "rubric",
     userPrompt: "answers",
     rubricVersion: "current",
+    generationConfig: { responseMimeType: "application/json", temperature: 0.1 },
   }),
   instructionFingerprint: async (text) =>
     createHash("sha256").update(text).digest("hex"),
@@ -110,6 +111,9 @@ try {
   globalThis.__geminiEnv.VITE_GEMINI_MODEL = "gemini-3.5-flash-lite";
   assert.equal(settings.getGeminiModel(), "gemini-3.5-flash-lite");
   delete globalThis.__geminiEnv.VITE_GEMINI_MODEL;
+  assert.equal(settings.getGeminiModel(["task1"]), "gemini-3.5-flash-lite");
+  assert.equal(settings.getGeminiModel(["task3"]), "gemini-4-hydrogen");
+  globalThis.__geminiEnv.VITE_GEMINI_MODEL = "gemini-4-hydrogen";
   assert.throws(() => settings.setGeminiModel("unknown-model"));
   for (const [primary, backup] of [
     ["", ""],

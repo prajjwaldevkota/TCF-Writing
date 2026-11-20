@@ -1,6 +1,6 @@
 # TCF Canada writing evaluation guide
 
-User-supplied source check: 2026-10-17. Automated recheck on 2026-11-11 was blocked by FEI (ERR-BOT-403); this is not a new verification date.
+Public task format and word-count guidance checked against the FEI TCF Canada sample on 2026-11-19.
 
 ## Official public format
 Expression écrite lasts 60 minutes and contains three tasks.
@@ -64,3 +64,19 @@ IRCC's final TCF Canada writing conversions (verified on 2026-11-11):
 14–15 → 9; 16–20 → 10+. These are final official-score conversions, not a
 CEFR-to-NCLC conversion or permission to invent task marks.
 Source: https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/documents/language-test.html
+
+## Practice descriptors for boundary decisions
+
+A2: short clauses carry basic information through simple links such as et, mais or parce que. Limited elaboration and recurring agreement or tense errors can coexist with a comprehensible message. Check whether basic politeness suits the recipient.
+B1: a connected, largely linear account of a familiar situation, with an opinion and basic reasons. Look for usable everyday vocabulary, shifts between background and events where relevant, and sufficient register control. Repetition or circumlocution can limit precision. Clean spelling alone does not establish B2.
+B2: a clear, developed message; the reader can follow relationships between claims. Look for controlled subordination, varied reference and vocabulary, and a register sustained across the text. Relative clauses, conditions, concessions and the subjunctive can supply evidence when they serve the meaning. Occasional slips can coexist with B2. On Task 3, distinguish a genuine comparison from two unrelated summaries.
+C1: precise collocations, flexible syntax and economical reformulation express distinctions that matter to the reader. Look for nuance, concession or a response to a counterargument where appropriate, consistently controlled register and few systematic errors. A memorized expression or rare tense alone establishes no level. Apply the full scale when evidence warrants A1 or C2.
+These are practice interpretations of the Council of Europe CEFR descriptors. Judge what the learner achieves in context. No particular connector, grammatical construction or task-level CEFR-to-NCLC conversion is required.
+https://www.coe.int/en/web/common-european-framework-reference-languages/cefr-descriptors
+
+## How to interpret task demands
+
+Task 1: audit every requested detail and the relationship to the recipient. Check tu/vous, greeting and closing against that relationship. For this practice rubric, an omitted explicitly requested detail caps the task-fulfilment judgment at B1. Identify the omitted detail and assess language separately. A short, flawless routine message offers limited evidence for advanced proficiency.
+Task 2: check both account and purposeful commentary. Distinguish background from events when the time frame calls for it. For this practice rubric, when the assignment requires commentary and the response is entirely narrative, cap the task estimate at B1 and explain the missing function. Give a reason whenever an omission limits the range.
+Task 3: identify two functions even when paragraphs overlap. Look for a neutral reformulation relating the two views (typically 40–60 words), then an argued personal stance (typically 80–120). Evaluate the thesis, development of reasons, concrete consequences or examples, and conclusion. Apply part lengths where specified by the actual assignment. A particular layout, exactly two arguments, or a specific reporting verb is not a universal scoring condition.
+Full mock: Task 3 provides the strongest opportunity here to demonstrate synthesis and sustained argument. If Tasks 1 and 2 look B2 but Task 3 shows only B1 development, explain that conflict in the projection rationale and widen or withhold an unsupported NCLC 7+ estimate. Use all three tasks. The checklist caps above are simulator conventions. FEI has not published numerical task weights or these caps.

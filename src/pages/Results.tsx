@@ -237,7 +237,7 @@ export function Results({
           </div>
           {user ? (
             <div className="review-provider-actions">
-              <span className="muted text-small">{getGeminiModel()}</span>
+              <span className="muted text-small">{getGeminiModel(keys)}</span>
               <button
                 className="button primary"
                 disabled={!!busy}

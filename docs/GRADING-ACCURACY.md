@@ -139,3 +139,16 @@ Browser QA used isolated profiles and synthetic provider fixtures, including a
 full-mock NCLC display and a Groq 429 after a successful Gemini review. These tests
 verify application behaviour, not the accuracy of a model's judgment. No live
 human-grade calibration or real account-sync test was performed for this rebuild.
+
+## Calibrating the B1/B2 boundary (rubric v7)
+
+Use 10–15 held-out, permission-cleared French scripts with an independent task-level grade, the original assignment and an examiner rationale. Include clean high-B1 scripts, B2 work with minor slips, and Task 3 responses with varying source fidelity. Keep both prompt anchors out of the benchmark. The [FEI examples](https://www.france-education-international.fr/test/exemples-epreuves-tcf) provide assignments. An assignment or an official overall writing score does not establish a task-level gold label.
+
+Store cases in a private JSON array outside the repository. Each record contains a unique `id`, `task`, `answer`, `gold` (one CEFR label), `source` (document/page or assessor reference), `examiner_rationale`, and `requirement` with `instruction`, `minWords`, `maxWords` and both source documents for Task 3. Verify provenance and permission to send the scripts to Google before running.
+
+```sh
+node scripts/calibrate-writing.mjs /path/to/cases.json --check
+node --env-file=.env.local scripts/calibrate-writing.mjs /path/to/cases.json --run
+```
+
+The first command validates the inputs offline. The second sends each assignment and answer once to the selected model. Gold labels and examiner comments stay local. It reports each case's range, reference level, model, and whether the range covers, exceeds or falls below the reference. It also counts withholding, provider/validation failures, definite overgrading of B1, definite undergrading of B2, and intervals crossing the B2 threshold. Compare runs on the same held-out cases and model. A B1–B2 interval covers either reference level while leaving the boundary unresolved. Only independent reference data can establish a change in grading accuracy.

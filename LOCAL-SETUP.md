@@ -13,7 +13,7 @@
    local submissions, correction review status, and drafts.
 
 Copy `.env.example` to `.env.local` for local feedback credentials or optional
-account storage. `GEMINI_MODEL` optionally overrides the chain starting point (default: gemini-4-hydrogen).
+account storage. `GEMINI_MODEL` optionally overrides the chain starting point (defaults: Flash-Lite for standalone Task 1, Hydrogen otherwise).
 Model accessibility must match your own provider account. These identifiers are
 public configuration and do not establish grading accuracy.
 
@@ -72,8 +72,8 @@ Vercel project’s environment for the relevant deployment, then redeploy. For e
 ```env
 GEMINI_API_KEY=your-primary-gemini-key
 GEMINI_BACKUP_KEY=your-backup-gemini-key
-# Optional: omit to use gemini-4-hydrogen automatically
-GEMINI_MODEL=gemini-4-hydrogen
+# Optional override for every task; omit for task-specific routing
+# GEMINI_MODEL=gemini-4-hydrogen
 ```
 
 The current UI and practice flow are documented in [README.md](README.md).
@@ -150,10 +150,9 @@ another Gemini request or QStash delivery. The visible-tab interval uses 90%
 fewer periodic status requests than the previous 3-second interval. Guest
 results may take up to one polling interval to appear after completion.
 
-The default model is `gemini-4-hydrogen`, followed by `gemini-3.6-flash`, `gemini-3.5-flash-lite` and
+Standalone Task 1 starts at `gemini-3.5-flash-lite`. For other reviews the default model is `gemini-4-hydrogen`, followed by `gemini-3.6-flash`, `gemini-3.5-flash-lite` and
 `gemini-3.1-flash-lite`. If the Vercel project explicitly sets `GEMINI_MODEL`,
-change that override to `gemini-4-hydrogen` (or remove it), then redeploy so the
-browser build picks up the new starting model.
+remove that override and rebuild to enable task-specific routing.
 
 References: [QStash publishing](https://upstash.com/docs/qstash/api-reference/messages/publish-a-message),
 [QStash retries](https://upstash.com/docs/qstash/features/retry), and

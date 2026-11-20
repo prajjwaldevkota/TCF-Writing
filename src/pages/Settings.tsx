@@ -115,8 +115,8 @@ export function Settings({
           <p>{getGeminiModel()}</p>
           <p className="footnote">
             {en
-              ? "Automatic order: Gemini 4 Hydrogen → 3.6 Flash → 3.5 Flash-Lite → 3.1 Flash-Lite. A model availability error, quota error or temporary unavailability triggers the next model. No manual selection is needed. The model used is shown on your review."
-              : "Ordre automatique : Gemini 4 Hydrogen → 3.6 Flash → 3.5 Flash-Lite → 3.1 Flash-Lite. Une erreur d’accès au modèle, de quota ou d’indisponibilité temporaire déclenche le modèle suivant. Aucun choix manuel n’est nécessaire. Le modèle utilisé figure sur votre bilan."}
+              ? "Task 1 alone starts with Flash-Lite. Longer reviews start with Hydrogen by default. A deployment model override applies to all tasks. A model availability error, quota error or temporary unavailability triggers the next model. No manual selection is needed. The model used is shown on your review."
+              : "La tâche 1 seule utilise Flash-Lite en premier. Les autres bilans commencent par Hydrogen par défaut. Un modèle configuré sur le serveur s’applique à toutes les tâches. Une erreur d’accès au modèle, de quota ou d’indisponibilité temporaire déclenche le modèle suivant. Aucun choix manuel n’est nécessaire. Le modèle utilisé figure sur votre bilan."}
           </p>
           <a
             className="text-button"

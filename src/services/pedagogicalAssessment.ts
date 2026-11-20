@@ -5,6 +5,8 @@ import { DimensionScore } from '../types/aiEvaluation';
 export const LEVELS = ['A1 not achieved', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
 
 export interface PedagogicalTask {
+  task_fulfilment_audit?: { requirement: string; met: boolean; finding: string }[];
+  syntactic_and_lexical_inventory?: { structures: string[]; recurrent_errors: string[] };
   range: { lower: string; upper: string } | null;
   withholding_reason: string;
   communication_pass: string;
@@ -89,7 +91,7 @@ function normalizeStringList(value: unknown, fieldName: string): string[] {
   return out;
 }
 
-export function validatePedagogicalAssessment(raw: any, keys: TaskKey[], result: ExamResult): PedagogicalAssessment {
+export function validatePedagogicalAssessment(raw: any, keys: TaskKey[], result: ExamResult, requireDiagnostic = false): PedagogicalAssessment {
   if (!raw || !['en', 'fr'].includes(raw.feedback_language) || !raw.tasks || typeof raw.tasks !== 'object') throw new Error('Incomplete AI assessment.');
   for (const k of Object.keys(raw.tasks)) {
     if (!keys.includes(k as TaskKey) && raw.tasks[k] == null) delete raw.tasks[k];
@@ -102,6 +104,18 @@ export function validatePedagogicalAssessment(raw: any, keys: TaskKey[], result:
     if (task) { task.validation_warnings=[]; task.omitted_corrections=0; task.corrections_incomplete=false; }
     if (task && ['score', 'clb_level', 'nclc_level', 'official_score'].some(k => task[k] != null)) throw new Error('Task scores and NCLC estimates are not allowed.');
     if (!task || typeof task.feedback !== 'string' || !task.feedback.trim()) throw new Error(`Missing feedback: ${key}`);
+    if (requireDiagnostic) {
+      const audit = task.task_fulfilment_audit;
+      const inventory = task.syntactic_and_lexical_inventory;
+      const hasText = (value: unknown) => typeof value === 'string' && !!value.trim();
+      if (!Array.isArray(audit) || (req.instruction?.trim() && !audit.length) ||
+        !audit.every(item => item && hasText(item.requirement) && typeof item.met === 'boolean' && hasText(item.finding))) {
+        throw new Error(`Missing task fulfilment audit: ${key}`);
+      }
+      if (![inventory?.structures, inventory?.recurrent_errors].every(list => Array.isArray(list) && list.every(hasText))) {
+        throw new Error(`Missing language inventory: ${key}`);
+      }
+    }
     for (const name of ['communication_pass', 'language_pass']) if (typeof task[name] !== 'string' || !task[name].trim()) throw new Error(`Missing evidence: ${key}/${name}`);
     for (const name of ['linguistic', 'pragmatic', 'sociolinguistic']) if (typeof task.domains?.[name] !== 'string' || !task.domains[name].trim()) throw new Error(`Missing domain: ${name}`);
     for (const name of ['limiting_evidence', 'priorities', 'risks'] as const) {
@@ -123,7 +137,7 @@ export function validatePedagogicalAssessment(raw: any, keys: TaskKey[], result:
     const hasRange = task.range !== null;
     if (hasRange && (!task.range || !LEVELS.includes(task.range.lower) || !LEVELS.includes(task.range.upper) || LEVELS.indexOf(task.range.lower) > LEVELS.indexOf(task.range.upper))) throw new Error('Invalid pedagogical range.');
     // Enforce limitations even when a model ignores the instruction.
-    const missingPrompt = !(req.instruction || req.title)?.trim();
+    const missingPrompt = !req.instruction?.trim();
     const missingSource = key === 'task3' && (!req.document1?.trim() || !req.document2?.trim() || !(req.title || req.instruction)?.trim());
     const blank = countFrenchWords(result.answers[key] || '') === 0;
     if (missingPrompt || missingSource || blank) {
@@ -181,7 +195,7 @@ export function validatePedagogicalAssessment(raw: any, keys: TaskKey[], result:
     }
     // Deterministic word-limit risk, never an invented official penalty.
     const words = countFrenchWords(result.answers[key] || '');
-    if (words < req.minWords || words > req.maxWords) task.risks.push(raw.feedback_language === 'en' ? `Word count ${words}; requested range ${req.minWords}–${req.maxWords}.` : `${words} mots ; plage demandée ${req.minWords}–${req.maxWords}.`);
+    if (words < req.minWords || words > req.maxWords) task.risks.push(raw.feedback_language === 'en' ? `Word count ${words}; requested range ${req.minWords}–${req.maxWords}. In the exam this puts the script at risk of A1 non atteint.` : `${words} mots ; plage demandée ${req.minWords}–${req.maxWords}. À l’examen, la copie risque la mention « A1 non atteint ».`);
   }
 
   raw.overall_indicative_score = null;

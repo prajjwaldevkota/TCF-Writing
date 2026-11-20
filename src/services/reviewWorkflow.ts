@@ -16,7 +16,7 @@ export async function resumeSubmissionReview(result: ExamResult): Promise<AIEval
   const language = localStorage.getItem("tcf_language") === "en" ? "en" : "fr";
   const instructions = buildEvaluationInstructions(result, getActiveEvaluatedTasks(result), language);
   const fingerprint = await instructionFingerprint(instructions.systemPrompt + "\n" + instructions.userPrompt);
-  if (!pendingEvaluationJobMatches(result.id, getGeminiModel(), fingerprint)) return null;
+  if (!pendingEvaluationJobMatches(result.id, getGeminiModel(getActiveEvaluatedTasks(result)), fingerprint)) return null;
   return reviewSubmission(result, true);
 }
 export async function reviewSubmission(
@@ -32,7 +32,7 @@ export async function reviewSubmission(
   const hash = await instructionFingerprint(
     instructions.systemPrompt + "\n" + instructions.userPrompt,
   );
-  const model = getGeminiModel();
+  const model = getGeminiModel(getActiveEvaluatedTasks(result));
   const saved = savedGeminiReview(result);
   if (
     !force &&
