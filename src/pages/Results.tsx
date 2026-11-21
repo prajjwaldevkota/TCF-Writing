@@ -1,3 +1,4 @@
+import { useWorkspace } from "../context/WorkspaceContext";
 import React, { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -17,7 +18,7 @@ import {
 import type { ExamResult, TaskKey } from "../types/exam";
 import { useLanguage } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
-import { getStoredSubmissions } from "../utils/storage";
+
 import { countFrenchWords, formatTime } from "../utils/wordCount";
 import { practicedKeys, TASK_INFO, TASK_KEYS } from "../utils/practice";
 import { withGeminiReview } from "../utils/reviewState";
@@ -46,13 +47,14 @@ export function Results({
   onNotebook: () => void;
   onLogin?: () => void;
 }) {
+  const { getStoredSubmissions } = useWorkspace();
   const { user, loading: authLoading } = useAuth();
   const { language } = useLanguage();
   const en = language === "en";
   const keys = result.isPracticeMode ? practicedKeys(result) : TASK_KEYS;
   const [active, setActive] = useState<TaskKey>(keys[0] || "task1");
   const [busy, setBusy] = useState(false);
-  const [background, setBackground] = useState(() => hasPendingEvaluationJob(result.id));
+  const [background, setBackground] = useState(() => hasPendingEvaluationJob(result.id, user?.id));
   const [error, setError] = useState("");
   const locked = useRef(false);
   const errorRef = useRef<HTMLDivElement>(null);
@@ -86,7 +88,7 @@ export function Results({
     setBusy(true);
     setError("");
     try {
-      const data = resume ? await resumeSubmissionReview(result) : await reviewSubmission(result, force);
+      const data = resume ? await resumeSubmissionReview(result, user.id) : await reviewSubmission(result, force, user.id);
       if (data) onSave(withGeminiReview(result, data));
     } catch (e) {
       setError(
@@ -103,16 +105,17 @@ export function Results({
   };
   useEffect(() => {
     const queued = (event: Event) => {
-      if ((event as CustomEvent).detail?.submissionId === result.id) setBackground(true);
+      const detail = (event as CustomEvent).detail;
+      if (detail?.submissionId === result.id && detail.owner === user?.id) setBackground(true);
     };
     window.addEventListener("tcf-review-queued", queued);
     return () => window.removeEventListener("tcf-review-queued", queued);
-  }, [result.id]);
+  }, [result.id, user?.id]);
   useEffect(() => {
     if (authLoading || !user) return;
     // Resuming a saved job reads its existing result; it never creates a new
     // evaluation just because the learner opened this page.
-    if (hasPendingEvaluationJob(result.id)) void review(true, true);
+    if (hasPendingEvaluationJob(result.id, user?.id)) void review(true, true);
   }, [result.id, authLoading, user?.id]);
   const words = countFrenchWords(result.answers[active]);
   const requirement = result.combination.tasks[active];

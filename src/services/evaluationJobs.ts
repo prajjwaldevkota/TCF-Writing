@@ -9,6 +9,7 @@ interface JobReference {
   fingerprint: string;
   submissionId?: string;
   pending: boolean;
+  expiresAt: number;
   rubricVersion?: string;
   requestSignature?: string;
   failed?: boolean;
@@ -22,23 +23,27 @@ interface JobStatus {
   error_code: string | null;
   cache_expires_at?: string | null;
 }
-const prefix = "tcf_evaluation_job:";
-const referenceKey = (id: string | undefined, model: string, fingerprint: string) =>
-  prefix + encodeURIComponent(id || "anonymous") + ":" + model + ":" + fingerprint;
+const jobPrefix = (owner?: string) => "ecriture:job:" + encodeURIComponent(owner || "guest") + ":";
+const referenceKey = (id: string | undefined, model: string, fingerprint: string, owner?: string) =>
+  jobPrefix(owner) + encodeURIComponent(id || "anonymous") + ":" + model + ":" + fingerprint;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function read(key: string): JobReference | null {
   try {
     const ref = JSON.parse(localStorage.getItem(key) || "null");
+    if (ref && !(ref.expiresAt > Date.now())) {
+      localStorage.removeItem(key);
+      return null;
+    }
     return ref && uuid.test(ref.id) && uuid.test(ref.token) ? ref : null;
   } catch { return null; }
 }
-export function hasPendingEvaluationJob(submissionId?: string): boolean {
+export function hasPendingEvaluationJob(submissionId?: string, owner?: string): boolean {
   if (!submissionId) return false;
   try {
-    for (let i = 0; i < localStorage.length; i++) {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
       const key = localStorage.key(i);
-      if (key?.startsWith(prefix)) {
+      if (key?.startsWith(jobPrefix(owner))) {
         const ref = read(key);
         if (ref?.submissionId === submissionId && ref.pending) return true;
       }
@@ -47,12 +52,13 @@ export function hasPendingEvaluationJob(submissionId?: string): boolean {
   return false;
 }
 
-export function pendingEvaluationJobMatches(submissionId: string | undefined, model: string, fingerprint: string): boolean {
-  const ref = read(referenceKey(submissionId, model, fingerprint));
+export function pendingEvaluationJobMatches(submissionId: string | undefined, model: string, fingerprint: string, owner?: string): boolean {
+  const ref = read(referenceKey(submissionId, model, fingerprint, owner));
   return !!ref?.pending && ref.submissionId === submissionId;
 }
 export async function queueEvaluation(input: {
   // Only requested jobs are created; page-open recovery checks the fingerprint first.
+  owner?: string;
   result: ExamResult;
   model: string;
   request: Record<string, unknown>;
@@ -61,13 +67,13 @@ export async function queueEvaluation(input: {
   rubricVersion?: string;
   force?: boolean;
 }): Promise<{ payload: any; model: string; keySource: "primary" | "backup"; acceptCache: () => Promise<void>; rejectCache: () => void } | null> {
-  const key = referenceKey(input.result.id, input.model, input.fingerprint);
+  const key = referenceKey(input.result.id, input.model, input.fingerprint, input.owner);
   const previous = read(key);
   const requestSignature = await instructionFingerprint(JSON.stringify(input.request));
   const reusable = previous?.pending || (!input.force && !previous?.failed && previous?.rubricVersion === input.rubricVersion && previous?.requestSignature === requestSignature);
   const ref: JobReference = previous && reusable ? previous : {
     id: createLogRequestId(), token: createLogRequestId(), fingerprint: input.fingerprint,
-    submissionId: input.result.id, pending: true,
+    submissionId: input.result.id, pending: true, expiresAt: Date.now() + 7 * 86400_000,
     rubricVersion: input.rubricVersion, requestSignature,
   };
   ref.pending = true;
@@ -93,6 +99,7 @@ export async function queueEvaluation(input: {
         supabase.auth.getSession(),
         new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), 3000); }),
       ]);
+      if (input.owner && session?.data.session?.user.id !== input.owner) throw interrupted();
       const token = session?.data.session?.access_token;
       if (token) auth = { Authorization: `Bearer ${token}` };
     } finally { clearTimeout(timer); }
@@ -133,7 +140,7 @@ export async function queueEvaluation(input: {
     : "Le service de correction en arrière-plan est indisponible. Votre texte est sauvegardé ; rouvrez cette rédaction pour reprendre la même demande.");
   let current = await readStatus(response);
   if (typeof window !== "undefined")
-    window.dispatchEvent(new CustomEvent("tcf-review-queued", { detail: { submissionId: input.result.id } }));
+    window.dispatchEvent(new CustomEvent("tcf-review-queued", { detail: { submissionId: input.result.id, owner: input.owner } }));
 
   let wake: (() => void) | undefined;
   let completionNotified = false;

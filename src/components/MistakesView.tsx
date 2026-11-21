@@ -1,12 +1,7 @@
+import { useWorkspace } from "../context/WorkspaceContext";
 import React, { useState, useMemo } from 'react';
 import { SavedMistake } from '../types/aiEvaluation';
-import {
-  CANONICAL_CATEGORIES,
-  CanonicalCategory,
-  CATEGORY_INFO,
-  deleteStoredMistake,
-  clearAllStoredMistakes
-} from '../utils/mistakesStorage';
+import { CANONICAL_CATEGORIES, CanonicalCategory, CATEGORY_INFO } from "../utils/mistakesStorage";
 import { useLanguage } from '../context/LanguageContext';
 import {
   ChevronDown,
@@ -33,6 +28,7 @@ export const MistakesView: React.FC<MistakesViewProps> = ({
   onStartExam,
   onGoToExams
 }) => {
+  const { deleteStoredMistake, clearAllStoredMistakes } = useWorkspace();
   const { language, t } = useLanguage();
 
   // Filter dropdown state

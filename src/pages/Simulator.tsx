@@ -1,3 +1,4 @@
+import { useWorkspace } from "../context/WorkspaceContext";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -16,13 +17,7 @@ import {
   Minimize2,
 } from "lucide-react";
 import type { ExamResult, TaskKey } from "../types/exam";
-import {
-  PracticeSession,
-  savePracticeSession,
-  sessionElapsed,
-  TASK_INFO,
-  TASK_KEYS,
-} from "../utils/practice";
+import { PracticeSession, sessionElapsed, TASK_INFO, TASK_KEYS } from "../utils/practice";
 import { countFrenchWords, formatTime } from "../utils/wordCount";
 import { cleanDocumentText, normalizeParagraphText } from "../utils/cleanText";
 import { WritingTemplatePanel } from "../components/WritingTemplatePanel";
@@ -198,6 +193,7 @@ export function Simulator({
   onCancelExam: () => void;
   onDraftChange: (session: PracticeSession) => void;
 }) {
+  const { savePracticeSession } = useWorkspace();
   const { language } = useLanguage();
   const en = language === "en";
   const [session, setSession] = useState(initialSession);

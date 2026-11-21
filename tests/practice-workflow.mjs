@@ -17,16 +17,19 @@ globalThis.localStorage = {
   removeItem: (key) => values.delete(key),
 };
 const practiceUrl = url(compile("src/utils/practice.ts"));
-const practice = await import(practiceUrl);
+const practiceModule = await import(practiceUrl);
+const practice = { ...practiceModule, ...practiceModule.draftStorage(localStorage) };
 const storageUrl = url(compile("src/utils/storage.ts"));
-const storage = await import(storageUrl);
-const backup = await import(
+const storageModule = await import(storageUrl);
+const storage = { ...storageModule, ...storageModule.submissionStorage(localStorage) };
+const backupModule = await import(
   url(
     compile("src/utils/backup.ts")
       .replace(/(['"])\.\/practice\1/, JSON.stringify(practiceUrl))
       .replace(/(['"])\.\/storage\1/, JSON.stringify(storageUrl)),
   )
 );
+const backup = backupModule.backupStorage(localStorage);
 const nclcUrl = url(compile("src/utils/nclcComparison.ts"));
 const reviews = await import(
   url(

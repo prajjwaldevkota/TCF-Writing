@@ -26,7 +26,6 @@ export function withGeminiReview(
 
 /** Keep practice context inside the existing feedback column; no database migration. */
 export function feedbackWithContext(result: ExamResult) {
-  if (!result.aiEvaluation) return null;
   return {
     ...result.aiEvaluation,
     practice_context: {

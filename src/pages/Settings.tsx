@@ -1,3 +1,4 @@
+import { useWorkspace } from "../context/WorkspaceContext";
 import { ErrorLogPanel } from "../components/ErrorLogPanel";
 import React, { useRef, useState } from "react";
 import {
@@ -11,7 +12,7 @@ import {
 import { useLanguage } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
 import { getGeminiModel } from "../utils/geminiSettings";
-import { createBackup, importBackup } from "../utils/backup";
+
 export function Settings({
   onLogin,
   onDataChange,
@@ -23,6 +24,7 @@ export function Settings({
   onSync: () => Promise<void>;
   syncStatus: string;
 }) {
+  const { createBackup, importBackup } = useWorkspace();
   const { language, setLanguage } = useLanguage();
   const { user, isConfigured, signOut, isAdmin } = useAuth();
   const en = language === "en";
@@ -142,8 +144,8 @@ export function Settings({
         </div>
         <p>
           {en
-            ? "Your finished work and unfinished session are saved in this browser. Export regularly if you use local mode or plan to switch devices. Backups do not contain API keys."
-            : "Vos rédactions et votre séance en cours sont enregistrées dans ce navigateur. Exportez-les régulièrement en mode local ou avant de changer d’appareil. Les sauvegardes ne contiennent pas de clés API."}
+            ? "Backups include writing, the current draft and learning progress from this workspace. Importing a backup adds its contents here."
+            : "Les sauvegardes incluent les rédactions, le brouillon et la progression de cet espace. Importer une sauvegarde ajoute son contenu ici."}
         </p>
         <div className="row wrap">
           <button className="button secondary" onClick={exportData}>
@@ -189,8 +191,8 @@ export function Settings({
           <p>
             {user
               ? en
-                ? "New writing is saved locally first. Use account sync to retrieve cloud submissions."
-                : "Les nouveaux textes sont d’abord enregistrés localement. La synchronisation du compte récupère les rédactions du cloud."
+                ? "Your writing and learning progress sync with your account. Drafts stay on this device."
+                : "Vos rédactions et votre progression sont synchronisées avec votre compte. Les brouillons restent sur cet appareil."
               : en
                 ? "An account is optional. You can practise and save your work on this device."
                 : "Le compte est facultatif. Vous pouvez vous entraîner et conserver votre travail sur cet appareil."}

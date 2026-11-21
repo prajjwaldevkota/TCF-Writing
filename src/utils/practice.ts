@@ -1,3 +1,4 @@
+import type { WorkspaceStorage } from "./workspaceStorage";
 import type {
   ExamAnswers,
   ExamCombination,
@@ -170,21 +171,24 @@ export function isPracticeSession(session: any): session is PracticeSession {
     typeof session.month === "string"
   );
 }
-export function loadPracticeSession(): PracticeSession | null {
-  try {
-    const session = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
-    return isPracticeSession(session) ? session : null;
-  } catch {
-    return null;
+export function draftStorage(store: WorkspaceStorage) {
+  function loadPracticeSession(): PracticeSession | null {
+    try {
+      const session = JSON.parse(store.getItem(DRAFT_KEY) || "null");
+      return isPracticeSession(session) ? session : null;
+    } catch {
+      return null;
+    }
   }
-}
-export function savePracticeSession(session: PracticeSession): boolean {
-  try {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(session));
-    return true;
-  } catch {
-    return false;
+  function savePracticeSession(session: PracticeSession): boolean {
+    try {
+      store.setItem(DRAFT_KEY, JSON.stringify(session));
+      return true;
+    } catch {
+      return false;
+    }
   }
+  return { loadPracticeSession, savePracticeSession };
 }
 export function sessionElapsed(
   session: PracticeSession,

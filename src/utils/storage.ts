@@ -1,90 +1,93 @@
+import type { WorkspaceStorage } from "./workspaceStorage";
 import { ExamResult } from '../types/exam';
 
 const STORAGE_KEY = 'tcf_exam_submissions_v1';
 
-export function getStoredSubmissions(): ExamResult[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    console.error('Error reading submissions from localStorage:', e);
-    return [];
-  }
-}
-
-export function saveSubmission(result: ExamResult): ExamResult {
-  const submissions = getStoredSubmissions();
-  
-  const dateFormatted = new Date().toLocaleString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-
-  const newSubmission: ExamResult = {
-    ...result,
-    id: result.id || `sub_${Date.now()}`,
-    date: result.date || dateFormatted
-  };
-
-  // Add to beginning of array
-  const updated = [newSubmission, ...submissions.filter(s => s.id !== newSubmission.id)];
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch (e) {
-    console.error('Error saving submission to localStorage:', e);
-  }
-
-  return newSubmission;
-}
-
-export function updateStoredSubmission(updatedResult: ExamResult): boolean {
-  try {
-    const submissions = getStoredSubmissions();
-    const index = submissions.findIndex((s) => s.id === updatedResult.id);
-    if (index !== -1) {
-      submissions[index] = { ...submissions[index], ...updatedResult };
-    } else {
-      submissions.unshift(updatedResult);
+export function submissionStorage(store: WorkspaceStorage) {
+  function getStoredSubmissions(): ExamResult[] {
+    try {
+      const raw = store.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      console.error('Error reading submissions from localStorage:', e);
+      return [];
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(submissions));
-    return true;
-  } catch (e) {
-    console.error('Error updating submission in localStorage:', e);
-    return false;
   }
-}
 
-export function deleteStoredSubmission(id: string): void {
-  try {
+  function saveSubmission(result: ExamResult): ExamResult {
     const submissions = getStoredSubmissions();
-    const updated = submissions.filter((sub) => sub.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch (e) {
-    console.error('Error deleting submission from localStorage:', e);
-  }
-}
 
-export function clearSubmissions(): void {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch (e) {
-    console.error('Error clearing submissions:', e);
-  }
-}
+    const dateFormatted = new Date().toLocaleString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
 
-export function syncStoredSubmissions(submissions: ExamResult[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(submissions));
-  } catch (e) {
-    console.error('Error syncing submissions to localStorage:', e);
-  }
-}
+    const newSubmission: ExamResult = {
+      ...result,
+      id: result.id || `sub_${Date.now()}`,
+      date: result.date || dateFormatted
+    };
 
+    // Add to beginning of array
+    const updated = [newSubmission, ...submissions.filter(s => s.id !== newSubmission.id)];
+    try {
+      store.setItem(STORAGE_KEY, JSON.stringify(updated));
+    } catch (e) {
+      console.error('Error saving submission to localStorage:', e);
+    }
+
+    return newSubmission;
+  }
+
+  function updateStoredSubmission(updatedResult: ExamResult): boolean {
+    try {
+      const submissions = getStoredSubmissions();
+      const index = submissions.findIndex((s) => s.id === updatedResult.id);
+      if (index !== -1) {
+        submissions[index] = { ...submissions[index], ...updatedResult };
+      } else {
+        submissions.unshift(updatedResult);
+      }
+      store.setItem(STORAGE_KEY, JSON.stringify(submissions));
+      return true;
+    } catch (e) {
+      console.error('Error updating submission in localStorage:', e);
+      return false;
+    }
+  }
+
+  function deleteStoredSubmission(id: string): void {
+    try {
+      const submissions = getStoredSubmissions();
+      const updated = submissions.filter((sub) => sub.id !== id);
+      store.setItem(STORAGE_KEY, JSON.stringify(updated));
+    } catch (e) {
+      console.error('Error deleting submission from localStorage:', e);
+    }
+  }
+
+  function clearSubmissions(): void {
+    try {
+      store.removeItem(STORAGE_KEY);
+    } catch (e) {
+      console.error('Error clearing submissions:', e);
+    }
+  }
+
+  function syncStoredSubmissions(submissions: ExamResult[]): void {
+    try {
+      store.setItem(STORAGE_KEY, JSON.stringify(submissions));
+    } catch (e) {
+      console.error('Error syncing submissions to localStorage:', e);
+    }
+  }
+  return { getStoredSubmissions, saveSubmission, updateStoredSubmission, deleteStoredSubmission, clearSubmissions, syncStoredSubmissions };
+}
 /**
  * Merges primary (e.g. Supabase) and secondary (e.g. LocalStorage) submissions
  * deduplicating by ID as well as matching combination & content.
@@ -123,6 +126,7 @@ export function mergeSubmissions(primary: ExamResult[], secondary: ExamResult[])
         existing.allocatedMinutes = sub.allocatedMinutes ?? existing.allocatedMinutes;
         existing.revisionOf = sub.revisionOf ?? existing.revisionOf;
         existing.createdAt = sub.createdAt ?? existing.createdAt;
+        if (sub.pendingAccountSave) existing.pendingAccountSave = true;
         existing.cloudId = sub.cloudId ?? existing.cloudId;
         existing.combination = sub.combination;
       }

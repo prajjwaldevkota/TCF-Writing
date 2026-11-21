@@ -1,3 +1,4 @@
+import { useWorkspace } from "../context/WorkspaceContext";
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
   ResponsiveContainer,
@@ -90,6 +91,7 @@ export const DashboardAnalytics: React.FC<DashboardAnalyticsProps> = ({
   onStartNewExam,
   onViewSubmission
 }) => {
+  const { store } = useWorkspace();
   const { language, t } = useLanguage();
   const [radarMode, setRadarMode] = useState<'target' | 'latest'>('target');
   const [showDemoPreview, setShowDemoPreview] = useState<boolean>(false);
@@ -97,7 +99,7 @@ export const DashboardAnalytics: React.FC<DashboardAnalyticsProps> = ({
   // Target Goal State (default B2, stored in localStorage)
   const [targetGoal, setTargetGoal] = useState<CefrLevel>(() => {
     try {
-      const stored = localStorage.getItem(TARGET_GOAL_STORAGE_KEY);
+      const stored = store.getItem(TARGET_GOAL_STORAGE_KEY);
       if (stored && ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].includes(stored)) {
         return stored as CefrLevel;
       }
@@ -110,7 +112,7 @@ export const DashboardAnalytics: React.FC<DashboardAnalyticsProps> = ({
   const handleSelectTargetGoal = (level: CefrLevel) => {
     setTargetGoal(level);
     try {
-      localStorage.setItem(TARGET_GOAL_STORAGE_KEY, level);
+      store.setItem(TARGET_GOAL_STORAGE_KEY, level);
       window.dispatchEvent(new Event('tcf_target_goal_updated'));
     } catch (e) {
       // ignore

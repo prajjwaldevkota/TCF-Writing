@@ -1,14 +1,15 @@
+import { useWorkspace } from "../context/WorkspaceContext";
 import { PedagogicalProgress } from '../components/PedagogicalProgress';
 import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { fetchSubmissionsFromSupabase, deleteSubmissionFromSupabase } from '../lib/supabase';
-import { getStoredSubmissions, deleteStoredSubmission, mergeSubmissions, syncStoredSubmissions } from '../utils/storage';
+import { mergeSubmissions } from "../utils/storage";
 import { ExamResult, TaskKey } from '../types/exam';
 import { SavedMistake, CefrLevel } from '../types/aiEvaluation';
 import { AdminPanel } from '../components/AdminPanel';
 import { MistakesView } from '../components/MistakesView';
 import { DashboardAnalytics } from '../components/DashboardAnalytics';
-import { getStoredMistakes, mergeMistakesFromSubmissions } from '../utils/mistakesStorage';
+
 import { useLanguage } from '../context/LanguageContext';
 import { mapScoreToTcfCanadaLevels } from '../services/geminiEvaluator';
 import {
@@ -40,6 +41,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   initialTab,
   onTabChange
 }) => {
+  const { getStoredSubmissions, deleteStoredSubmission, syncStoredSubmissions, getStoredMistakes, mergeMistakesFromSubmissions, store } = useWorkspace();
   const { user, userName, isConfigured, isAdmin } = useAuth();
   const { language, t } = useLanguage();
   const [submissions, setSubmissions] = useState<ExamResult[]>([]);
@@ -197,7 +199,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // Target Goal State (synced with localStorage key used in DashboardAnalytics)
   const [targetGoal, setTargetGoal] = useState<CefrLevel>(() => {
     try {
-      const stored = localStorage.getItem('tcf_user_target_goal_v1');
+      const stored = store.getItem('tcf_user_target_goal_v1');
       if (stored && ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].includes(stored)) {
         return stored as CefrLevel;
       }
@@ -208,7 +210,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   useEffect(() => {
     const syncGoal = () => {
       try {
-        const stored = localStorage.getItem('tcf_user_target_goal_v1');
+        const stored = store.getItem('tcf_user_target_goal_v1');
         if (stored && ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].includes(stored)) {
           setTargetGoal(stored as CefrLevel);
         }

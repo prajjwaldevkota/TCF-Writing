@@ -1,3 +1,4 @@
+import { useWorkspace } from "../context/WorkspaceContext";
 import React, { useEffect, useState } from "react";
 import {
   ArrowLeft,
@@ -14,14 +15,10 @@ import {
   Zap,
 } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
-import { getStoredMistakes, deleteStoredMistakes } from "../utils/mistakesStorage";
-import {
-  getReviewedMistakeIds, markMistakeReviewed, getMistakeLifecycle,
-  setMistakeCleanupDays, getCleanupCandidates, postponeMistakeCleanup,
-  initializeReviewedMistakeDates,
-  type CleanupDays,
-} from "../utils/mistakeLifecycle";
+
+import { type CleanupDays } from "../utils/mistakeLifecycle";
 export function Notebook({ onPractice }: { onPractice: () => void }) {
+  const { getReviewedMistakeIds, markMistakeReviewed, getMistakeLifecycle, setMistakeCleanupDays, getCleanupCandidates, postponeMistakeCleanup, initializeReviewedMistakeDates, getStoredMistakes, deleteStoredMistakes } = useWorkspace();
   const { language } = useLanguage();
   const en = language === "en";
   const [mistakes, setMistakes] = useState(() => getStoredMistakes());
@@ -173,8 +170,8 @@ export function Notebook({ onPractice }: { onPractice: () => void }) {
         </button>
       </div>
       <p className="footnote">{en
-        ? "Cleanup asks first. Removing a notebook correction keeps the original writing and feedback. This preference applies to this browser."
-        : "Le nettoyage demande votre accord. Supprimer une correction du carnet conserve la rédaction et son bilan. Ce réglage s’applique à ce navigateur."}</p>
+        ? "Cleanup asks first. Removing a notebook correction keeps the original writing and feedback."
+        : "Le nettoyage demande votre accord. Supprimer une correction du carnet conserve la rédaction et son bilan."}</p>
       {cleanupIds.length > 0 && (
         <div className="notice" role="status">
           <div>

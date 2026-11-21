@@ -26,7 +26,7 @@ are ignored. Keys in the same Google project share quota.
 ## Optional Supabase accounts
 
 Use your own project. Run `supabase/schema.sql`, followed by
-`supabase/repair-ai-feedback.sql`, in that project's SQL editor. Configure
+`supabase/repair-ai-feedback.sql` and [supabase/learning-progress.sql](supabase/learning-progress.sql) in that project's SQL editor. Configure
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. For two learners, create/invite
 both accounts and disable public sign-ups if you want invitation-only access.
 Keep the supplied row-level ownership policies enabled.
@@ -35,9 +35,16 @@ Sign in from Settings. New submissions are written locally before the cloud
 request starts. A failed cloud write does not remove local work. Feedback saves
 through the existing `ai_feedback` column; it also carries the practice context
 and original question snapshot for later retrieval. This needs no new database
-column. Unfinished drafts and correction-review status remain browser-local.
+column. Each account has its own offline cache and local draft. Favorites, notes,
+learning goals and notebook progress sync through the owner-protected
+`learning_progress` table. Guest practice has a separate local workspace.
 Use **Sync my account** to retrieve cloud submissions. The merge preserves local
 practice/revision metadata and the latest saved review for identical answers.
+
+Before upgrading a single-user browser, export its practice backup if it contains
+local-only work. Older browser-wide keys have no reliable owner. The app leaves
+them untouched and excludes them from account and guest workspaces. A learner
+can explicitly import their own backup in Settings.
 
 Existing records without feedback may lack practice metadata. Local metadata is
 preserved when available; the new app does not manufacture missing original

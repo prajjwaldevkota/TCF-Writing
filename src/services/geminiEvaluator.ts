@@ -75,6 +75,7 @@ export async function evaluateTcfSubmissionWithGemini(
   customApiKey?: string,
   requestedModel = getGeminiModel(getActiveEvaluatedTasks(result)),
   force = false,
+  owner?: string,
 ): Promise<AIEvaluation> {
   const requestId = createLogRequestId();
   try {
@@ -84,6 +85,7 @@ export async function evaluateTcfSubmissionWithGemini(
       requestedModel,
       requestId,
       force,
+      owner,
     );
   } catch (error) {
     const message =
@@ -101,6 +103,7 @@ async function evaluateGeminiRequest(
   requestedModel: string,
   requestId: string,
   force: boolean,
+  owner?: string,
 ): Promise<AIEvaluation> {
   const started = Date.now();
   let assessmentCode:
@@ -137,7 +140,7 @@ async function evaluateGeminiRequest(
     generationConfig,
   };
   const queued = customApiKey?.trim() ? null : await queueEvaluation({
-    result, model: requestedModel, request: requestBody, fingerprint: promptHash, language: feedbackLanguage, rubricVersion, force,
+    owner, result, model: requestedModel, request: requestBody, fingerprint: promptHash, language: feedbackLanguage, rubricVersion, force,
   });
   let payload: any = queued?.payload;
   let keySource: "primary" | "backup" = queued?.keySource || "primary";
@@ -159,7 +162,8 @@ async function evaluateGeminiRequest(
         continue;
       }
       const server = "server" in key && key.server;
-      const sessionToken = server ? (await supabase?.auth.getSession())?.data.session?.access_token : undefined;
+      const session = server ? (await supabase?.auth.getSession())?.data.session : undefined;
+      const sessionToken = !owner || session?.user.id === owner ? session?.access_token : undefined;
       if (server && !sessionToken) throw new Error(feedbackLanguage === "en"
         ? "Please sign in again to request a review." : "Reconnectez-vous pour demander une correction.");
       // A timeout or network failure can follow accepted work. Do not replay it.

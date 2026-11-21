@@ -1,3 +1,4 @@
+import { useWorkspace, WorkspaceProvider } from "./context/WorkspaceContext";
 import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { ThemeProvider } from "./context/ThemeContext";
 import { Home } from "./pages/Home";
@@ -6,16 +7,7 @@ import { AppLayout, AppView } from "./components/AppLayout";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LanguageProvider, useLanguage } from "./context/LanguageContext";
 import type { ExamResult, TaskKey } from "./types/exam";
-import {
-  DRAFT_KEY,
-  QuestionEntry,
-  loadPracticeSession,
-  makeSession,
-  PracticeSession,
-  savePracticeSession,
-  resultTimestamp,
-  practicedKeys,
-} from "./utils/practice";
+import { DRAFT_KEY, QuestionEntry, makeSession, PracticeSession, resultTimestamp, practicedKeys } from "./utils/practice";
 import {
   getCachedQuestions,
   loadQuestions,
@@ -44,20 +36,8 @@ const Notebook = lazy(() =>
 const Settings = lazy(() =>
   import("./pages/Settings").then((m) => ({ default: m.Settings })),
 );
-import {
-  getStoredSubmissions,
-  saveSubmission,
-  updateStoredSubmission,
-  mergeSubmissions,
-  syncStoredSubmissions,
-} from "./utils/storage";
-import { feedbackWithContext } from "./utils/reviewState";
-import { saveEvaluationMistakes } from "./utils/mistakesStorage";
-import {
-  fetchSubmissionsFromSupabase,
-  saveSubmissionToSupabase,
-  updateSubmissionAiFeedback,
-} from "./lib/supabase";
+import { syncAccountHistory } from "./services/submissionSync";
+import { syncLearningProgress } from "./services/learningProgress";
 const validViews: AppView[] = [
   "home",
   "library",
@@ -79,6 +59,7 @@ function route() {
   };
 }
 function MainRouter() {
+  const { getStoredSubmissions, saveSubmission, updateStoredSubmission, loadPracticeSession, savePracticeSession, saveEvaluationMistakes, store } = useWorkspace();
   const { user, userName, isConfigured, isPasswordRecovery, loading: authLoading } = useAuth();
   const { language } = useLanguage();
   const en = language === "en";
@@ -116,6 +97,37 @@ function MainRouter() {
   const { questions } = useQuestions(!showSplash);
   const [notice, setNotice] = useState("");
   const [syncStatus, setSyncStatus] = useState("");
+  const [progressVersion, setProgressVersion] = useState(0);
+  const [progressError, setProgressError] = useState(false);
+  const syncProgress = async () => {
+    try {
+      if (await syncLearningProgress(store)) setProgressVersion(v => v + 1);
+      setProgressError(false);
+    } catch {
+      setProgressError(true);
+    }
+  };
+  useEffect(() => {
+    if (!user || !isConfigured) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => void syncProgress(), 250);
+    };
+    const storageChanged = (event: StorageEvent) => {
+      if (event.key === store.progressKey) {
+        setProgressVersion(v => v + 1);
+        schedule();
+      }
+    };
+    const unsubscribe = store.subscribe(schedule);
+    window.addEventListener("storage", storageChanged);
+    return () => {
+      clearTimeout(timer);
+      unsubscribe();
+      window.removeEventListener("storage", storageChanged);
+    };
+  }, [store, isConfigured]);
   const syncedUser = useRef("");
   const refresh = () => {
     setSubmissions(
@@ -141,20 +153,23 @@ function MainRouter() {
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
-  const sync = async () => {
+  const syncQueue = useRef(Promise.resolve());
+  const sync = () => {
+    syncQueue.current = syncQueue.current.then(syncAccount, syncAccount);
+    return syncQueue.current;
+  };
+  const syncAccount = async () => {
     if (!user || !isConfigured) return;
+    const progress = syncProgress();
     setSyncStatus(en ? "Syncing account…" : "Synchronisation du compte…");
     try {
-      const response = await fetchSubmissionsFromSupabase(user.id);
-      if (response.error) throw response.error;
-      syncStoredSubmissions(
-        mergeSubmissions(response.submissions, getStoredSubmissions()),
-      );
+      await syncAccountHistory(store);
       refresh();
+      if (route().view === "results") setActive(getStoredSubmissions().find(s => s.id === route().id) ?? null);
       setSyncStatus(
         en
-          ? "Account synced. Your local drafts stay on this device."
-          : "Compte synchronisé. Vos brouillons locaux restent sur cet appareil.",
+          ? "Writing history synced. Your drafts stay on this device."
+          : "Historique synchronisé. Vos brouillons restent sur cet appareil.",
       );
     } catch (e) {
       setSyncStatus(
@@ -163,12 +178,16 @@ function MainRouter() {
           : "Synchronisation indisponible. Votre travail local reste accessible.",
       );
     }
+    await progress;
   };
   useEffect(() => {
     if (user && isConfigured && syncedUser.current !== user.id) {
       syncedUser.current = user.id;
       void sync();
     }
+    const reconnect = () => void sync();
+    window.addEventListener("online", reconnect);
+    return () => window.removeEventListener("online", reconnect);
   }, [user?.id, isConfigured]);
   const start = (
     entry: QuestionEntry,
@@ -224,7 +243,7 @@ function MainRouter() {
     if (entry) start(entry, task);
   };
   const saveReview = (result: ExamResult) => {
-    const stored = updateStoredSubmission(result);
+    const stored = updateStoredSubmission({ ...result, pendingAccountSave: Boolean(user && isConfigured) });
     if (!stored) {
       setActive((previous) => (previous?.id === result.id ? result : previous));
       setNotice(
@@ -237,23 +256,10 @@ function MainRouter() {
     saveEvaluationMistakes(result.aiEvaluation!, result);
     setActive((previous) => (previous?.id === result.id ? result : previous));
     refresh();
-    if (user && isConfigured && result.id) {
-      void updateSubmissionAiFeedback(
-        result.cloudId || result.id,
-        user.id,
-        feedbackWithContext(result),
-      ).then(({ error }) => {
-        if (error)
-          setSyncStatus(
-            en
-              ? "Feedback saved locally. Cloud sync failed."
-              : "Bilan sauvegardé localement. Synchronisation du cloud échouée.",
-          );
-      });
-    }
+    if (user && isConfigured) void sync();
   };
   const finish = (result: ExamResult): boolean => {
-    const saved = saveSubmission(result);
+    const saved = saveSubmission({ ...result, pendingAccountSave: Boolean(user && isConfigured) });
     if (!getStoredSubmissions().some((s) => s.id === saved.id)) {
       setNotice(
         en
@@ -262,49 +268,11 @@ function MainRouter() {
       );
       return false;
     }
-    localStorage.removeItem(DRAFT_KEY);
+    store.removeItem(DRAFT_KEY);
     setDraft(null);
     refresh();
     navigate("results", saved);
-    if (user && isConfigured) {
-      void saveSubmissionToSupabase(user.id, saved)
-        .then(async ({ data, error }) => {
-          if (error) {
-            setSyncStatus(
-              en
-                ? "Writing saved locally. Cloud copy unavailable."
-                : "Texte enregistré localement. Copie cloud indisponible.",
-            );
-            return;
-          }
-          if (data?.id) {
-            const latest = getStoredSubmissions().find(
-              (s) => s.id === saved.id,
-            );
-            if (latest) {
-              const updated = { ...latest, cloudId: data.id };
-              updateStoredSubmission(updated);
-              setActive((previous) =>
-                previous?.id === updated.id ? updated : previous,
-              );
-              refresh();
-              if (latest.aiEvaluation)
-                await updateSubmissionAiFeedback(
-                  data.id,
-                  user.id,
-                  feedbackWithContext(latest),
-                );
-            }
-          }
-        })
-        .catch(() =>
-          setSyncStatus(
-            en
-              ? "Writing saved locally. Cloud copy unavailable."
-              : "Texte enregistré localement. Copie cloud indisponible.",
-          ),
-        );
-    }
+    if (user && isConfigured) void sync();
     return true;
   };
   const name = user ? userName : en ? "My workspace" : "Mon espace";
@@ -344,7 +312,7 @@ function MainRouter() {
         />
       );
     if (view === "library")
-      return <PracticeLibrary onStart={start} submissions={submissions} />;
+      return <PracticeLibrary key={progressVersion} onStart={start} submissions={submissions} />;
     if (view === "templates")
       return <Templates onPractice={() => navigate("library")} />;
     if (view === "dashboard")
@@ -356,7 +324,7 @@ function MainRouter() {
         />
       );
     if (view === "notebook")
-      return <Notebook onPractice={() => navigate("library")} />;
+      return <Notebook key={progressVersion} onPractice={() => navigate("library")} />;
     if (view === "settings")
       return (
         <Settings
@@ -418,6 +386,9 @@ function MainRouter() {
 
   return (
     <AppLayout view={view} onNavigate={navigate} name={name} hasDraft={!!draft}>
+      {progressError && <p className="notice warning" role="status">{en
+        ? "Learning progress sync is unavailable. Changes are saved on this device. Retry in Settings."
+        : "La synchronisation de votre progression est indisponible. Les changements sont enregistrés sur cet appareil. Réessayez dans les réglages."}</p>}
       {notice && (
         <div className="notice warning" role="alert">
           {notice}
@@ -445,7 +416,7 @@ export function App() {
     <LanguageProvider>
       <ThemeProvider>
         <AuthProvider>
-          <MainRouter />
+          <WorkspaceProvider><MainRouter /></WorkspaceProvider>
         </AuthProvider>
       </ThemeProvider>
     </LanguageProvider>

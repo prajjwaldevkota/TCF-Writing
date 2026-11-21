@@ -44,6 +44,7 @@ export interface ExamResult {
   createdAt?: string;
   revisionOf?: string;
   cloudId?: string;
+  pendingAccountSave?: boolean;
   id?: string;
   date?: string;
   combination: ExamCombination;

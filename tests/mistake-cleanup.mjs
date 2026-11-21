@@ -14,15 +14,18 @@ globalThis.localStorage = {
   removeItem: key => values.delete(key),
 };
 const lifecycleUrl = url(compile("src/utils/mistakeLifecycle.ts"));
-const lifecycle = await import(lifecycleUrl);
+const lifecycleModule = await import(lifecycleUrl);
+const lifecycle = { ...lifecycleModule, ...lifecycleModule.notebookLifecycle(localStorage) };
 const storageUrl = url(compile("src/utils/storage.ts"));
-const mistakes = await import(url(compile("src/utils/mistakesStorage.ts")
+const mistakesModule = await import(url(compile("src/utils/mistakesStorage.ts")
   .replaceAll(/(["'])\.\/mistakeLifecycle\1/g, JSON.stringify(lifecycleUrl))
   .replace(/(["'])\.\/storage\1/, JSON.stringify(storageUrl))));
 const practiceUrl = url(compile("src/utils/practice.ts"));
-const backup = await import(url(compile("src/utils/backup.ts")
+const backupModule = await import(url(compile("src/utils/backup.ts")
   .replace(/(["'])\.\/storage\1/, JSON.stringify(storageUrl))
   .replace(/(["'])\.\/practice\1/, JSON.stringify(practiceUrl))));
+const mistakes = mistakesModule.notebookStorage(localStorage);
+const backup = backupModule.backupStorage(localStorage);
 const day = 86400_000;
 const now = Date.now();
 const first = { id: "one", original_text: "je suis aller", corrected_text: "je suis allé", explanation: "Accord", category: "Grammaire", submission_id: "essay-one", task_key: "task1", date: "today", timestamp: now - 365 * day };

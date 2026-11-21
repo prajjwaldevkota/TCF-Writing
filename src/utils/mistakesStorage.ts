@@ -1,7 +1,8 @@
+import type { WorkspaceStorage } from "./workspaceStorage";
 import { AIEvaluation, MistakeItem, SavedMistake } from '../types/aiEvaluation';
 import { ExamResult, TaskKey } from '../types/exam';
-import { getStoredSubmissions } from './storage';
-import { MISTAKES_STORAGE_KEY, filterDeletedMistakes, removeMistakes } from './mistakeLifecycle';
+import { submissionStorage } from './storage';
+import { MISTAKES_STORAGE_KEY, notebookLifecycle, mistakeFingerprint } from './mistakeLifecycle';
 
 export { MISTAKES_STORAGE_KEY } from './mistakeLifecycle';
 
@@ -119,193 +120,200 @@ export const CATEGORY_INFO: Record<
   }
 };
 
-/**
- * Read stored mistakes from localStorage, auto-syncing from past submissions if empty.
- */
-export function getStoredMistakes(): SavedMistake[] {
-  try {
-    const raw = localStorage.getItem(MISTAKES_STORAGE_KEY);
-    let mistakes: SavedMistake[] = [];
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        mistakes = parsed;
+export function notebookStorage(store: WorkspaceStorage) {
+  const { getStoredSubmissions } = submissionStorage(store);
+  const { filterDeletedMistakes, removeMistakes } = notebookLifecycle(store);
+  /**
+   * Read stored mistakes from localStorage, auto-syncing from past submissions if empty.
+   */
+  function getStoredMistakes(): SavedMistake[] {
+    try {
+      const raw = store.getItem(MISTAKES_STORAGE_KEY);
+      let mistakes: SavedMistake[] = [];
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          mistakes = parsed;
+        }
       }
-    }
 
-    // Auto-seed/sync from stored submissions if any exist
-    const submissions = getStoredSubmissions();
-    const synced = submissions && submissions.length > 0
-      ? mergeMistakesFromSubmissions(mistakes, submissions)
-      : filterDeletedMistakes(mistakes);
-    if (synced.length !== mistakes.length) {
-      localStorage.setItem(MISTAKES_STORAGE_KEY, JSON.stringify(synced));
-    }
-    return synced;
-  } catch (err) {
-    console.error('Error reading mistakes from localStorage:', err);
-    return [];
-  }
-}
-
-/**
- * Save mistakes found in a newly performed AI evaluation.
- */
-export function saveEvaluationMistakes(evaluation: AIEvaluation, result: ExamResult): SavedMistake[] {
-  if (!evaluation || !evaluation.tasks) {
-    return getStoredMistakes();
-  }
-
-  const existingMistakes = getStoredMistakes();
-  const newMistakes: SavedMistake[] = [];
-
-  const comboNum = result.combination?.combinationNumber || result.combination?.combination || 1;
-  const examTitle = `Combinaison ${comboNum} (${result.month} ${result.year})`;
-  const dateFormatted = result.date || new Date().toLocaleString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-  const now = Date.now();
-
-  const taskKeys: TaskKey[] = ['task1', 'task2', 'task3'];
-  let counter = 0;
-
-  for (const tKey of taskKeys) {
-    const taskEval = evaluation.tasks[tKey];
-    if (!taskEval || !Array.isArray(taskEval.mistakes)) continue;
-
-    const taskLabel = tKey === 'task1' ? 'Tâche 1' : tKey === 'task2' ? 'Tâche 2' : 'Tâche 3';
-
-    for (const item of taskEval.mistakes) {
-      if (!item.original_text && !item.corrected_text) continue;
-
-      const normCategory = normalizeCategory(item.category);
-      counter++;
-
-      const savedItem: SavedMistake = {
-        id: `mst_${now}_${counter}_${Math.random().toString(36).slice(2, 7)}`,
-        category: normCategory,
-        original_text: item.original_text || '',
-        corrected_text: item.corrected_text || '',
-        explanation: item.explanation || '',
-        task_key: tKey,
-        task_name: taskLabel,
-        submission_id: result.id,
-        exam_title: examTitle,
-        date: dateFormatted,
-        timestamp: now
-      };
-
-      // Check if duplicate already exists
-      const isDuplicate = existingMistakes.some(
-        (m) =>
-          m &&
-          (m.original_text || '').trim() === (savedItem.original_text || '').trim() &&
-          (m.corrected_text || '').trim() === (savedItem.corrected_text || '').trim() &&
-          m.submission_id === savedItem.submission_id
-      ) || newMistakes.some(
-        (m) =>
-          m &&
-          (m.original_text || '').trim() === (savedItem.original_text || '').trim() &&
-          (m.corrected_text || '').trim() === (savedItem.corrected_text || '').trim() &&
-          m.task_key === savedItem.task_key
-      );
-
-      if (!isDuplicate) {
-        newMistakes.push(savedItem);
+      // Auto-seed/sync from stored submissions if any exist
+      const submissions = getStoredSubmissions();
+      const synced = submissions && submissions.length > 0
+        ? mergeMistakesFromSubmissions(mistakes, submissions)
+        : filterDeletedMistakes(mistakes);
+      if (synced.length !== mistakes.length) {
+        store.setItem(MISTAKES_STORAGE_KEY, JSON.stringify(synced));
       }
+      return synced;
+    } catch (err) {
+      console.error('Error reading mistakes from localStorage:', err);
+      return [];
     }
   }
 
-  const updated = filterDeletedMistakes([...newMistakes, ...existingMistakes]);
-  try {
-    localStorage.setItem(MISTAKES_STORAGE_KEY, JSON.stringify(updated));
-  } catch (e) {
-    console.error('Error saving mistakes to localStorage:', e);
-  }
+  /**
+   * Save mistakes found in a newly performed AI evaluation.
+   */
+  function saveEvaluationMistakes(evaluation: AIEvaluation, result: ExamResult): SavedMistake[] {
+    if (!evaluation || !evaluation.tasks) {
+      return getStoredMistakes();
+    }
 
-  return updated;
-}
+    const existingMistakes = getStoredMistakes();
+    const newMistakes: SavedMistake[] = [];
 
-/**
- * Merge mistakes from an array of submissions into existing mistakes
- */
-export function mergeMistakesFromSubmissions(
-  existing: SavedMistake[],
-  submissions: ExamResult[]
-): SavedMistake[] {
-  if (!Array.isArray(existing) || !Array.isArray(submissions)) {
-    return Array.isArray(existing) ? existing : [];
-  }
-
-  const result: SavedMistake[] = [...existing];
-  let counter = 0;
-
-  for (const sub of submissions) {
-    if (!sub || !sub.aiEvaluation || !sub.aiEvaluation.tasks) continue;
-
-    const comboNum = sub.combination?.combinationNumber || sub.combination?.combination || 1;
-    const examTitle = `Combinaison ${comboNum} (${sub.month || ''} ${sub.year || ''})`;
-    const dateFormatted = sub.date || '—';
+    const comboNum = result.combination?.combinationNumber || result.combination?.combination || 1;
+    const examTitle = `Combinaison ${comboNum} (${result.month} ${result.year})`;
+    const dateFormatted = result.date || new Date().toLocaleString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    const now = Date.now();
 
     const taskKeys: TaskKey[] = ['task1', 'task2', 'task3'];
+
+
     for (const tKey of taskKeys) {
-      const taskEval = sub.aiEvaluation.tasks[tKey];
+      const taskEval = evaluation.tasks[tKey];
       if (!taskEval || !Array.isArray(taskEval.mistakes)) continue;
 
       const taskLabel = tKey === 'task1' ? 'Tâche 1' : tKey === 'task2' ? 'Tâche 2' : 'Tâche 3';
 
       for (const item of taskEval.mistakes) {
-        if (!item || (!item.original_text && !item.corrected_text)) continue;
+        if (!item.original_text && !item.corrected_text) continue;
 
-        const isDuplicate = result.some(
+        const normCategory = normalizeCategory(item.category);
+
+
+        const savedItem: SavedMistake = {
+          id: mistakeFingerprint({ submission_id: result.id, exam_title: examTitle, task_key: tKey,
+              original_text: item.original_text || "", corrected_text: item.corrected_text || "" }),
+          category: normCategory,
+          original_text: item.original_text || '',
+          corrected_text: item.corrected_text || '',
+          explanation: item.explanation || '',
+          task_key: tKey,
+          task_name: taskLabel,
+          submission_id: result.id,
+          exam_title: examTitle,
+          date: dateFormatted,
+          timestamp: now
+        };
+
+        // Check if duplicate already exists
+        const isDuplicate = existingMistakes.some(
           (m) =>
             m &&
-            (m.original_text || '').trim() === (item.original_text || '').trim() &&
-            (m.corrected_text || '').trim() === (item.corrected_text || '').trim() &&
-            (m.submission_id === sub.id || m.exam_title === examTitle)
+            (m.original_text || '').trim() === (savedItem.original_text || '').trim() &&
+            (m.corrected_text || '').trim() === (savedItem.corrected_text || '').trim() &&
+            m.submission_id === savedItem.submission_id
+        ) || newMistakes.some(
+          (m) =>
+            m &&
+            (m.original_text || '').trim() === (savedItem.original_text || '').trim() &&
+            (m.corrected_text || '').trim() === (savedItem.corrected_text || '').trim() &&
+            m.task_key === savedItem.task_key
         );
 
         if (!isDuplicate) {
-          counter++;
-          result.push({
-            id: `mst_sync_${Date.now()}_${counter}_${Math.random().toString(36).slice(2, 6)}`,
-            category: normalizeCategory(item.category),
-            original_text: item.original_text || '',
-            corrected_text: item.corrected_text || '',
-            explanation: item.explanation || '',
-            task_key: tKey,
-            task_name: taskLabel,
-            submission_id: sub.id,
-            exam_title: examTitle,
-            date: dateFormatted,
-            timestamp: Date.now()
-          });
+          newMistakes.push(savedItem);
         }
       }
     }
+
+    const updated = filterDeletedMistakes([...newMistakes, ...existingMistakes]);
+    try {
+      store.setItem(MISTAKES_STORAGE_KEY, JSON.stringify(updated));
+    } catch (e) {
+      console.error('Error saving mistakes to localStorage:', e);
+    }
+
+    return updated;
   }
 
-  return filterDeletedMistakes(result);
-}
+  /**
+   * Merge mistakes from an array of submissions into existing mistakes
+   */
+  function mergeMistakesFromSubmissions(
+    existing: SavedMistake[],
+    submissions: ExamResult[]
+  ): SavedMistake[] {
+    if (!Array.isArray(existing) || !Array.isArray(submissions)) {
+      return Array.isArray(existing) ? existing : [];
+    }
 
-/**
- * Delete a mistake by id
- */
-export function deleteStoredMistake(id: string): SavedMistake[] {
-  return deleteStoredMistakes([id]);
-}
-export function deleteStoredMistakes(ids: string[]): SavedMistake[] {
-  return removeMistakes(getStoredMistakes(), ids);
-}
+    const result: SavedMistake[] = [...existing];
 
-/**
- * Clear all stored mistakes
- */
-export function clearAllStoredMistakes(): void {
-  const mistakes = getStoredMistakes();
-  removeMistakes(mistakes, mistakes.map(m => m.id));
+
+    for (const sub of submissions) {
+      if (!sub || !sub.aiEvaluation || !sub.aiEvaluation.tasks) continue;
+
+      const comboNum = sub.combination?.combinationNumber || sub.combination?.combination || 1;
+      const examTitle = `Combinaison ${comboNum} (${sub.month || ''} ${sub.year || ''})`;
+      const dateFormatted = sub.date || '—';
+
+      const taskKeys: TaskKey[] = ['task1', 'task2', 'task3'];
+      for (const tKey of taskKeys) {
+        const taskEval = sub.aiEvaluation.tasks[tKey];
+        if (!taskEval || !Array.isArray(taskEval.mistakes)) continue;
+
+        const taskLabel = tKey === 'task1' ? 'Tâche 1' : tKey === 'task2' ? 'Tâche 2' : 'Tâche 3';
+
+        for (const item of taskEval.mistakes) {
+          if (!item || (!item.original_text && !item.corrected_text)) continue;
+
+          const isDuplicate = result.some(
+            (m) =>
+              m &&
+              (m.original_text || '').trim() === (item.original_text || '').trim() &&
+              (m.corrected_text || '').trim() === (item.corrected_text || '').trim() &&
+              (m.submission_id === sub.id || m.exam_title === examTitle)
+          );
+
+          if (!isDuplicate) {
+
+            result.push({
+              id: mistakeFingerprint({ submission_id: sub.id, exam_title: examTitle, task_key: tKey,
+              original_text: item.original_text || "", corrected_text: item.corrected_text || "" }),
+              category: normalizeCategory(item.category),
+              original_text: item.original_text || '',
+              corrected_text: item.corrected_text || '',
+              explanation: item.explanation || '',
+              task_key: tKey,
+              task_name: taskLabel,
+              submission_id: sub.id,
+              exam_title: examTitle,
+              date: dateFormatted,
+              timestamp: Date.now()
+            });
+          }
+        }
+      }
+    }
+
+    return filterDeletedMistakes(result);
+  }
+
+  /**
+   * Delete a mistake by id
+   */
+  function deleteStoredMistake(id: string): SavedMistake[] {
+    return deleteStoredMistakes([id]);
+  }
+  function deleteStoredMistakes(ids: string[]): SavedMistake[] {
+    return removeMistakes(getStoredMistakes(), ids);
+  }
+
+  /**
+   * Clear all stored mistakes
+   */
+  function clearAllStoredMistakes(): void {
+    const mistakes = getStoredMistakes();
+    removeMistakes(mistakes, mistakes.map(m => m.id));
+  }
+  return { getStoredMistakes, saveEvaluationMistakes, mergeMistakesFromSubmissions, deleteStoredMistake, deleteStoredMistakes, clearAllStoredMistakes };
 }

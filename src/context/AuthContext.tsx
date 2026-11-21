@@ -122,10 +122,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     }, 4000);
 
-    // Initialize Supabase Auth session
+    let receivedAuthEvent = false;
+    // An older session lookup must never overwrite a newer sign-in or sign-out.
     supabase.auth
       .getSession()
       .then(({ data: { session } }) => {
+        if (receivedAuthEvent) return;
         clearTimeout(sessionTimeout);
         setSession(session);
         setUser(session?.user ?? null);
@@ -140,6 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const {
       data: { subscription }
     } = supabase.auth.onAuthStateChange((event, session) => {
+      receivedAuthEvent = true;
       clearTimeout(sessionTimeout);
       setSession(session);
       setUser(session?.user ?? null);
@@ -151,6 +154,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       clearTimeout(sessionTimeout);
+      receivedAuthEvent = true;
       subscription.unsubscribe();
     };
   }, []);

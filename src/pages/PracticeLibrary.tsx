@@ -1,3 +1,4 @@
+import { useWorkspace } from "../context/WorkspaceContext";
 import React, { useMemo, useState } from "react";
 import {
   ArrowRight,
@@ -40,6 +41,7 @@ export const PracticeLibrary: React.FC<{
   onStart: (entry: QuestionEntry, task: TaskKey | "exam") => void;
   submissions: ExamResult[];
 }> = ({ onStart, submissions }) => {
+  const { store } = useWorkspace();
   const { language } = useLanguage();
   const en = language === "en";
   const { questions: allQuestions, loading } = useQuestions();
@@ -52,7 +54,7 @@ export const PracticeLibrary: React.FC<{
   const [saved, setSaved] = useState<string[]>(() => {
     try {
       const value = JSON.parse(
-        localStorage.getItem("tcf_favorite_topics") || "[]",
+        store.getItem("tcf_favorite_topics") || "[]",
       );
       return Array.isArray(value) && value.every((id) => typeof id === "string")
         ? value
@@ -118,7 +120,7 @@ export const PracticeLibrary: React.FC<{
       : [...saved, id];
     setSaved(next);
     try {
-      localStorage.setItem("tcf_favorite_topics", JSON.stringify(next));
+      store.setItem("tcf_favorite_topics", JSON.stringify(next));
     } catch {
       setNotice(
         en

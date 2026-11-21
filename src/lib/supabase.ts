@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { feedbackWithContext } from '../utils/reviewState';
 import { ExamResult, ExamCombination } from '../types/exam';
 import questionsData from '../data/questions.json';
 
@@ -64,7 +65,7 @@ export async function saveSubmissionToSupabase(
     return { data: null, error: new Error('Supabase configuration missing.') };
   }
 
-  const now = new Date();
+  const now = result.createdAt ? new Date(result.createdAt) : new Date();
   const completedAt = getLocalISOString(now);
   const calculatedStartedAt = startedAt
     ? startedAt
@@ -73,6 +74,7 @@ export async function saveSubmissionToSupabase(
   const payload = {
     ...(result.id && /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(result.id) ? {id: result.id} : {}),
     user_id: userId,
+    ai_feedback: feedbackWithContext(result),
     year: result.year,
     month: result.month,
     combination: result.combination.combinationNumber || result.combination.combination,
@@ -176,7 +178,7 @@ export async function fetchSubmissionsFromSupabase(
         task2: row.task2_word_count,
         task3: row.task3_word_count
       },
-      aiEvaluation: (row as any).ai_feedback || undefined
+      aiEvaluation: Object.keys((row as any).ai_feedback || {}).some(key => key !== "practice_context") ? (row as any).ai_feedback : undefined
     };
   });
 
