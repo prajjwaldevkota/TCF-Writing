@@ -6,7 +6,7 @@ export function prepareGeminiRequest(model: string, request: Record<string, unkn
     ...request,
     generationConfig: {
       ...(config && typeof config === "object" ? config : {}),
-      thinkingConfig: { thinkingLevel: "LOW" },
+      thinkingConfig: { thinkingLevel: "MEDIUM" },
     },
   };
 }
