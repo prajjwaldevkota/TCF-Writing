@@ -91,6 +91,7 @@ try {
     assert.equal(calls.length, 1);
     assert.equal(calls[0].options.headers["x-goog-api-key"], key);
     assert(calls[0].url.includes("gemini-4-hydrogen:generateContent"));
+    assert.equal(JSON.parse(calls[0].options.body).generationConfig.thinkingConfig.thinkingLevel, "LOW");
     assert(!JSON.stringify([...response.headers]).includes("sentinel"));
     assert(!(await response.text()).includes("sentinel"));
   }
