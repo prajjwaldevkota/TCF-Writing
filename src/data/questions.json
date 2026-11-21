@@ -7700,6 +7700,30 @@
             "document2": "Iris, 34 ans : « Dans l’entreprise où je travaille, les employés sont autorisés à venir avec leur animal de compagnie, chat ou chien. Personnellement, cela me dérange. Je ne suis pas très à l’aise avec les animaux, qui peuvent avoir des comportements imprévisibles. D’autre part, je trouve que cela peut poser des problèmes de santé. Que faire si un employé est allergique aux chats ? Sera-t-il obligé de rester enfermé dans son bureau ? Et puis c’est aussi une source de distraction. Mes collègues et moi ne serons pas plus productifs grâce à un chien ou un chat ! »"
           }
         }
+      },
+      {
+        "combination": 860,
+        "combinationNumber": 58,
+        "tasks": {
+          "task1": {
+            "instruction": "Écrivez un message à votre ami(e) pour lui décrire le programme de vos prochaines vacances (lieu, date, activités, etc.).",
+            "minWords": 60,
+            "maxWords": 120
+          },
+          "task2": {
+            "instruction": "Écrivez un article de blog sur un évènement auquel vous avez assisté récemment (festival, cérémonie, fête, etc.).",
+            "minWords": 120,
+            "maxWords": 150
+          },
+          "task3": {
+            "instruction": "Le vélo en ville",
+            "title": "Le vélo en ville",
+            "minWords": 120,
+            "maxWords": 180,
+            "document1": "Quand on parle de vélo, on pense systématiquement à deux choses : sport et loisir. On oublie souvent que c’est avant tout un mode de déplacement personnel et professionnel. En ville, c’est un moyen de transport rapide et déstressant puisqu’il permet d’éviter les interminables embouteillages aux heures de pointe. Se rendre au travail tout en faisant du sport, c’est joindre l’utile à l’agréable.",
+            "document2": "Avec tous les accidents de la route observés annuellement, sortir son vélo pour se déplacer avec en ville peut être très dangereux. En effet, avec la densité importante de véhicules, le non-respect du Code de la route et le manque de pistes cyclables, pratiquer du vélo en zone urbaine présente de vrais risques d’accident. De plus, faire du vélo de nos jours, c’est s’exposer à des gaz d’échappement toxiques et nocifs pour la santé humaine."
+          }
+        }
       }
     ]
   },
