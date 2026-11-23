@@ -20,8 +20,10 @@ import type { ExamResult, TaskKey } from "../types/exam";
 import { PracticeSession, sessionElapsed, TASK_INFO, TASK_KEYS } from "../utils/practice";
 import { countFrenchWords, formatTime } from "../utils/wordCount";
 import { cleanDocumentText, normalizeParagraphText } from "../utils/cleanText";
-import { WritingTemplatePanel } from "../components/WritingTemplatePanel";
 import { useLanguage } from "../context/LanguageContext";
+const WritingTemplatePanel = React.lazy(() => import("../components/WritingTemplatePanel")
+  .then(module => ({ default: module.WritingTemplatePanel })));
+
 const CHECKS = {
   task1: [
     "Le destinataire et le but du message sont clairs.",
@@ -89,7 +91,7 @@ const SessionTimerControls: React.FC<{
   return (
     <div className={`writing-clock ${isExam && timeLeft < 300 ? "urgent" : ""}`}>
       <Clock3 size={22} aria-hidden="true" />
-      <span>{formatTime(isExam ? timeLeft : elapsed)}</span>
+      <span role="timer" aria-label={isExam ? (en ? "Time left" : "Temps restant") : (en ? "Elapsed time" : "Temps écoulé")}>{formatTime(isExam ? timeLeft : elapsed)}</span>
       <small>
         {isExam
           ? en
@@ -199,7 +201,7 @@ export function Simulator({
   const [session, setSession] = useState(initialSession);
   const [saved, setSaved] = useState(true);
   const [focusWriting, setFocusWriting] = useState(false);
-  const [mobilePromptOpen, setMobilePromptOpen] = useState(true);
+  const [mobilePromptOpen, setMobilePromptOpen] = useState(initialSession.mode !== "exam");
   const [accentsOpen, setAccentsOpen] = useState(false);
   const [uppercaseAccents, setUppercaseAccents] = useState(false);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
@@ -459,7 +461,7 @@ export function Simulator({
   };
   return (
     <div
-      className={`writing-workspace focused-workspace ${focusWriting ? "writing-only" : ""}`}
+      className={`writing-workspace focused-workspace ${isExam ? "exam-workspace" : ""} ${focusWriting ? "writing-only" : ""}`}
     >
       <header className="writing-session-header">
         <div className="writing-session-title">
@@ -634,13 +636,16 @@ export function Simulator({
                   ? en
                     ? "Collapse prompt"
                     : "Réduire la consigne"
-                  : en
+                  : task === "task3"
+                    ? (en ? "Read prompt and documents" : "Lire la consigne et les documents")
+                    : en
                     ? "Read the prompt"
                     : "Lire la consigne"}
                 <ChevronDown size={15} />
               </button>
               <button
                 onClick={() => {
+                  if (isExam) setMobilePromptOpen(false);
                   textRef.current?.focus({ preventScroll: true });
                   textRef.current?.scrollIntoView({ block: "center" });
                 }}
@@ -970,11 +975,13 @@ export function Simulator({
         </section>
       </div>
       {templates && !isExam && (
-        <WritingTemplatePanel
-          activeTask={task}
-          isPracticeMode
-          onClose={() => setTemplates(false)}
-        />
+        <React.Suspense fallback={<p role="status">{en ? "Loading templates…" : "Chargement des modèles…"}</p>}>
+          <WritingTemplatePanel
+            activeTask={task}
+            isPracticeMode
+            onClose={() => setTemplates(false)}
+          />
+        </React.Suspense>
       )}
       {finish && (
         <div className="modal-overlay" onClick={() => setFinish(false)}>

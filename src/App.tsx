@@ -11,7 +11,6 @@ import { DRAFT_KEY, QuestionEntry, makeSession, PracticeSession, resultTimestamp
 import {
   getCachedQuestions,
   loadQuestions,
-  prefetchQuestionsIdle,
   useQuestions,
 } from "./utils/questionsLoader";
 
@@ -66,9 +65,6 @@ function MainRouter() {
   const { user, userName, isConfigured, isPasswordRecovery, loading: authLoading } = useAuth();
   const { language } = useLanguage();
   const en = language === "en";
-  useEffect(() => {
-    prefetchQuestionsIdle();
-  }, []);
   const [reviewTask, setReviewTask] = useState(route().task);
   const [view, setView] = useState<AppView>(() => route().view);
   const [submissions, setSubmissions] = useState(() =>
@@ -99,7 +95,7 @@ function MainRouter() {
     isPasswordRecovery ||
     view === "login" ||
     (!authLoading && !user && !guestDismissed && view === "home");
-  const { questions } = useQuestions(!showSplash);
+  const { questions } = useQuestions(view === "home" && !showSplash);
   const [notice, setNotice] = useState("");
   const [syncStatus, setSyncStatus] = useState("");
   const [progressVersion, setProgressVersion] = useState(0);

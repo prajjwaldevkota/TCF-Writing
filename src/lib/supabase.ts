@@ -1,7 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { feedbackWithContext } from '../utils/reviewState';
-import { ExamResult, ExamCombination } from '../types/exam';
-import questionsData from '../data/questions.json';
+import { ExamResult, ExamCombination, QuestionsDB } from '../types/exam';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 
@@ -103,6 +102,14 @@ export async function saveSubmissionToSupabase(
   return { data, error: null };
 }
 
+function savedCombination(row: DBSubmission): ExamCombination | undefined {
+  const combo = (row as any).ai_feedback?.practice_context?.combination;
+  return combo?.tasks && ['task1','task2','task3'].every(key =>
+    typeof combo.tasks[key]?.instruction === 'string' &&
+    typeof combo.tasks[key]?.minWords === 'number' &&
+    typeof combo.tasks[key]?.maxWords === 'number') ? combo : undefined;
+}
+
 /**
  * Fetches past submissions for the logged in user from Supabase RLS
  */
@@ -124,11 +131,14 @@ export async function fetchSubmissionsFromSupabase(
     return { submissions: [], error: new Error(error.message) };
   }
 
-  const db = questionsData as any;
+  const rows: DBSubmission[] = data || [];
+  const db: QuestionsDB | undefined = rows.some(row => !savedCombination(row))
+    ? (await import('../data/questions.json')).default as QuestionsDB
+    : undefined;
 
-  const mappedSubmissions: ExamResult[] = (data || []).map((row: DBSubmission) => {
+  const mappedSubmissions: ExamResult[] = rows.map((row) => {
     // Reconstruct ExamCombination from questionsData if available, or build fallback
-    const combosForMonth = (db[row.year] && db[row.year][row.month]) || [];
+    const combosForMonth = db?.[row.year]?.[row.month] || [];
     const matchedCombo = combosForMonth.find(
       (c: ExamCombination) => (c.combinationNumber || c.combination) === row.combination
     );
@@ -152,8 +162,6 @@ export async function fetchSubmissionsFromSupabase(
     });
 
     const context = (row as any).ai_feedback?.practice_context;
-    const originalCombination = context?.combination;
-    const validSnapshot = originalCombination?.tasks && ['task1','task2','task3'].every(k => typeof originalCombination.tasks[k]?.instruction === 'string' && typeof originalCombination.tasks[k]?.minWords === 'number' && typeof originalCombination.tasks[k]?.maxWords === 'number');
     const inferredPractice = !context && (row as any).ai_feedback?.evaluated_tasks?.length < 3;
     return {
       isPracticeMode: typeof context?.isPracticeMode === 'boolean' ? context.isPracticeMode : inferredPractice || undefined,
@@ -164,7 +172,7 @@ export async function fetchSubmissionsFromSupabase(
       id: row.id,
       createdAt: context?.createdAt || row.completed_at || row.created_at,
       date: dateFormatted,
-      combination: validSnapshot ? originalCombination : fallbackCombo,
+      combination: savedCombination(row) ?? fallbackCombo,
       year: row.year,
       month: row.month,
       timeUsedSeconds: row.duration_seconds,

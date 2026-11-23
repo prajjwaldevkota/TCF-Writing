@@ -57,7 +57,6 @@ export function loadQuestions(): Promise<QuestionEntry[]> {
     pendingPromise = import("../data/questions.json")
       .then((mod) => {
         const entries = questionEntries((mod.default ?? mod) as QuestionsDB);
-        for (const entry of entries) computeMeta(entry);
         cachedEntries = entries;
         return entries;
       })
@@ -67,18 +66,6 @@ export function loadQuestions(): Promise<QuestionEntry[]> {
       });
   }
   return pendingPromise;
-}
-
-export function prefetchQuestionsIdle(): void {
-  if (cachedEntries || pendingPromise || typeof window === "undefined") return;
-  const run = () => {
-    void loadQuestions().catch(() => {});
-  };
-  if ("requestIdleCallback" in window) {
-    (window as any).requestIdleCallback(run, { timeout: 1200 });
-  } else {
-    globalThis.setTimeout(run, 180);
-  }
 }
 
 export function useQuestions(enabled = true): {
