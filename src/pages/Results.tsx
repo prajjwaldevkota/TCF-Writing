@@ -32,6 +32,7 @@ import { SubmissionExport } from "../components/SubmissionExport";
 import { EvaluationStepper } from "../components/EvaluationStepper";
 export function Results({
   result,
+  initialTask,
   onSave,
   onRevise,
   onHomeClick,
@@ -40,6 +41,7 @@ export function Results({
   onLogin,
 }: {
   result: ExamResult;
+  initialTask?: TaskKey;
   onSave: (result: ExamResult) => void;
   onRevise: (result: ExamResult, key: TaskKey) => void;
   onHomeClick: () => void;
@@ -52,7 +54,7 @@ export function Results({
   const { language } = useLanguage();
   const en = language === "en";
   const keys = result.isPracticeMode ? practicedKeys(result) : TASK_KEYS;
-  const [active, setActive] = useState<TaskKey>(keys[0] || "task1");
+  const [active, setActive] = useState<TaskKey>(initialTask && keys.includes(initialTask) ? initialTask : keys[0] || "task1");
   const [section, setSection] = useState<"feedback" | "answer" | "corrections" | "examples" | null>(null);
   const [busy, setBusy] = useState(false);
   const [background, setBackground] = useState(() => hasPendingEvaluationJob(result.id, user?.id));

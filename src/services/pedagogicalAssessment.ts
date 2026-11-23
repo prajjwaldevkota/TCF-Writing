@@ -55,6 +55,11 @@ export function findOriginalExcerpt(original:string,quote:string):string|null {
   return index<0?null:original.slice(source.starts[index],source.ends[index+target.length-1]);
 }
 
+// Compare whole words, allowing French typographic and punctuation differences.
+function comparisonWords(text: string): string {
+  return (text.normalize('NFC').toLowerCase().match(/[\p{L}\p{M}\p{N}]+/gu) ?? []).join(' ');
+}
+
 function normalizeStringList(value: unknown, fieldName: string): string[] {
   if (value == null) return [];
   if (typeof value === 'string') return value.trim() ? [value.trim()] : [];
@@ -149,16 +154,42 @@ export function validatePedagogicalAssessment(raw: any, keys: TaskKey[], result:
         : (blank ? 'Aucune réponse fournie : le niveau ne peut pas être évalué.' : missingPrompt ? 'La consigne originale est nécessaire pour évaluer la réalisation de la tâche.' : 'La consigne et les deux documents sont nécessaires pour évaluer la fidélité et la comparaison.');
     }
     if (task.range !== null) {
+      const answer = result.answers[key] || '';
+      const suppliedTexts = [req.instruction, ...(key === 'task3' ? [req.document1, req.document2] : [])]
+        .filter((text): text is string => Boolean(text)).map(text => ` ${comparisonWords(text)} `);
+      const appearsInSource = (words: string) => Boolean(words) && suppliedTexts.some(text => text.includes(` ${words} `));
+      const answerWords = comparisonWords(answer);
+      const sourceOnlyAnswer = appearsInSource(answerWords);
+      // Mask substantial verbatim runs so even a short quotation from inside one
+      // cannot establish a level unless it also occurs in the learner's own prose.
+      const words = answerWords.split(' ');
+      const borrowed = new Uint8Array(words.length);
+      for (let i = 0; i + 8 <= words.length; i++) {
+        if (appearsInSource(words.slice(i, i + 8).join(' '))) borrowed.fill(1, i, i + 8);
+      }
+      const independentText = ' ' + words.map((word, i) => borrowed[i] ? '|' : word).join(' ') + ' ';
+      let sourceEvidenceExcluded = false;
       const verifiedEvidence = (Array.isArray(task.level_evidence) ? task.level_evidence : []).flatMap((evidence:any) => {
         if (!evidence || typeof evidence.quote !== 'string' || !['linguistic','pragmatic','sociolinguistic'].includes(evidence.domain) || typeof evidence.explanation !== 'string' || !evidence.explanation.trim()) return [];
         const quote=findOriginalExcerpt(result.answers[key] || '',evidence.quote);
-        return quote ? [{...evidence,quote}] : [];
+        if (!quote) return [];
+        const quoteWords = comparisonWords(quote);
+        if (sourceOnlyAnswer || (appearsInSource(quoteWords) && !independentText.includes(` ${quoteWords} `))) {
+          sourceEvidenceExcluded = true;
+          return [];
+        }
+        return [{...evidence,quote}];
       });
       const seen=new Set<string>();
       task.level_evidence=verifiedEvidence.filter((e:any)=>{const identity=e.quote;if(seen.has(identity))return false;seen.add(identity);return true;});
       if (task.level_evidence.length < 2) {
         task.range=null;
         task.withholding_reason=raw.feedback_language==='en' ? 'Level withheld: fewer than two supporting excerpts could be verified in your response.' : 'Niveau suspendu : moins de deux citations justificatives ont pu être vérifiées dans votre réponse.';
+        if (sourceEvidenceExcluded) {
+          task.withholding_reason = raw.feedback_language === 'en'
+            ? 'Level withheld because fewer than two independent examples remain after excluding supplied wording. Use your own words to explain the ideas.'
+            : 'Niveau suspendu faute de deux exemples personnels après exclusion des passages repris du sujet. Expliquez les idées avec vos propres mots.';
+        }
         task.validation_warnings.push(task.withholding_reason);
       }
     }

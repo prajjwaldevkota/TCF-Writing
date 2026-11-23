@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   BookOpen,
   BarChart3,
+  TrendingUp,
   Feather,
   Home,
   Library,
@@ -22,6 +23,7 @@ export type AppView =
   | "templates"
   | "simulator"
   | "results"
+  | "analytics"
   | "dashboard"
   | "notebook"
   | "settings"
@@ -85,6 +87,7 @@ export const AppLayout: React.FC<{
       icon: BarChart3,
       label: en ? "My progress" : "Ma progression",
     },
+    { view: "analytics", icon: TrendingUp, label: en ? "Analytics" : "Statistiques" },
     {
       view: "notebook",
       icon: NotebookPen,

@@ -86,3 +86,26 @@ assert.doesNotThrow(() => pedagogical.validatePedagogicalAssessment(diagnosed,['
 assert.throws(() => pedagogical.validatePedagogicalAssessment(payload(),['task1'],full,true), /audit/);
 diagnosed.tasks.task1.syntactic_and_lexical_inventory.recurrent_errors = [null];
 assert.throws(() => pedagogical.validatePedagogicalAssessment(diagnosed,['task1'],full,true), /inventory/);
+
+const firstView = 'Le quartier devrait conserver son marché du samedi matin.';
+const secondView = 'Les habitants préfèrent maintenant les petits commerces de proximité.';
+const original = 'Je comprends cette préférence. Pourtant le marché réunit davantage de voisins.';
+function reviewSourceUse(answer, quotes) {
+  const input = structuredClone(complete);
+  input.answers.task3 = answer;
+  Object.assign(input.combination.tasks.task3, {document1:firstView, document2:secondView});
+  const assessment = projection();
+  assessment.tasks.task3.level_evidence = quotes.map(quote => ({quote, domain:'pragmatic', explanation:'Evidence.'}));
+  return pedagogical.validatePedagogicalAssessment(assessment, all, input);
+}
+const borrowed = reviewSourceUse(firstView, ['quartier','marché']);
+assert.equal(borrowed.tasks.task3.range,null);
+assert.match(borrowed.tasks.task3.withholding_reason,/supplied wording/);
+const mixed = reviewSourceUse([firstView, secondView, original].join(' '), [firstView, secondView, 'Je comprends cette préférence.']);
+assert.equal(mixed.tasks.task3.range,null);
+assert.equal(mixed.tasks.task3.level_evidence.length,1);
+const supported = reviewSourceUse(firstView+' '+original, [firstView, 'Je comprends cette préférence.', 'le marché réunit davantage de voisins.']);
+assert.deepEqual(supported.tasks.task3.range,{lower:'B1',upper:'B2'});
+assert.equal(supported.tasks.task3.level_evidence.length,2);
+
+assert.equal(reviewSourceUse(firstView+' '+secondView, ['quartier','habitants']).tasks.task3.range,null);

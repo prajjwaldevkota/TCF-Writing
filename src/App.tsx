@@ -27,6 +27,7 @@ const Results = lazy(() =>
 const Templates = lazy(() =>
   import("./pages/Templates").then((m) => ({ default: m.Templates })),
 );
+const Analytics = lazy(() => import("./pages/Analytics").then(m => ({ default: m.Analytics })));
 const Progress = lazy(() =>
   import("./pages/Progress").then((m) => ({ default: m.Progress })),
 );
@@ -45,17 +46,19 @@ const validViews: AppView[] = [
   "simulator",
   "results",
   "dashboard",
+  "analytics",
   "notebook",
   "settings",
   "login",
 ];
 function route() {
-  const [view, id] = location.hash.replace(/^#\/?/, "").split("/");
+  const [view, id, task] = location.hash.replace(/^#\/?/, "").split("/");
   return {
     view: validViews.includes(view as AppView)
       ? (view as AppView)
       : ("home" as AppView),
     id,
+    task: task === "task1" || task === "task2" || task === "task3" ? task as TaskKey : undefined,
   };
 }
 function MainRouter() {
@@ -66,6 +69,7 @@ function MainRouter() {
   useEffect(() => {
     prefetchQuestionsIdle();
   }, []);
+  const [reviewTask, setReviewTask] = useState(route().task);
   const [view, setView] = useState<AppView>(() => route().view);
   const [submissions, setSubmissions] = useState(() =>
     getStoredSubmissions().sort(
@@ -138,15 +142,17 @@ function MainRouter() {
     );
     setDraft(loadPracticeSession());
   };
-  const navigate = (next: AppView, result?: ExamResult) => {
+  const navigate = (next: AppView, result?: ExamResult, task?: TaskKey) => {
+    setReviewTask(task);
     if (result) setActive(result);
     setView(next);
-    location.hash = `/${next}${next === "results" && result?.id ? "/" + result.id : ""}`;
+    location.hash = `/${next}${next === "results" && result?.id ? "/" + result.id + (task ? "/" + task : "") : ""}`;
   };
   useEffect(() => {
     const onHash = () => {
       const next = route();
       setView(next.view);
+      setReviewTask(next.task);
       if (next.view === "results" && next.id)
         setActive(getStoredSubmissions().find((s) => s.id === next.id) || null);
       window.scrollTo(0, 0);
@@ -282,7 +288,8 @@ function MainRouter() {
     if (view === "results" && active)
       return (
         <Results
-          key={active.id}
+          key={active.id + (reviewTask || "")}
+          initialTask={reviewTask}
           result={active}
           onSave={saveReview}
           onRevise={(s, key) =>
@@ -307,6 +314,8 @@ function MainRouter() {
       return <PracticeLibrary key={progressVersion} onStart={start} progressBySet={progressBySet} />;
     if (view === "templates")
       return <Templates onPractice={() => navigate("library")} />;
+    if (view === "analytics")
+      return <Analytics submissions={submissions} onOpen={(s, task) => navigate("results", s, task)} onPractice={() => navigate("library")} />;
     if (view === "dashboard")
       return (
         <Progress
