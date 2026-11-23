@@ -23,6 +23,7 @@ import { drawPracticeCombination } from "../utils/randomCombination";
 import { loadQuestions } from "../utils/questionsLoader";
 import { normalizeParagraphText } from "../utils/cleanText";
 import { SessionList } from "../components/SessionList";
+import { CorrectionDrill } from "../components/CorrectionDrill";
 import { PracticeTracker } from "../components/PracticeTracker";
 import { CombinationStatus } from "../components/CombinationStatus";
 
@@ -92,6 +93,7 @@ export const Home: React.FC<{
           </button>
         </div>
       )}
+      <CorrectionDrill en={en} />
       <section
         className="random-combination-bar"
         aria-label={en ? "Random combination" : "Combinaison au hasard"}

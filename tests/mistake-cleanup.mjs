@@ -30,6 +30,17 @@ const day = 86400_000;
 const now = Date.now();
 const first = { id: "one", original_text: "je suis aller", corrected_text: "je suis allé", explanation: "Accord", category: "Grammaire", submission_id: "essay-one", task_key: "task1", date: "today", timestamp: now - 365 * day };
 const second = { ...first, id: "two", original_text: "il vont", corrected_text: "ils vont", task_key: "task2" };
+const drill = await import(url(compile("src/utils/correctionDrill.ts")
+  .replace(/(["'])\.\/mistakeLifecycle\1/, JSON.stringify(lifecycleUrl))));
+const cards = [first, second, { ...first, id: "duplicate" }];
+assert.equal(drill.dueCorrections(cards, localStorage, now).length, 2);
+drill.scheduleCorrection(localStorage, first, false, now);
+drill.scheduleCorrection(localStorage, second, true, now);
+assert.deepEqual(drill.dueCorrections(cards, localStorage, now), []);
+assert.deepEqual(drill.dueCorrections(cards, localStorage, now + day), [first]);
+assert.deepEqual(drill.dueCorrections(cards, localStorage, now + 3 * day), [first, second]);
+assert.equal(drill.matchesCorrection("j’ai  mangé", "j'ai mange\u0301"), true);
+assert.equal(drill.matchesCorrection("j’ai mange", "j’ai mangé"), false);
 const submission = {
   id: "essay-one", year: "2026", month: "Novembre", timeUsedSeconds: 60,
   combination: { combination: 1, combinationNumber: 1, tasks: Object.fromEntries(["task1", "task2", "task3"].map(key => [key, { instruction: "Test", minWords: 60, maxWords: 120 }])) },
