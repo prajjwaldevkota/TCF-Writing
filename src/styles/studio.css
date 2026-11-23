@@ -31,7 +31,7 @@
   font-size: 23px;
 }
 .lab-sidebar {
-  background: #192b4c;
+  background: #232d53;
   border-right: 0;
   color: #edf2ff;
 }
@@ -41,29 +41,29 @@
   font-weight: 700;
 }
 .lab-brand-icon {
-  background: #344f91;
+  background: #3e5089;
   color: #fff;
   border-radius: 10px;
 }
 .lab-brand > span > span,
 .lab-sidebar .nav-caption,
 .lab-sidebar .lab-person small {
-  color: #becbe4;
+  color: #c7cee7;
 }
 .lab-sidebar .nav-caption {
   font-size: 12px;
 }
 .lab-sidebar .lab-nav {
-  color: #d0dcf3;
+  color: #dce1f5;
   font-size: 14px;
   border: 1px solid transparent;
 }
 .lab-sidebar .lab-nav:hover {
-  background: #243b63;
+  background: #303c64;
 }
 .lab-sidebar .lab-nav.active {
-  background: #2d4776;
-  border-color: #526fa5;
+  background: #3b497c;
+  border-color: #6476aa;
   color: #fff;
 }
 .lab-sidebar .lab-nav i {
@@ -853,7 +853,7 @@ progress::-moz-progress-bar {
   color: var(--text);
 }
 .splash-showcase {
-  background: #192b4c;
+  background: #232d53;
   color: #edf2ff;
   padding: clamp(28px, 4vw, 52px);
   display: flex;
@@ -876,7 +876,7 @@ progress::-moz-progress-bar {
   width: 40px;
   height: 44px;
   border-radius: 10px;
-  background: #344f91;
+  background: #3e5089;
   color: #ffffff;
   display: grid;
   place-items: center;
@@ -897,7 +897,7 @@ progress::-moz-progress-bar {
   font-weight: 650;
   letter-spacing: 0.8px;
   text-transform: uppercase;
-  color: #becbe4;
+  color: #c7cee7;
 }
 .splash-goal-pill {
   padding: 5px 11px;
@@ -930,13 +930,13 @@ progress::-moz-progress-bar {
 .splash-lead {
   font-size: 16px;
   line-height: 1.75;
-  color: #cdd9f0;
+  color: #e1e5f7;
 }
 .splash-specimen {
   max-width: 560px;
   border-radius: 12px;
-  background: #21365d;
-  border: 1px solid #385282;
+  background: #2a3862;
+  border: 1px solid #4a5982;
   overflow: hidden;
 }
 .splash-specimen-head {
@@ -945,11 +945,11 @@ progress::-moz-progress-bar {
   justify-content: space-between;
   gap: 12px;
   padding: 13px 18px;
-  background: #1b2f52;
-  border-bottom: 1px solid #354e7c;
+  background: #263256;
+  border-bottom: 1px solid #4a5982;
   font-size: 12.5px;
   font-weight: 600;
-  color: #cad8f4;
+  color: #d7dff8;
 }
 .splash-specimen-head span:last-child {
   display: inline-flex;
@@ -977,7 +977,7 @@ progress::-moz-progress-bar {
   width: 28px;
   height: 28px;
   border-radius: 7px;
-  background: #314d86;
+  background: #41548b;
   color: #ffffff;
   display: grid;
   place-items: center;
@@ -994,7 +994,7 @@ progress::-moz-progress-bar {
 .splash-task-list small {
   display: block;
   font-size: 12.5px;
-  color: #b9c9e8;
+  color: #c9d1e8;
   margin-top: 2px;
 }
 .splash-word-pill {
@@ -1013,16 +1013,16 @@ progress::-moz-progress-bar {
   gap: 8px;
   padding: 12px 18px;
   background: rgba(16, 28, 52, 0.28);
-  border-top: 1px solid #354e7c;
+  border-top: 1px solid #4a5982;
   font-size: 12px;
-  color: #c2d1ee;
+  color: #d4dcf4;
 }
 .splash-showcase-foot span {
   display: inline-flex;
   align-items: center;
   gap: 7px;
   font-size: 12.5px;
-  color: #b7c7e6;
+  color: #cbd3e9;
 }
 .splash-auth-pane {
   display: flex;
@@ -1203,7 +1203,7 @@ progress::-moz-progress-bar {
   margin-top: 10px;
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid #526fa5;
+  border: 1px solid #6476aa;
   background: #28426f;
   color: #ffffff;
   font-size: 13px;
@@ -1495,4 +1495,121 @@ progress::-moz-progress-bar {
   padding: 2px 6px;
   border-radius: 4px;
   border: 1px solid var(--line);
+}
+
+/* Task selection and reading typography shared across the studio. */
+.lab-main .page-heading h1,
+.splash-hero-copy h1 {
+  font-family: var(--serif);
+  font-size: clamp(2.1rem, 4vw, 3.55rem);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -.035em;
+  text-wrap: balance;
+}
+.home-greeting { margin-bottom: .4rem; color: var(--muted); }
+.simple-home .random-combination-bar {
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  margin: 0;
+  padding: 1rem 0 1.35rem;
+}
+.practice-choices {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(230px, 1fr);
+  gap: clamp(16px, 2vw, 32px);
+}
+.task-menu {
+  min-width: 0;
+  padding: 1.25rem clamp(1rem, 2.2vw, 2rem) .5rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.task-menu .section-head { flex-wrap: wrap; gap: 8px; margin: 0 0 .6rem; }
+.practice-task-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 1.15rem 0;
+  text-align: left;
+  border-top: 1px solid var(--line);
+}
+.practice-task-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 44px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.task-row-copy { flex: 1; min-width: 0; }
+.task-row-copy strong { display: block; color: var(--ink); font-size: clamp(1.05rem, 1.6vw, 1.4rem); line-height: 1.3; }
+.task-row-copy small, .task-preview { color: var(--muted); font-size: .8rem; }
+.task-preview { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 4px; }
+.practice-task-row:hover strong, .task-row-copy .task-repeat { color: var(--teal); }
+.mock-invitation {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: .9rem;
+  padding: clamp(1.3rem, 2.6vw, 2.3rem);
+  border-radius: 14px;
+  background: #354bc2;
+  color: #fff;
+}
+.mock-invitation h2 { font-size: 1.4rem; font-weight: 600; color: inherit; }
+.mock-duration { display: flex; align-items: baseline; gap: .45rem; font-size: 1.15rem; }
+.mock-duration strong { font: 500 clamp(3.6rem, 6vw, 5rem)/1 var(--serif); letter-spacing: -.055em; }
+.mock-duration svg { align-self: center; margin-right: 4px; }
+.mock-invitation p { color: #eef0ff; line-height: 1.6; }
+.mock-invitation .button { background: #fff; color: #354bc2; margin-top: auto; }
+.mock-invitation button:focus-visible { outline: 3px solid white; outline-offset: 4px; }
+.annotation-hint { font-size: .85rem; color: var(--muted); margin: 1rem 0 .4rem; }
+.annotated-phrase {
+  display: inline;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  white-space: inherit;
+  background: var(--warning-surface);
+  text-decoration: underline dotted var(--warning-text);
+  text-underline-offset: .2em;
+}
+.annotated-phrase[aria-pressed="true"] { background: var(--warning-border); }
+.passage-note { padding: 1rem; margin: .75rem 0; background: var(--surface-muted); border-inline-start: 3px solid var(--teal); overflow-wrap: anywhere; }
+.passage-note small { color: var(--muted); }
+.passage-note svg { display: inline-block; vertical-align: middle; }
+.passage-note p + p { margin-top: .4rem; }
+@media (max-width: 760px) {
+  .practice-choices { grid-template-columns: 1fr; }
+  .mock-invitation { gap: .6rem; }
+  .mock-duration strong { font-size: 3rem; }
+  .mock-invitation .button { margin-top: .5rem; }
+}
+
+
+.writing-report .page-heading { margin-bottom: 1.5rem; }
+.report-sections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 clamp(12px, 2vw, 28px);
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid var(--line);
+}
+.report-sections button {
+  padding: .75rem 0;
+  border-bottom: 3px solid transparent;
+  font-weight: 600;
+  color: var(--muted);
+}
+.report-sections button[aria-pressed="true"] { border-color: var(--teal); color: var(--teal); }
+.report-sections button span { font-size: .8em; margin-left: .15rem; }
+.writing-report .mock-estimate > .review-nclc { margin: 0; border: 0; }
+@media (max-width: 540px) {
+  .report-sections button { font-size: .88rem; }
 }

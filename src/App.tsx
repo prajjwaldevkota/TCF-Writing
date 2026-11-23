@@ -1,5 +1,5 @@
 import { useWorkspace, WorkspaceProvider } from "./context/WorkspaceContext";
-import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
+import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { ThemeProvider } from "./context/ThemeContext";
 import { Home } from "./pages/Home";
 import { SplashScreen } from "./pages/SplashScreen";
@@ -7,7 +7,7 @@ import { AppLayout, AppView } from "./components/AppLayout";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LanguageProvider, useLanguage } from "./context/LanguageContext";
 import type { ExamResult, TaskKey } from "./types/exam";
-import { DRAFT_KEY, QuestionEntry, makeSession, PracticeSession, resultTimestamp, practicedKeys } from "./utils/practice";
+import { DRAFT_KEY, QuestionEntry, makeSession, PracticeSession, resultTimestamp, combinationProgress } from "./utils/practice";
 import {
   getCachedQuestions,
   loadQuestions,
@@ -72,6 +72,7 @@ function MainRouter() {
       (a, b) => resultTimestamp(b) - resultTimestamp(a),
     ),
   );
+  const progressBySet = useMemo(() => combinationProgress(submissions), [submissions]);
   const [draft, setDraft] = useState<PracticeSession | null>(
     loadPracticeSession,
   );
@@ -227,19 +228,10 @@ function MainRouter() {
         ),
     );
     const entry =
-      available.find(
-        (q) =>
-          !submissions.some(
-            (s) =>
-              s.year === q.year &&
-              s.month === q.month &&
-              s.combination.combinationNumber ===
-              q.combination.combinationNumber &&
-              (task === "exam"
-                ? !s.isPracticeMode
-                : practicedKeys(s).includes(task)),
-          ),
-      ) || available[0];
+      available.find(q => {
+        const progress = progressBySet.get(q.id);
+        return !(task === "exam" ? progress?.mockCompleted : progress?.tasks.has(task));
+      }) || available[0];
     if (entry) start(entry, task);
   };
   const saveReview = (result: ExamResult) => {
@@ -312,7 +304,7 @@ function MainRouter() {
         />
       );
     if (view === "library")
-      return <PracticeLibrary key={progressVersion} onStart={start} submissions={submissions} />;
+      return <PracticeLibrary key={progressVersion} onStart={start} progressBySet={progressBySet} />;
     if (view === "templates")
       return <Templates onPractice={() => navigate("library")} />;
     if (view === "dashboard")
@@ -352,6 +344,7 @@ function MainRouter() {
       );
     return (
       <Home
+        progressBySet={progressBySet}
         name={user ? userName : ""}
         submissions={submissions}
         draft={draft}

@@ -248,6 +248,27 @@ export function practicedKeys(result: ExamResult): TaskKey[] {
       : TASK_KEYS.filter((k) => result.answers[k]?.trim());
   return TASK_KEYS.filter((k) => result.answers[k]?.trim());
 }
+export interface CombinationProgress {
+  tasks: Set<TaskKey>;
+  mockCompleted: boolean;
+}
+
+export function combinationProgress(submissions: ExamResult[]) {
+  const progress = new Map<string, CombinationProgress>();
+  for (const result of submissions) {
+    const answered = practicedKeys(result).filter(key => result.answers[key]?.trim());
+    if (!answered.length) continue;
+    const id = `${result.year}-${result.month}-${result.combination.combinationNumber}`;
+    const record = progress.get(id) ?? { tasks: new Set<TaskKey>(), mockCompleted: false };
+    for (const key of answered) record.tasks.add(key);
+    if (!result.isPracticeMode && TASK_KEYS.every(key => answered.includes(key))) {
+      record.mockCompleted = true;
+    }
+    progress.set(id, record);
+  }
+  return progress;
+}
+
 export function practiceSummary(submissions: ExamResult[], now = new Date()) {
   const counts = Object.fromEntries(
     TASK_KEYS.map((k) => [

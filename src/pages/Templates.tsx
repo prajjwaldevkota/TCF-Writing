@@ -23,16 +23,7 @@ export function Templates({ onPractice }: { onPractice: () => void }) {
     <div className="page-enter">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">
-            {en
-              ? "A STRUCTURE, THEN YOUR OWN WORDS"
-              : "UNE STRUCTURE, PUIS VOS PROPRES MOTS"}
-          </p>
-          <h1>
-            {en
-              ? "A little help getting started."
-              : "Pour trouver vos premiers mots."}
-          </h1>
+          <h1>{en ? "Writing templates" : "Modèles de rédaction"}</h1>
           <p>
             {en
               ? "Your TCFFormation collection, organised by task and purpose."

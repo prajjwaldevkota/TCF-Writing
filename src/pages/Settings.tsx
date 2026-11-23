@@ -71,14 +71,7 @@ export function Settings({
     <div className="page-enter settings-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">
-            {en ? "MAKE THIS SPACE YOURS" : "VOTRE ESPACE, À VOTRE MESURE"}
-          </p>
-          <h1>
-            {en
-              ? "A few things behind the scenes."
-              : "Quelques réglages, tout simplement."}
-          </h1>
+          <h1>{en ? "Workspace settings" : "Réglages de l’atelier"}</h1>
           <p>
             {en
               ? "Connect feedback, choose your language, and keep a copy of your work."

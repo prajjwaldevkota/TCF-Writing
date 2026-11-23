@@ -11,7 +11,7 @@ const compile = (file) =>
 const url = (source) =>
   "data:text/javascript;base64," + Buffer.from(source).toString("base64");
 const practiceUrl = url(compile("src/utils/practice.ts"));
-const { selectRandomCombination } = await import(
+const { selectRandomCombination, drawPracticeCombination } = await import(
   url(
     compile("src/utils/randomCombination.ts").replace(
       /(['"])\.\/practice\1/,
@@ -84,6 +84,23 @@ assert.equal(
   entries[0],
 );
 assert.equal(selectRandomCombination([incomplete]), null);
+const draws = new Map();
+const store = { getItem: key => draws.get(key), setItem: (key, value) => draws.set(key, value) };
+const progress = new Map([
+  ["set-1", { tasks: new Set(["task1"]), mockCompleted: false }],
+  ["set-2", { tasks: new Set(["task1", "task2", "task3"]), mockCompleted: true }],
+]);
+const draw = (pool = entries, workspace = store) => drawPracticeCombination(pool, progress, workspace, () => 0);
+assert.equal(draw(), entries[2]);
+assert.equal(draw(entries, { ...store }), entries[0]); // Reopen the workspace.
+assert.equal(draw(entries, { ...store }), entries[1]);
+assert.equal(draw(entries, { ...store }), entries[2]);
+assert.equal(draw([incomplete]), null);
+const blocked = { getItem() { throw Error(); }, setItem() { throw Error(); } };
+assert.equal(draw(entries, blocked), entries[2]);
+assert.equal(draw(entries, blocked), entries[0]);
+assert.equal(draw([entries[1]], blocked), entries[1]);
+assert.equal(draw([entries[1]], blocked), entries[1]);
 const { preferredTheme, initialTheme, applyTheme, THEME_STORAGE_KEY } =
   await import(url(compile("src/utils/theme.ts")));
 assert.equal(preferredTheme("dark", false), "dark");
@@ -113,7 +130,7 @@ try {
   applyTheme("light");
   assert.equal(initialTheme(), "light");
   assert.equal(document.documentElement.dataset.theme, "light");
-  assert.equal(meta.get("content"), "#f3f5fa");
+  assert.equal(meta.get("content"), "#f6f7fb");
   globalThis.localStorage = {
     getItem: () => {
       throw new Error("Blocked");

@@ -2225,9 +2225,7 @@ select {
   margin: 35px 0;
   min-height: 380px;
 }
-.settings-page {
-  max-width: 1050px;
-}
+
 .settings-section {
   margin-bottom: 24px;
   padding: 29px 30px;
@@ -3412,10 +3410,7 @@ select {
 }
 
 /* A quieter practice home: choose a task, or take one full mock. */
-.simple-home {
-  max-width: 1120px;
-  margin: auto;
-}
+
 .simple-practice-heading {
   margin: 30px 0 20px;
 }

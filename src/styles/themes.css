@@ -1,21 +1,21 @@
 :root {
   color-scheme: light;
-  --canvas: #f3f5fa;
+  --canvas: #f6f7fb;
   --surface: #ffffff;
-  --surface-muted: #edf1f8;
-  --surface-raised: #f8faff;
-  --ink: #192844;
-  --text: #273650;
-  --muted: #52617a;
-  --line: #d8dfeb;
-  --teal: #304fbd;
-  --primary-hover: #243e99;
+  --surface-muted: #f0f2f8;
+  --surface-raised: #fafbfe;
+  --ink: #1c2235;
+  --text: #30374b;
+  --muted: #586378;
+  --line: #dce0ea;
+  --teal: #4057d6;
+  --primary-hover: #3044b8;
   --primary-contrast: #ffffff;
-  --accent: #304fbd;
+  --accent: #4057d6;
   --rust: #ad4051;
   --sage-surface: #eaf0ff;
-  --sage-text: #304c9f;
-  --sage-border: #c6d3f5;
+  --sage-text: #334898;
+  --sage-border: #cbd6fa;
   --warning-surface: #f7eedc;
   --warning-text: #76551f;
   --warning-border: #e5d1ab;
@@ -26,7 +26,7 @@
   --rose-text: #884b35;
   --rose-border: #e4c8bb;
   --danger-text: #9d3f30;
-  --brand-background: #253f99;
+  --brand-background: #354bc2;
   --brand-text: #ffffff;
   --overlay: rgba(16, 28, 52, 0.48);
   --scrollbar: #a2afc6;
@@ -36,22 +36,22 @@
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --canvas: #111827;
-  --surface: #192337;
-  --surface-muted: #222f46;
-  --surface-raised: #1d2940;
-  --ink: #f0f4ff;
-  --text: #e2e9f7;
-  --muted: #b0bfd7;
-  --line: #3a4963;
-  --teal: #a9bfff;
-  --primary-hover: #cad7ff;
-  --primary-contrast: #142145;
-  --accent: #adc2ff;
+  --canvas: #141721;
+  --surface: #1d2230;
+  --surface-muted: #262d3e;
+  --surface-raised: #222838;
+  --ink: #f3f4fa;
+  --text: #e3e7f3;
+  --muted: #b5bdd2;
+  --line: #394155;
+  --teal: #aab9ff;
+  --primary-hover: #c8d0ff;
+  --primary-contrast: #17204c;
+  --accent: #b8c5ff;
   --rust: #ffb2bd;
-  --sage-surface: #24365b;
-  --sage-text: #c4d4ff;
-  --sage-border: #465f94;
+  --sage-surface: #293552;
+  --sage-text: #d1dbff;
+  --sage-border: #4a5c84;
   --warning-surface: #3a3325;
   --warning-text: #e5cf9d;
   --warning-border: #655638;
@@ -62,7 +62,7 @@
   --rose-text: #eabfa9;
   --rose-border: #6c4c3e;
   --danger-text: #f2b2a0;
-  --brand-background: #304fbd;
+  --brand-background: #4057d6;
   --brand-text: #ffffff;
   --overlay: rgba(0, 0, 0, 0.64);
   --scrollbar: #617394;
@@ -227,9 +227,12 @@ textarea {
   font-weight: 600;
   color: var(--text);
 }
-.random-selection-status span {
+.random-selection-status > span {
   display: block;
   margin-top: 4px;
+}
+.random-selection-status > .badge {
+  display: inline-flex;
 }
 .library-random-selection {
   display: flex;

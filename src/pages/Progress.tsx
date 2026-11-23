@@ -52,14 +52,7 @@ export function Progress({
     <div className="page-enter">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">
-            {en
-              ? "PROGRESS YOU CAN TRACE"
-              : "DES PROGRÈS QUE VOUS POUVEZ SUIVRE"}
-          </p>
-          <h1>
-            {en ? "Look how far your words go." : "Vos mots font leur chemin."}
-          </h1>
+          <h1>{en ? "Practice history" : "Ma progression"}</h1>
           <p>
             {en
               ? "Your practice, revisions, and supported estimates. Every number comes from your saved work."
@@ -114,7 +107,6 @@ export function Progress({
             <h2>
               {en ? "Writing estimate" : "Estimation en expression écrite"}
             </h2>
-            <span className="badge sand">Objectif 7</span>
           </div>
           {projection ? (
             <>

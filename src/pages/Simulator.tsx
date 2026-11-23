@@ -224,10 +224,10 @@ export function Simulator({
     if (!dirtyRef.current || finished.current) return true;
     const ok = savePracticeSession(sessionRef.current);
     setSaved(ok);
-    dirtyRef.current = false;
+    dirtyRef.current = !ok;
     onDraftChangeRef.current(sessionRef.current);
     return ok;
-  }, []);
+  }, [savePracticeSession]);
 
   const task = session.activeTask;
   const info = TASK_INFO[task];
@@ -291,29 +291,17 @@ export function Simulator({
       sessionRef.current = next;
       setSession(next);
 
+      dirtyRef.current = true;
       if (immediate) {
-        if (debounceTimerRef.current !== null) {
-          window.clearTimeout(debounceTimerRef.current);
-          debounceTimerRef.current = null;
-        }
-        dirtyRef.current = false;
-        setSaved(savePracticeSession(next));
-        onDraftChangeRef.current(next);
+        flushDraft();
       } else {
-        dirtyRef.current = true;
         if (debounceTimerRef.current !== null) {
           window.clearTimeout(debounceTimerRef.current);
         }
-        debounceTimerRef.current = window.setTimeout(() => {
-          debounceTimerRef.current = null;
-          if (!dirtyRef.current || finished.current) return;
-          dirtyRef.current = false;
-          setSaved(savePracticeSession(sessionRef.current));
-          onDraftChangeRef.current(sessionRef.current);
-        }, 250);
+        debounceTimerRef.current = window.setTimeout(flushDraft, 250);
       }
     },
-    [],
+    [flushDraft],
   );
 
   const complete = useCallback(() => {
@@ -322,7 +310,6 @@ export function Simulator({
       window.clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
     }
-    dirtyRef.current = false;
     const current = sessionRef.current;
     const currentIsExam = current.mode === "exam";
     const totalElapsed = sessionElapsed(current, Date.now());
@@ -345,8 +332,12 @@ export function Simulator({
       revisionOf: current.revisionOf,
     };
     if (onFinishExam(result)) finished.current = true;
-    else setSaveFailure(true);
-  }, [onFinishExam]);
+    else {
+      flushDraft();
+      setSaveFailure(true);
+      setFinish(true);
+    }
+  }, [onFinishExam, flushDraft]);
 
   useEffect(() => {
     if (!finish) return;
@@ -422,9 +413,27 @@ export function Simulator({
   }, [update]);
 
   const handleCancel = () => {
-    flushDraft();
-    onCancelExam();
+    if (flushDraft()) onCancelExam();
   };
+
+  const downloadDraft = () => {
+    const current = sessionRef.current;
+    const text = current.keys.map((key) =>
+      [`Tâche ${TASK_INFO[key].number}`, current.combination.tasks[key].title, "", current.answers[key]].join("\n")
+    ).join("\n\n");
+    const href = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = href;
+    link.download = `tcf-brouillon-${current.sessionId}.txt`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(href), 1000);
+  };
+
+  const downloadButton = (
+    <button className="button secondary" onClick={downloadDraft}>
+      {en ? "Download draft" : "Télécharger le brouillon"}
+    </button>
+  );
 
   const insert = (character: string) => {
     const editor = textRef.current;
@@ -558,10 +567,11 @@ export function Simulator({
               ? "Saved"
               : "Sauvegardé"
             : en
-              ? "Storage full — copy your text"
-              : "Stockage plein — copiez votre texte"}
+              ? "Draft save failed"
+              : "Échec de la sauvegarde"}
         </span>
       </div>
+      {!saved && <div className="notice warning">{downloadButton}</div>}
       {isExam && (
         <div className="session-progress">
           <span>
@@ -918,11 +928,11 @@ export function Simulator({
                   : `Retirez au moins ${words - requirement.maxWords} ${words - requirement.maxWords === 1 ? "mot" : "mots"} pour respecter la limite.`
                 : inRange
                   ? en
-                    ? `Word target reached (${requirement.minWords}–${requirement.maxWords} words). Fully compliant.`
-                    : `Longueur conforme aux exigences officielles (${requirement.minWords}–${requirement.maxWords} mots).`
+                    ? `Word target reached (${requirement.minWords}–${requirement.maxWords} words).`
+                    : `Objectif de longueur atteint (${requirement.minWords}–${requirement.maxWords} mots).`
                   : en
-                    ? `${requirement.minWords - words} more words to reach the minimum (TCF penalty applies below ${requirement.minWords}).`
-                    : `Encore ${requirement.minWords - words} mots pour atteindre le minimum (seuil officiel : ${requirement.minWords} mots).`}
+                    ? `${requirement.minWords - words} more to reach the minimum of ${requirement.minWords} words.`
+                    : `Encore ${requirement.minWords - words} mots pour atteindre le minimum de ${requirement.minWords} mots.`}
             </span>
           </div>
           <div className="writing-editor-footer">
@@ -1027,6 +1037,7 @@ export function Simulator({
               >
                 {en ? "Keep writing" : "Continuer à écrire"}
               </button>
+              {saveFailure && downloadButton}
               <button className="button primary" onClick={complete}>
                 {en ? "Save my writing" : "Enregistrer mon texte"}
                 <ArrowRight size={16} />

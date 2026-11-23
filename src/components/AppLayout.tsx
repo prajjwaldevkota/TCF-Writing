@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   BookOpen,
   BarChart3,
@@ -38,6 +38,32 @@ export const AppLayout: React.FC<{
   const { theme, toggleTheme } = useTheme();
   const { user } = useAuth();
   const [mobile, setMobile] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!mobile) return;
+    const body = bodyRef.current;
+    closeRef.current?.focus();
+    body?.setAttribute("inert", "");
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobile(false);
+    };
+    const desktop = window.matchMedia("(min-width: 761px)");
+    const closeOnDesktop = () => {
+      if (desktop.matches && view !== "simulator") setMobile(false);
+    };
+    desktop.addEventListener("change", closeOnDesktop);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      desktop.removeEventListener("change", closeOnDesktop);
+      window.removeEventListener("keydown", closeOnEscape);
+      body?.removeAttribute("inert");
+      toggleRef.current?.focus();
+    };
+  }, [mobile, view]);
+
   const go = (next: AppView) => {
     onNavigate(next);
     setMobile(false);
@@ -78,6 +104,20 @@ export const AppLayout: React.FC<{
         : en
           ? "Settings"
           : "Réglages");
+  const navigationLinks = links.map(({ view: next, icon: Icon, label }) => (
+    <button
+      key={next}
+      className={`lab-nav ${view === next || (view === "simulator" && next === "library") ? "active" : ""}`}
+      onClick={() => go(next)}
+      aria-current={view === next ? "page" : undefined}
+    >
+      <Icon size={19} />
+      <span>{label}</span>
+      {next === "library" && hasDraft && (
+        <i aria-label={en ? "Draft saved" : "Brouillon sauvegardé"} />
+      )}
+    </button>
+  ));
   return (
     <div className={`lab-shell ${view === "simulator" ? "is-writing" : ""}`}>
       <a
@@ -97,7 +137,7 @@ export const AppLayout: React.FC<{
           onClick={() => setMobile(false)}
         />
       )}
-      <aside className={`lab-sidebar ${mobile ? "open" : ""}`}>
+      <aside id="workspace-menu" className={`lab-sidebar ${mobile ? "open" : ""}`}>
         <button className="lab-brand" onClick={() => go("home")}>
           <span className="lab-brand-icon">
             <Feather size={24} />
@@ -107,6 +147,7 @@ export const AppLayout: React.FC<{
           </span>
         </button>
         <button
+          ref={closeRef}
           className="lab-close-menu icon-button"
           onClick={() => setMobile(false)}
           aria-label={en ? "Close navigation" : "Fermer la navigation"}
@@ -115,20 +156,7 @@ export const AppLayout: React.FC<{
         </button>
         <p className="nav-caption">{en ? "Your practice" : "Votre pratique"}</p>
         <nav aria-label={en ? "Main navigation" : "Navigation principale"}>
-          {links.map(({ view: next, icon: Icon, label }) => (
-            <button
-              key={next}
-              className={`lab-nav ${view === next || (view === "simulator" && next === "library") ? "active" : ""}`}
-              onClick={() => go(next)}
-              aria-current={view === next ? "page" : undefined}
-            >
-              <Icon size={19} />
-              <span>{label}</span>
-              {next === "library" && hasDraft && (
-                <i aria-label={en ? "Draft saved" : "Brouillon sauvegardé"} />
-              )}
-            </button>
-          ))}
+          {navigationLinks}
         </nav>
         <div className="lab-sidebar-bottom">
           <button
@@ -165,15 +193,21 @@ export const AppLayout: React.FC<{
           )}
         </div>
       </aside>
-      <div className="lab-body">
+      <div ref={bodyRef} className="lab-body">
         <header className="lab-topbar">
           <div className="row">
             <button
+              ref={toggleRef}
+              aria-controls="workspace-menu"
+              aria-expanded={mobile}
               className="lab-menu icon-button"
               aria-label={en ? "Open navigation" : "Ouvrir la navigation"}
               onClick={() => setMobile(true)}
             >
               <Menu size={21} />
+            </button>
+            <button className="masthead-brand" onClick={() => go("home")} aria-label={en ? "Écriture home" : "Accueil Écriture"}>
+              <Feather aria-hidden="true" size={24} /> écriture
             </button>
             <span className="breadcrumb">
               <span className="breadcrumb-root">
@@ -183,10 +217,10 @@ export const AppLayout: React.FC<{
               <strong>{current}</strong>
             </span>
           </div>
+          <nav className="masthead-navigation" aria-label={en ? "Workspace navigation" : "Navigation de l’atelier"}>{navigationLinks}</nav>
           <div className="row">
-            <span className="top-goal">
-              <span /> Objectif NCLC 7
-            </span>
+            <button className="masthead-settings icon-button" aria-current={view === "settings" ? "page" : undefined} onClick={() => go("settings")} aria-label={en ? "Settings" : "Réglages"} title={en ? "Settings" : "Réglages"}><Settings2 size={19} /></button>
+            {!user && <button className="masthead-account text-button" onClick={() => go("login")}><LogIn size={16} />{en ? "Sign in" : "Connexion"}</button>}
             <button
               type="button"
               className="theme-toggle"
@@ -247,10 +281,7 @@ export const AppLayout: React.FC<{
         </main>
         <footer className="lab-footer">
           <span>
-            Écriture ·{" "}
-            {en
-              ? "A little French, every day."
-              : "Un peu de français, chaque jour."}
+            Écriture · TCF Canada
           </span>
           <span>
             {en

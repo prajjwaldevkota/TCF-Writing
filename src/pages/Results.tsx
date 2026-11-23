@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUpRight,
-  BookOpen,
   Check,
   ChevronDown,
   AlertCircle,
@@ -24,10 +23,11 @@ import { practicedKeys, TASK_INFO, TASK_KEYS } from "../utils/practice";
 import { withGeminiReview } from "../utils/reviewState";
 import { reviewSubmission, resumeSubmissionReview } from "../services/reviewWorkflow";
 import { hasPendingEvaluationJob } from "../services/evaluationJobs";
-import { getGeminiModel } from "../utils/geminiSettings";
 import { mockProjectionEligibility } from "../services/pedagogicalAssessment";
 import { AIEvaluationView } from "../components/AIEvaluationView";
 import { LEVEL_UP_DATA } from "../components/PedagogicalEvaluationView";
+import { RevisionComparison } from "../components/RevisionComparison";
+import { AnnotatedAnswer } from "../components/AnnotatedAnswer";
 import { SubmissionExport } from "../components/SubmissionExport";
 import { EvaluationStepper } from "../components/EvaluationStepper";
 export function Results({
@@ -53,6 +53,7 @@ export function Results({
   const en = language === "en";
   const keys = result.isPracticeMode ? practicedKeys(result) : TASK_KEYS;
   const [active, setActive] = useState<TaskKey>(keys[0] || "task1");
+  const [section, setSection] = useState<"feedback" | "answer" | "corrections" | "examples" | null>(null);
   const [busy, setBusy] = useState(false);
   const [background, setBackground] = useState(() => hasPendingEvaluationJob(result.id, user?.id));
   const [error, setError] = useState("");
@@ -68,6 +69,27 @@ export function Results({
   const chosen = result.aiEvaluation;
   const assessment = chosen?.pedagogical;
   const feedback = assessment?.tasks[active];
+  const hasFeedback = Boolean(feedback || (chosen && !assessment));
+  const [wide, setWide] = useState(() => window.matchMedia("(min-width: 1024px)").matches);
+  useEffect(() => {
+    const layout = window.matchMedia("(min-width: 1024px)");
+    const resize = () => setWide(layout.matches);
+    resize();
+    layout.addEventListener("change", resize);
+    return () => layout.removeEventListener("change", resize);
+  }, []);
+  const visibleSection = !hasFeedback ? "answer"
+    : section === "answer" && !wide ? "answer"
+    : feedback && (section === "corrections" || section === "examples") ? section : "feedback";
+  const assessmentLabels: Record<string, string> = {
+    linguistic: en ? "Language" : "Langue",
+    pragmatic: en ? "Structure and meaning" : "Structure et sens",
+    sociolinguistic: en ? "Tone and register" : "Ton et registre",
+    document1: "Document 1",
+    document2: "Document 2",
+    comparison: en ? "Comparison" : "Comparaison",
+    reformulation: en ? "Paraphrasing" : "Reformulation",
+  };
   const projection = result.aiEvaluation?.pedagogical?.mock_projection;
   const eligibility = mockProjectionEligibility(
     result,
@@ -120,85 +142,37 @@ export function Results({
   const words = countFrenchWords(result.answers[active]);
   const requirement = result.combination.tasks[active];
   return (
-    <div className="page-enter">
+    <div className="page-enter writing-report">
       <button className="text-button back-link" onClick={onHomeClick}>
         <ArrowLeft size={15} />
         {en ? "Back to my practice" : "Retour à mon entraînement"}
       </button>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">
-            {en ? "WRITE. REFLECT. TRY AGAIN." : "ÉCRIRE. RELIRE. RECOMMENCER."}
-          </p>
-          <h1>
-            {en
-              ? "A page closer to your goal."
-              : "Une page de plus vers votre objectif."}
-          </h1>
-          <p>
-            {en
-              ? "Your writing is saved. Now turn it into your next improvement."
-              : "Votre rédaction est sauvegardée. Transformez-la en prochaine piste de progrès."}
-          </p>
+          <h1>{en ? "Writing review" : "Bilan de rédaction"}</h1>
+          <p>{result.revisionOf ? (en ? "Revision" : "Réécriture") : result.isPracticeMode ? (en ? "Guided practice" : "Pratique guidée") : (en ? "Full mock" : "Examen blanc")} · {formatTime(result.timeUsedSeconds)} · {result.month} {result.year} · {en ? "Set" : "Série"} {result.combination.combinationNumber}</p>
         </div>
         <span className="outline-badge">
           <Check size={15} />
           {en ? "Saved in this browser" : "Enregistré dans ce navigateur"}
         </span>
       </div>
-      <SubmissionExport key={result.id} result={result} />
+      {!result.isPracticeMode && projection && (
+        <section className="exam-estimate" aria-labelledby="estimate-heading">
+          <div className="estimate-range">
+            <h2 id="estimate-heading">{en ? "Full mock estimate" : "Estimation de l’examen blanc"}</h2>
+            <div className="estimate-score"><span>NCLC</span> <strong>{projection.lower === 3 ? "<4" : projection.lower}–{projection.upper === 10 ? "10+" : projection.upper}</strong></div>
+          </div>
+          <div className="estimate-reading">
+            <h3>{en ? "Basis for the estimate" : "Justification de l’estimation"}</h3>
+            <p>{projection.rationale}</p>
+            <small className="estimate-note">{en ? "Uncalibrated practice estimate based on the three tasks. Only the TCF issues an official result." : "Estimation de pratique non calibrée, fondée sur les trois tâches. Seul le TCF délivre un résultat officiel."}</small>
+          </div>
+        </section>
+      )}
       {busy && (
         <EvaluationStepper en={en} isBackground={background} />
       )}
-      <div className="review-summary">
-        <div>
-          <span className="eyebrow">{en ? "SESSION" : "SÉANCE"}</span>
-          <strong>
-            {result.revisionOf
-              ? en
-                ? "Revision"
-                : "Réécriture"
-              : result.isPracticeMode
-                ? en
-                  ? "Guided practice"
-                  : "Pratique guidée"
-                : en
-                  ? "Full mock exam"
-                  : "Examen blanc complet"}
-          </strong>
-        </div>
-        <div>
-          <span className="eyebrow">{en ? "TIME USED" : "TEMPS UTILISÉ"}</span>
-          <strong>{formatTime(result.timeUsedSeconds)}</strong>
-        </div>
-        <div>
-          <span className="eyebrow">
-            {en ? "WORD COUNTS" : "NOMBRE DE MOTS"}
-          </span>
-          <strong>
-            {keys
-              .map(
-                (k) =>
-                  `T${TASK_INFO[k].number} : ${countFrenchWords(result.answers[k])}`,
-              )
-              .join(" · ")}
-          </strong>
-        </div>
-        <div>
-          <span className="eyebrow">
-            {en ? "NEXT STEP" : "PROCHAINE ÉTAPE"}
-          </span>
-          <strong>
-            {result.aiEvaluation
-              ? en
-                ? "Rewrite with feedback"
-                : "Réécrire avec le bilan"
-              : en
-                ? "Request my review"
-                : "Demander mon bilan"}
-          </strong>
-        </div>
-      </div>
       {error && (
         <div ref={errorRef} className="notice warning" role="alert">
           <AlertCircle size={20} />
@@ -221,6 +195,75 @@ export function Results({
           </div>
         </div>
       )}
+      <section className="task-report" aria-labelledby="task-report-title">
+        <div className="task-report-heading">
+          <div>
+            {keys.length > 1 && <div className="review-task-picker" role="group" aria-label={en ? "Select a task" : "Choisir une tâche"}>
+              {keys.map(k => <button key={k} aria-pressed={active === k} onClick={() => setActive(k)}>
+                {en ? "Task" : "Tâche"} {TASK_INFO[k].number}
+              </button>)}
+            </div>}
+            <h2 id="task-report-title">{en ? "Task" : "Tâche"} {TASK_INFO[active].number} · {en ? TASK_INFO[active].en : TASK_INFO[active].fr}</h2>
+          </div>
+          <button className="button secondary" onClick={() => onRevise(result, active)} disabled={busy}>
+            <FilePenLine size={16} />{en ? "Rewrite this task" : "Réécrire cette tâche"}
+          </button>
+        </div>
+      <div className="task-report-panes" key={active}>
+      {hasFeedback && <div className="report-sections" role="group" aria-label={en ? "Review sections" : "Rubriques du bilan"}>
+        <button aria-pressed={visibleSection === "feedback"} onClick={() => setSection("feedback")}>{en ? "Assessment" : "Évaluation"}</button>
+        {!wide && <button aria-pressed={visibleSection === "answer"} onClick={() => setSection("answer")}>{en ? "Your text" : "Votre texte"}</button>}
+        {feedback && <button aria-pressed={visibleSection === "corrections"} onClick={() => setSection("corrections")}>Corrections <span>{feedback.mistakes.length}</span></button>}
+        {feedback && <button aria-pressed={visibleSection === "examples"} onClick={() => setSection("examples")}>{en ? "Examples" : "Exemples"}</button>}
+      </div>}
+
+        {(wide || visibleSection === "answer") && <section className="review-original panel">
+          <div className="section-head">
+            <h2>{en ? "Your writing" : "Votre rédaction"}</h2>
+            <span
+              className={`badge ${words >= requirement.minWords && words <= requirement.maxWords ? "sage" : words < requirement.minWords ? "rose" : "sand"}`}
+            >
+              {words} / {requirement.minWords}–{requirement.maxWords} {en ? "words" : "mots"}
+            </span>
+          </div>
+          {words < requirement.minWords && (
+            <div className="length-check-banner is-under" role="note">
+              <AlertTriangle size={15} aria-hidden="true" />
+              <span>
+                {en
+                  ? `Add ${requirement.minWords - words} ${requirement.minWords - words === 1 ? "word" : "words"} to reach the minimum.`
+                  : `Il manque ${requirement.minWords - words} ${requirement.minWords - words === 1 ? "mot" : "mots"} pour atteindre le minimum.`}
+              </span>
+            </div>
+          )}
+          {original && (
+            <RevisionComparison
+              before={original.answers[active]}
+              after={result.answers[active]}
+              priorities={original.aiEvaluation?.pedagogical?.tasks[active]?.priorities}
+              en={en}
+            />
+          )}
+          <AnnotatedAnswer key={active} answer={result.answers[active]} mistakes={feedback?.mistakes} en={en} />
+          <details className="review-prompt">
+            <summary>
+              {en ? "See the prompt" : "Revoir la consigne"}
+              <ChevronDown size={14} />
+            </summary>
+            <p>{requirement.instruction}</p>
+            {active === "task3" &&
+              [requirement.document1, requirement.document2].map((doc, i) => doc && (
+                <div key={i}>
+                  <strong>Document {i + 1}</strong>
+                  <p>{doc}</p>
+                </div>
+              ))}
+          </details>
+
+
+        </section>}
+        <div className="review-reading-pane">
+
       {!result.aiEvaluation && (
         <section className="review-intro panel">
           <span className="resource-icon">
@@ -229,18 +272,17 @@ export function Results({
           <div>
             <h2>
               {en
-                ? "Feedback you can put to work."
-                : "Un bilan à mettre en pratique."}
+                ? "Get feedback on your writing"
+                : "Obtenir un bilan de votre rédaction"}
             </h2>
             <p>
               {en
-                ? "Get a task-level range, evidence from your text, verified corrections, and a few clear priorities. No automatic API calls."
-                : "Obtenez une plage de niveau, des preuves tirées de votre texte, des corrections vérifiées et quelques priorités claires. Aucun appel IA automatique."}
+                ? "See which passages support your estimated level and what to work on in your next draft."
+                : "Repérez les passages qui étayent votre niveau estimé et les points à travailler dans votre prochaine version."}
             </p>
           </div>
           {user ? (
             <div className="review-provider-actions">
-              <span className="muted text-small">{getGeminiModel(keys)}</span>
               <button
                 className="button primary"
                 disabled={!!busy}
@@ -261,20 +303,6 @@ export function Results({
               </button>
             </div>
           ) : (
-            <div className="review-auth-gate">
-              <div className="review-auth-gate-title">
-                <Lock size={16} aria-hidden="true" />
-                <strong>
-                  {en
-                    ? "Sign in required for AI review"
-                    : "Connexion requise pour le bilan IA"}
-                </strong>
-              </div>
-              <p>
-                {en
-                  ? "Your writing is saved on this device. Sign in or create a free account to unlock the CEFR range, verified corrections, and NCLC projection."
-                  : "Votre rédaction est conservée sur cet appareil. Connectez-vous ou créez un compte gratuit pour débloquer la plage CECRL, les corrections vérifiées et l’estimation NCLC."}
-              </p>
               <button
                 type="button"
                 className="button primary"
@@ -283,169 +311,23 @@ export function Results({
                 <Lock size={15} />
                 <span>
                   {en
-                    ? "Sign in / Create free account"
-                    : "Se connecter / Créer un compte gratuit"}
+                    ? "Sign in for feedback"
+                    : "Se connecter pour obtenir le bilan"}
                 </span>
               </button>
-            </div>
           )}
         </section>
       )}
-      {!result.isPracticeMode && (
-        <>
-          <div className="review-nclc panel">
-            <div className="nclc-heading">
-              <span className="eyebrow">
-                {en
-                  ? "FULL-MOCK WRITING ESTIMATE"
-                  : "ESTIMATION DE L’EXAMEN BLANC"}
-              </span>
-              <span className="badge sand">
-                {en ? "NON-OFFICIAL" : "NON OFFICIEL"}
-              </span>
-            </div>
-            <div className="nclc-body">
-              <h2>
-                {projection ? (
-                  <>
-                    NCLC{" "}
-                    <em>
-                      {projection.lower === 3 ? "<4" : projection.lower}–
-                      {projection.upper === 10 ? "10+" : projection.upper}
-                    </em>
-                  </>
-                ) : en ? (
-                  "Your NCLC estimate"
-                ) : (
-                  "Votre estimation NCLC"
-                )}
-              </h2>
-              <p>
-                {projection
-                  ? projection.rationale
-                  : !eligibility.eligible
-                    ? en
-                      ? eligibility.reason_en
-                      : eligibility.reason_fr
-                    : result.aiEvaluation?.pedagogical
-                        ?.projection_withholding_reason ||
-                      (en
-                        ? "Complete all three tasks, then request one Gemini review of the full mock."
-                        : "Complétez les trois tâches, puis demandez un bilan Gemini de l’ensemble.")}
-              </p>
-            </div>
-            <p className="footnote">
-              {en
-                ? "An uncalibrated practice range, not an official result. One isolated task cannot determine a final /20 score or NCLC level."
-                : "Plage de pratique non calibrée, sans valeur officielle. Une tâche isolée ne détermine ni la note finale sur 20 ni le niveau NCLC."}
-            </p>
-          </div>
-        </>
-      )}
-      {result.isPracticeMode && (
-        <p className="footnote task-review-note">
-          {en
-            ? "This task review is non-official. One isolated task cannot determine a final /20 score or NCLC level."
-            : "Ce bilan de tâche est non officiel. Une tâche isolée ne détermine ni la note finale sur 20 ni le niveau NCLC."}
-        </p>
-      )}
-      <div className="review-controls">
-        <div className="segmented">
-          {(keys.length ? keys : (["task1"] as TaskKey[])).map((k) => (
-            <button
-              key={k}
-              aria-pressed={active === k}
-              onClick={() => setActive(k)}
-            >
-              Tâche {TASK_INFO[k].number}
-            </button>
-          ))}
-        </div>
-        <div className="row">
-          <button
-            className="button primary"
-            onClick={() => onRevise(result, active)}
-            disabled={!!busy}
-          >
-            <FilePenLine size={16} />
-            {en ? "Rewrite this task" : "Réécrire cette tâche"}
-          </button>
-        </div>
-      </div>
-      <div className="review-grid">
-        <section className="review-original panel">
-          <div className="section-head">
-            <h2>{en ? "Your writing" : "Votre rédaction"}</h2>
-            <span
-              className={`badge ${words >= requirement.minWords && words <= requirement.maxWords ? "sage" : words < requirement.minWords ? "rose" : "sand"}`}
-            >
-              {words} / {requirement.minWords}–{requirement.maxWords} {en ? "words" : "mots"}
-            </span>
-          </div>
-          {words < requirement.minWords && (
-            <div className="length-check-banner is-under" role="note">
-              <AlertTriangle size={15} aria-hidden="true" />
-              <span>
-                {en
-                  ? `Below official minimum (${requirement.minWords} words). In TCF Canada, short responses trigger an automatic CEFR ceiling.`
-                  : `Sous le seuil minimal officiel (${requirement.minWords} mots). Au TCF Canada, un texte trop court plafonne automatiquement le niveau CECRL.`}
-              </span>
-            </div>
-          )}
-          <details className="review-prompt">
-            <summary>
-              {en ? "See the prompt" : "Revoir la consigne"}
-              <ChevronDown size={14} />
-            </summary>
-            <p>{requirement.instruction}</p>
-            {active === "task3" &&
-              [requirement.document1, requirement.document2].map((doc, i) => (
-                <div key={i}>
-                  <strong>Document {i + 1}</strong>
-                  <p>{doc || "—"}</p>
-                </div>
-              ))}
-          </details>
-          {original && (
-            <details className="revision-reference">
-              <summary>
-                {en
-                  ? "Compare with the previous version"
-                  : "Comparer avec la version précédente"}
-              </summary>
-              <p>{original.answers[active]}</p>
-            </details>
-          )}
-          <div className="original-writing">
-            {result.answers[active] ||
-              (en
-                ? "No response was written for this task."
-                : "Aucune réponse rédigée pour cette tâche.")}
-          </div>
-          <div className="original-caption">
-            {result.month} {result.year} · Série{" "}
-            {result.combination.combinationNumber}
-          </div>
-        </section>
-        <section className="feedback-column">
-          {busy && (
-            <div className="notice" role="status">
-              <Loader2 className="spin" size={20} />
-              <span>
-                {en
-                  ? "Evaluating your answer against CEFR benchmarks (see progress above)…"
-                  : "Évaluation de votre réponse selon les critères du CECRL (voir progression ci-dessus)…"}
-              </span>
-            </div>
-          )}
+        {chosen && !hasFeedback && <p className="notice">{en ? "This saved review contains no assessment for this task." : "Le bilan enregistré ne contient pas d’évaluation pour cette tâche."}</p>}
+        {visibleSection === "feedback" && <section className="feedback-column">
           {feedback ? (
             <>
               <div className="feedback-level panel">
                 <div>
                   <span className="eyebrow">
                     {en
-                      ? "PEDAGOGICAL LEVEL RANGE · THIS TASK"
-                      : "PLAGE DE NIVEAU PÉDAGOGIQUE · CETTE TÂCHE"}
+                      ? "Estimated CEFR range"
+                      : "Plage de niveau CECRL estimée"}
                   </span>
                   <h2>
                     {feedback.range
@@ -480,33 +362,12 @@ export function Results({
                     </button>
                   </div>
                 )}
-                {chosen?.requested_model &&
-                  chosen.model !== chosen.requested_model && (
-                    <p className="notice">
-                      {en
-                        ? `Automatic fallback: ${chosen.model} produced this review.`
-                        : `Relais automatique : ce bilan a été réalisé par ${chosen.model}.`}
-                    </p>
-                  )}
-                {chosen?.key_source === "backup" && (
-                  <p className="notice">
-                    {en
-                      ? "The backup Gemini key was used for this review."
-                      : "La clé Gemini de secours a été utilisée pour ce bilan."}
-                  </p>
-                )}
-                <span className="feedback-model">
-                  {chosen?.model} ·{" "}
-                  {en
-                    ? "Not an official assessment"
-                    : "Évaluation non officielle"}
-                </span>
               </div>
               {!!feedback.strengths?.length && (
                 <div className="feedback-box">
                   <span className="badge sage">
                     <Check size={13} />
-                    {en ? "KEEP DOING THIS" : "À CONSERVER"}
+                    {en ? "Strengths" : "Points forts"}
                   </span>
                   {feedback.strengths.map((s, i) => (
                     <p key={i}>{s}</p>
@@ -516,8 +377,8 @@ export function Results({
               <div className="feedback-box priorities">
                 <span className="badge sand">
                   {en
-                    ? "YOUR NEXT IMPROVEMENTS"
-                    : "VOS PROCHAINES AMÉLIORATIONS"}
+                    ? "Revision priorities"
+                    : "Priorités de réécriture"}
                 </span>
                 {feedback.priorities.length ? (
                   <ol>
@@ -535,15 +396,7 @@ export function Results({
                       : "Aucune priorité spécifique fournie. Consultez les observations ci-dessous."}
                   </p>
                 )}
-                <button
-                  className="text-button"
-                  onClick={() => onRevise(result, active)}
-                >
-                  {en
-                    ? "Put these into a new version"
-                    : "Les appliquer dans une nouvelle version"}
-                  <ArrowRight size={15} />
-                </button>
+
               </div>
               {!!feedback.risks.length && (
                 <div className="notice warning">
@@ -570,12 +423,12 @@ export function Results({
                 </div>
               )}
               <div className="panel feedback-evidence">
-                <h3>{en ? "Why this range?" : "Pourquoi cette plage ?"}</h3>
+                <h3>{en ? "Evidence from your text" : "Observations sur votre texte"}</h3>
                 {feedback.level_evidence?.map((e, i) => (
                   <div className="evidence-item" key={i}>
                     <blockquote>« {e.quote} »</blockquote>
                     <p>{e.explanation}</p>
-                    <small>{e.domain}</small>
+                    <small>{assessmentLabels[e.domain] || e.domain}</small>
                   </div>
                 ))}
                 <details>
@@ -585,13 +438,21 @@ export function Results({
                       : "Lire les observations détaillées"}
                     <ChevronDown size={14} />
                   </summary>
-                  <h4>{en ? "Communication" : "Communication"}</h4>
+                  {!!feedback.task_fulfilment_audit?.length && <div className="task-audit">
+                    <h4>{en ? "Prompt requirements" : "Respect de la consigne"}</h4>
+                    {feedback.task_fulfilment_audit.map((item, i) => <div key={i}>
+                      <strong>{item.requirement}</strong>
+                      <small>{item.met ? (en ? "Met" : "Respecté") : (en ? "To revisit" : "À revoir")}</small>
+                      <p>{item.finding}</p>
+                    </div>)}
+                  </div>}
+                  <h4>Communication</h4>
                   <p>{feedback.communication_pass}</p>
                   <h4>{en ? "Language control" : "Maîtrise de la langue"}</h4>
                   <p>{feedback.language_pass}</p>
                   {Object.entries(feedback.domains).map(([domain, text]) => (
                     <div key={domain}>
-                      <h4>{domain}</h4>
+                      <h4>{assessmentLabels[domain] || domain}</h4>
                       <p>{text}</p>
                     </div>
                   ))}
@@ -599,7 +460,7 @@ export function Results({
                     Object.entries(feedback.source_checks).map(
                       ([key, value]) => (
                         <p key={key}>
-                          <strong>{key} :</strong> {value}
+                          <strong>{assessmentLabels[key] || key} :</strong> {value}
                         </p>
                       ),
                     )}
@@ -615,32 +476,12 @@ export function Results({
             </>
           ) : chosen && !chosen.pedagogical ? (
             <AIEvaluationView evaluation={chosen} />
-          ) : (
-            <div className="feedback-placeholder panel">
-              <BookOpen size={28} />
-              <h3>
-                {en
-                  ? "Your feedback will appear here."
-                  : "Votre bilan apparaîtra ici."}
-              </h3>
-              <p>
-                {en
-                  ? "Read it once for the main ideas, then choose one improvement for your revision."
-                  : "Lisez-le pour comprendre l’essentiel, puis choisissez une amélioration à appliquer."}
-              </p>
-            </div>
-          )}
-        </section>
-      </div>
-      {feedback && (
+          ) : null}
+        </section>}
+      {visibleSection === "corrections" && feedback && (
         <section className="panel corrections-section">
           <div className="section-head">
             <div>
-              <p className="eyebrow">
-                {en
-                  ? "LEARN FROM YOUR OWN WORDS"
-                  : "APPRENDRE À PARTIR DE VOS MOTS"}
-              </p>
               <h2>
                 {en ? "Corrections to remember" : "Les corrections à retenir"}
               </h2>
@@ -675,8 +516,13 @@ export function Results({
                   : "Le bilan ne contient pas de correction pour cette tâche."}
             </p>
           )}
+        </section>
+      )}
+      {visibleSection === "examples" && feedback && (
+        <section className="panel review-examples">
+          <h3>{en ? "Examples for this task" : "Exemples pour cette tâche"}</h3>
           {feedback.model_answer && (
-            <details className="model-answer">
+            <details className="model-answer" open>
               <summary>
                 {en
                   ? "See an illustrative response"
@@ -728,12 +574,59 @@ export function Results({
           )}
         </section>
       )}
+      </div>
+      </div>
+      </section>
+      {!result.isPracticeMode && !projection && (
+        <details className="review-options panel mock-estimate">
+          <summary>{en ? "Full mock NCLC estimate" : "Estimation NCLC de l’examen blanc"} <ChevronDown size={16} /></summary>
+          <div className="review-nclc">
+              <p>
+                {!eligibility.eligible
+                    ? en
+                      ? eligibility.reason_en
+                      : eligibility.reason_fr
+                    : result.aiEvaluation?.pedagogical
+                        ?.projection_withholding_reason ||
+                      (en
+                        ? "Request a review of this mock exam to see its estimated range."
+                        : "Demandez le bilan de cet examen blanc pour consulter sa plage estimée.")}
+              </p>
+            <p className="footnote">
+              {en
+                ? "An uncalibrated practice range, not an official result. One isolated task cannot determine a final /20 score or NCLC level."
+                : "Plage de pratique non calibrée, sans valeur officielle. Une tâche isolée ne détermine ni la note finale sur 20 ni le niveau NCLC."}
+            </p>
+          </div>
+        </details>
+      )}
       {result.aiEvaluation && (
         <details className="review-options panel">
           <summary>
             {en ? "Review options" : "Options de correction"}
             <ChevronDown size={16} />
           </summary>
+                {chosen?.requested_model &&
+                  chosen.model !== chosen.requested_model && (
+                    <p className="notice">
+                      {en
+                        ? `Automatic fallback: ${chosen.model} produced this review.`
+                        : `Relais automatique : ce bilan a été réalisé par ${chosen.model}.`}
+                    </p>
+                  )}
+                {chosen?.key_source === "backup" && (
+                  <p className="notice">
+                    {en
+                      ? "The backup Gemini key was used for this review."
+                      : "La clé Gemini de secours a été utilisée pour ce bilan."}
+                  </p>
+                )}
+                <span className="feedback-model">
+                  {chosen?.model} ·{" "}
+                  {en
+                    ? "Not an official assessment"
+                    : "Évaluation non officielle"}
+                </span>
           {user ? (
             <>
               <p>
@@ -770,6 +663,7 @@ export function Results({
           )}
         </details>
       )}
+      <SubmissionExport key={result.id} result={result} />
     </div>
   );
 }

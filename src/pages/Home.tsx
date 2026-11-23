@@ -3,23 +3,31 @@ import {
   ArrowRight,
   ArrowUpRight,
   Clock3,
+  MessageSquareText,
+  BookOpen,
+  Scale,
   RotateCcw,
   Shuffle,
 } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 import type { ExamResult, TaskKey } from "../types/exam";
 import {
+  type CombinationProgress,
   PracticeSession,
   QuestionEntry,
   TASK_INFO,
   TASK_KEYS,
 } from "../utils/practice";
-import { selectRandomCombination } from "../utils/randomCombination";
+import { useWorkspace } from "../context/WorkspaceContext";
+import { drawPracticeCombination } from "../utils/randomCombination";
 import { loadQuestions } from "../utils/questionsLoader";
 import { normalizeParagraphText } from "../utils/cleanText";
 import { SessionList } from "../components/SessionList";
 import { PracticeTracker } from "../components/PracticeTracker";
+import { CombinationStatus } from "../components/CombinationStatus";
+
 export const Home: React.FC<{
+  progressBySet: Map<string, CombinationProgress>;
   name: string;
   submissions: ExamResult[];
   draft: PracticeSession | null;
@@ -31,6 +39,7 @@ export const Home: React.FC<{
   onStart: (entry: QuestionEntry, task: TaskKey | "exam") => void;
   onOpen: (s: ExamResult) => void;
 }> = ({
+  progressBySet,
   name,
   submissions,
   draft,
@@ -42,32 +51,21 @@ export const Home: React.FC<{
   onStart,
   onOpen,
 }) => {
+  const { store } = useWorkspace();
   const { language } = useLanguage();
   const en = language === "en";
   const [selected, setSelected] = useState<QuestionEntry | null>(null);
+  const progress = selected ? progressBySet.get(selected.id) : undefined;
   const draw = async () => {
     const pool = questions.length ? questions : await loadQuestions();
-    setSelected(selectRandomCombination(pool, selected?.id));
+    setSelected(drawPracticeCombination(pool, progressBySet, store));
   };
   return (
     <div className="page-enter simple-home">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">
-            {name
-              ? `${en ? "Hello" : "Bonjour"}, ${name.split(" ")[0]}`
-              : "Expression écrite · TCF Canada"}
-          </p>
-          <h1>
-            {en
-              ? "What would you like to practise?"
-              : "Qu’allez-vous pratiquer ?"}
-          </h1>
-          <p>
-            {en
-              ? "Choose a task, write your response, then use feedback to improve it."
-              : "Choisissez une tâche, rédigez votre réponse, puis améliorez-la avec le bilan."}
-          </p>
+          {name && <p className="home-greeting">{en ? "Hello" : "Bonjour"}, {name.split(" ")[0]}</p>}
+          <h1>{en ? "Writing practice" : "Atelier de rédaction"}</h1>
         </div>
       </div>
       {draft && (
@@ -104,7 +102,7 @@ export const Home: React.FC<{
           onClick={draw}
         >
           <Shuffle size={18} />
-          {en ? "Random combination" : "Combinaison au hasard"}
+          {selected ? (en ? "Draw another set" : "Tirer une autre série") : (en ? "Random combination" : "Combinaison au hasard")}
         </button>
         <div
           className="random-selection-status"
@@ -119,6 +117,7 @@ export const Home: React.FC<{
                 {selected.combination.combinationNumber} · {selected.month}{" "}
                 {selected.year}
               </strong>
+              <CombinationStatus progress={progress} en={en} />
               <span>
                 {en
                   ? "All three tasks below belong to this set. Choose a task or start the full mock."
@@ -128,89 +127,49 @@ export const Home: React.FC<{
           ) : (
             <p>
               {en
-                ? "Draw one complete set of three tasks. You choose when to begin."
-                : "Tirez une seule série de trois tâches. Vous choisissez quand commencer."}
+                ? "Unstarted sets come first. Each draw includes all three tasks."
+                : "Les séries jamais travaillées passent en premier. Chaque tirage réunit trois tâches."}
             </p>
           )}
         </div>
       </section>
-      <div className="section-head simple-practice-heading">
-        <h2>{en ? "One task at a time" : "Une tâche à la fois"}</h2>
-        <button className="text-button" onClick={onLibrary}>
-          {en ? "Choose a specific topic" : "Choisir un sujet précis"}
-          <ArrowUpRight size={15} />
-        </button>
-      </div>
-      <div className="simple-task-grid">
-        {TASK_KEYS.map((key) => {
-          const info = TASK_INFO[key];
-          return (
-            <button
-              key={key}
-              className="simple-task-card"
-              onClick={() =>
-                selected ? onStart(selected, key) : onPractice(key)
-              }
-            >
-              <span className={`task-token ${info.color}`}>{info.number}</span>
-              <span className="eyebrow">
-                {en ? "Task" : "Tâche"} {info.number}
-              </span>
-              <h3>{en ? info.en : info.fr}</h3>
-              <p>
-                {selected
-                  ? normalizeParagraphText(
-                      selected.combination.tasks[key].instruction,
-                    ).slice(0, 180) +
-                    (selected.combination.tasks[key].instruction.length > 180
-                      ? "…"
-                      : "")
-                  : en
-                    ? [
-                        "A message with clear details and the right tone.",
-                        "An experience, concrete details and your opinion.",
-                        "Two documents, a comparison and your position.",
-                      ][info.number - 1]
-                    : info.description}
-              </p>
-              <div className="simple-task-meta">
-                <span>
-                  {info.min}–{info.max} {en ? "words" : "mots"}
-                </span>
-                <span>~{info.minutes} min</span>
-              </div>
-              <span className="simple-task-action">
-                {en ? "Start writing" : "Commencer à écrire"}
-                <ArrowRight size={17} />
-              </span>
+      <div className="practice-choices">
+        <section className="task-menu">
+          <div className="section-head">
+            <h2>{en ? "Guided tasks" : "Tâches guidées"}</h2>
+            <button className="text-button" onClick={onLibrary}>
+              {en ? "Browse topics" : "Parcourir les sujets"} <ArrowUpRight size={15} />
             </button>
-          );
-        })}
+          </div>
+          <div className="guided-task-list">
+          {TASK_KEYS.map(key => {
+            const info = TASK_INFO[key];
+            const Icon = { task1: MessageSquareText, task2: BookOpen, task3: Scale }[key];
+            return (
+              <button key={key} className="practice-task-row" onClick={() => selected ? onStart(selected, key) : onPractice(key)}>
+                <span className={`practice-task-icon ${info.color}`}><Icon size={21} /></span>
+                <span className="task-row-copy">
+                  <small>{en ? "Task" : "Tâche"} {info.number}</small>
+                  <strong>{en ? info.en : info.fr}</strong>
+                  <small className="task-duration">{info.minutes} min · {info.min}–{info.max} {en ? "words" : "mots"}</small>
+                  {selected && <span className="task-preview">{normalizeParagraphText(selected.combination.tasks[key].instruction)}</span>}
+                  {progress?.tasks.has(key) && <small className="task-repeat">{en ? "Practise again" : "Refaire la tâche"}</small>}
+                </span>
+                <ArrowRight size={17} aria-hidden="true" />
+              </button>
+            );
+          })}
+          </div>
+        </section>
+        <section className="mock-invitation">
+          <h2>{en ? "Full mock exam" : "Examen blanc"}</h2>
+          <div className="mock-duration"><Clock3 size={26} /><strong>60</strong> min</div>
+          <p>{en ? "Write all three responses against one clock. You choose how to divide your time." : "Rédigez les trois réponses dans le temps imparti. Répartissez votre temps librement."}</p>
+          <button className="button" onClick={() => selected ? onStart(selected, "exam") : onPractice("exam")}>
+            {progress?.mockCompleted ? (en ? "Retake mock exam" : "Refaire l’examen") : (en ? "Start mock exam" : "Commencer l’examen")} <ArrowRight size={16} />
+          </button>
+        </section>
       </div>
-      <button
-        className="simple-mock-card"
-        onClick={() =>
-          selected ? onStart(selected, "exam") : onPractice("exam")
-        }
-      >
-        <span className="simple-mock-icon">
-          <Clock3 size={24} />
-        </span>
-        <span>
-          <strong>
-            {en ? "Practise the full exam" : "S’entraîner à l’examen complet"}
-          </strong>
-          <small>
-            {en
-              ? "3 tasks · 60 minutes · A supported NCLC estimate after review"
-              : "3 tâches · 60 minutes · Estimation NCLC si le bilan le permet"}
-          </small>
-        </span>
-        <span className="simple-mock-action">
-          {en ? "Start mock exam" : "Commencer l’examen"}
-          <ArrowRight size={17} />
-        </span>
-      </button>
       <PracticeTracker submissions={submissions} onProgress={onProgress} />
       {!!submissions.length && (
         <section className="panel simple-recent">

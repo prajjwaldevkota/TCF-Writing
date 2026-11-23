@@ -10,6 +10,20 @@ const compile = (file) =>
   }).outputText;
 const url = (source) =>
   "data:text/javascript;base64," + Buffer.from(source).toString("base64");
+const { revisionDiff } = await import(url(compile("src/utils/revisionDiff.ts")));
+for (const [before, after] of [
+  ["Je suis aller.\nMerci !", "Je suis allé.\nMerci !"],
+  ["Très très bien", "Très bien !"], ["", "Bienvenue"], ["Bonjour", ""],
+  ["Identique.", "Identique."], ["un ".repeat(2000), "deux ".repeat(2000)],
+]) {
+  const spans = revisionDiff(before, after);
+  assert.equal(spans.filter(s => s.change !== "added").map(s => s.text).join(""), before);
+  assert.equal(spans.filter(s => s.change !== "removed").map(s => s.text).join(""), after);
+}
+assert.deepEqual(revisionDiff("Je suis aller.", "Je suis allé."), [
+  { change: "same", text: "Je suis " }, { change: "removed", text: "aller" },
+  { change: "added", text: "allé" }, { change: "same", text: "." },
+]);
 const values = new Map();
 globalThis.localStorage = {
   getItem: (key) => values.get(key) || null,
@@ -99,6 +113,18 @@ const result = {
   isPracticeMode: true,
   practiceTasks: ["task1"],
 };
+const setId = "2026-Novembre-1";
+const legacy = { ...result, practiceTasks: undefined, answers: { task1: "", task2: "Récit", task3: "" } };
+const partialMock = { ...result, isPracticeMode: false, answers: { task1: " ", task2: "", task3: "Avis" } };
+const blank = { ...result, month: "Mai", answers: practice.emptyAnswers() };
+const progress = practice.combinationProgress([result, result, legacy, partialMock, blank]);
+assert.deepEqual([...progress.get(setId).tasks], practice.TASK_KEYS);
+assert.equal(progress.get(setId).mockCompleted, false);
+assert.equal(progress.has("2026-Mai-1"), false);
+const fullMock = { ...partialMock, month: "Juin", answers: { task1: "A", task2: "B", task3: "C" } };
+const separateSets = practice.combinationProgress([result, fullMock]);
+assert.deepEqual([...separateSets.get(setId).tasks], ["task1"]);
+assert.equal(separateSets.get("2026-Juin-1").mockCompleted, true);
 const revision = practice.makeSession(entry, "task1", result);
 assert.equal(revision.revisionOf, "one");
 assert.equal(revision.answers.task1, result.answers.task1);

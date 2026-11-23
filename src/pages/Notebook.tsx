@@ -123,16 +123,7 @@ export function Notebook({ onPractice }: { onPractice: () => void }) {
     <div className="page-enter">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">
-            {en
-              ? "SMALL CORRECTIONS, LASTING HABITS"
-              : "DE PETITES CORRECTIONS, DE BONNES HABITUDES"}
-          </p>
-          <h1>
-            {en
-              ? "Make yesterday’s mistakes useful."
-              : "Les erreurs d’hier vous font avancer."}
-          </h1>
+          <h1>{en ? "Correction notebook" : "Carnet de corrections"}</h1>
           <p>
             {en
               ? "Rewrite a sentence, reveal the correction, then decide what needs another pass. No AI call required."

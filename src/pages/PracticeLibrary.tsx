@@ -4,7 +4,6 @@ import {
   ArrowRight,
   Bookmark,
   Briefcase,
-  Check,
   Clock3,
   Compass,
   Cpu,
@@ -17,12 +16,14 @@ import {
   Shuffle,
   Users,
 } from "lucide-react";
-import type { ExamResult, TaskKey } from "../types/exam";
-import { QuestionEntry, TASK_INFO, TASK_KEYS, TOPIC_THEMES, type TopicTheme, type TopicThemeKey } from "../utils/practice";
+import type { TaskKey } from "../types/exam";
+import { type CombinationProgress, QuestionEntry, TASK_INFO, TOPIC_THEMES, type TopicTheme, type TopicThemeKey } from "../utils/practice";
 import { getTopicMeta, useQuestions } from "../utils/questionsLoader";
 import { useLanguage } from "../context/LanguageContext";
-import { selectRandomCombination } from "../utils/randomCombination";
+import { drawPracticeCombination } from "../utils/randomCombination";
 import { normalizeParagraphText } from "../utils/cleanText";
+
+import { CombinationStatus } from "../components/CombinationStatus";
 
 const THEME_ICONS: Record<TopicThemeKey, LucideIcon> = {
   all: Layers,
@@ -39,8 +40,8 @@ const THEME_MAP = Object.fromEntries(
 
 export const PracticeLibrary: React.FC<{
   onStart: (entry: QuestionEntry, task: TaskKey | "exam") => void;
-  submissions: ExamResult[];
-}> = ({ onStart, submissions }) => {
+  progressBySet: Map<string, CombinationProgress>;
+}> = ({ onStart, progressBySet }) => {
   const { store } = useWorkspace();
   const { language } = useLanguage();
   const en = language === "en";
@@ -49,6 +50,7 @@ export const PracticeLibrary: React.FC<{
   const [query, setQuery] = useState("");
   const [year, setYear] = useState("all");
   const [selectedTheme, setSelectedTheme] = useState<TopicThemeKey>("all");
+  const [unstartedOnly, setUnstartedOnly] = useState(false);
   const [savedOnly, setSavedOnly] = useState(false);
   const [page, setPage] = useState(1);
   const [saved, setSaved] = useState<string[]>(() => {
@@ -72,21 +74,10 @@ export const PracticeLibrary: React.FC<{
     () => [...new Set(allQuestions.map((q) => q.year))],
     [allQuestions],
   );
-  const completedSet = useMemo(() => {
-    const keys = new Set<string>();
-    for (const s of submissions) {
-      const base = `${s.year}-${s.month}-${s.combination.combinationNumber}`;
-      if (!s.isPracticeMode) {
-        for (const k of TASK_KEYS) keys.add(`${base}:${k}`);
-      } else if (s.practiceTasks) {
-        for (const k of s.practiceTasks) keys.add(`${base}:${k}`);
-      }
-    }
-    return keys;
-  }, [submissions]);
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
     return allQuestions.filter((entry) => {
+      if (unstartedOnly && progressBySet.has(entry.id)) return false;
       if (year !== "all" && entry.year !== year) return false;
       if (savedOnly && !savedSet.has(entry.id)) return false;
       const meta = getTopicMeta(entry);
@@ -95,10 +86,10 @@ export const PracticeLibrary: React.FC<{
         return false;
       return true;
     });
-  }, [allQuestions, year, savedOnly, savedSet, query, task, selectedTheme]);
+  }, [allQuestions, year, savedOnly, savedSet, query, task, selectedTheme, unstartedOnly, progressBySet]);
   const displayed = randomSelection ? [randomSelection] : filtered;
   const drawRandom = () => {
-    const entry = selectRandomCombination(filtered, randomSelection?.id);
+    const entry = drawPracticeCombination(filtered, progressBySet, store);
     setRandomSelection(entry);
     setPage(1);
     setNotice(
@@ -133,16 +124,7 @@ export const PracticeLibrary: React.FC<{
     <div className="page-enter">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">
-            {en
-              ? "A PLACE TO PUT IDEAS INTO WORDS"
-              : "DES IDÉES À METTRE EN MOTS"}
-          </p>
-          <h1>
-            {en
-              ? "What will you write today?"
-              : "Qu’allez-vous écrire aujourd’hui ?"}
-          </h1>
+          <h1>{en ? "Topic library" : "Bibliothèque de sujets"}</h1>
           <p>
             {en
               ? "Choose a topic. Practise one task, or put all three together."
@@ -153,6 +135,8 @@ export const PracticeLibrary: React.FC<{
           {allQuestions.length} {en ? "topic sets" : "séries de sujets"}
         </span>
       </div>
+      <div className="catalog-layout">
+      <section className="catalog-tools" aria-label={en ? "Choose and filter topics" : "Choisir et filtrer les sujets"}>
       <div className="library-toolbar">
         <div className="segmented">
           {(["task1", "task2", "task3", "exam"] as const).map((k) => (
@@ -192,7 +176,7 @@ export const PracticeLibrary: React.FC<{
           onClick={drawRandom}
         >
           <Shuffle size={17} />
-          {en ? "Random combination" : "Combinaison au hasard"}
+          {randomSelection ? (en ? "Draw another set" : "Tirer une autre série") : (en ? "Random combination" : "Combinaison au hasard")}
         </button>
         <label className="search-field">
           <Search size={18} />
@@ -248,15 +232,22 @@ export const PracticeLibrary: React.FC<{
           );
         })}
       </div>
+      <label className="select-field catalog-theme-select">
+        <span>{en ? "Theme" : "Thème"}</span>
+        <select value={selectedTheme} onChange={e => update(() => setSelectedTheme(e.target.value as TopicThemeKey))}>
+          {TOPIC_THEMES.map(theme => <option key={theme.key} value={theme.key}>{en ? theme.en : theme.fr}</option>)}
+        </select>
+      </label>
+      </section>
+      <div className="catalog-results">
       <div className="row between library-count">
         <span className="muted text-small">
           {displayed.length} {en ? "sets found" : "séries disponibles"}
         </span>
-        <span className="muted text-small">
-          {en
-            ? "From your existing practice collection"
-            : "Votre collection de sujets de pratique"}
-        </span>
+        <label className="row gap-2 text-small">
+          <input type="checkbox" checked={unstartedOnly} onChange={e => update(() => setUnstartedOnly(e.target.checked))} />
+          {en ? "Unstarted sets only" : "Séries jamais travaillées"}
+        </label>
       </div>
       {randomSelection && (
         <div
@@ -295,7 +286,8 @@ export const PracticeLibrary: React.FC<{
               const key = task === "exam" ? "task1" : task;
               const requirement = entry.combination.tasks[key];
               const meta = getTopicMeta(entry);
-              const completed = completedSet.has(`${entry.id}:${key}`);
+              const progress = progressBySet.get(entry.id);
+              const completed = task === "exam" ? progress?.mockCompleted : progress?.tasks.has(task);
               const unavailable =
                 (task === "task3" || task === "exam") && !meta.hasSources;
               const themeMeta = THEME_MAP[meta.theme];
@@ -381,19 +373,14 @@ export const PracticeLibrary: React.FC<{
                         ? "3 tâches"
                         : `${requirement.minWords}–${requirement.maxWords} ${en ? "words" : "mots"}`}
                     </span>
-                    {completed && (
-                      <span className="completed-label">
-                        <Check size={13} />
-                        {en ? "Practised" : "Travaillé"}
-                      </span>
-                    )}
+                    <CombinationStatus progress={progress} en={en} />
                   </div>
                   <button
                     className="topic-start"
                     disabled={unavailable}
                     onClick={() => onStart(entry, task)}
                   >
-                    {en ? "Start writing" : "Commencer à écrire"}
+                    {completed ? (en ? "Practise again" : "Refaire cet exercice") : (en ? "Start writing" : "Commencer à écrire")}
                     <ArrowRight size={16} />
                   </button>
                 </article>
@@ -436,6 +423,7 @@ export const PracticeLibrary: React.FC<{
               setYear("all");
               setSelectedTheme("all");
               setSavedOnly(false);
+              setUnstartedOnly(false);
               setPage(1);
             }}
           >
@@ -443,6 +431,8 @@ export const PracticeLibrary: React.FC<{
           </button>
         </div>
       )}
+      </div>
+      </div>
     </div>
   );
 };

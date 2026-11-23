@@ -308,24 +308,14 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
               <span>L’atelier TCF Canada</span>
             </div>
           </div>
-          <span className="splash-goal-pill">Objectif NCLC 7+</span>
+
         </div>
 
         <div className="splash-hero-copy">
-          <p className="splash-kicker">
-            {en
-              ? "Expression écrite · Exam simulation & evidence-based review"
-              : "Expression écrite · Simulation officielle et bilan étayé"}
-          </p>
-          <h1>
-            {en
-              ? "Practise TCF Canada writing in a quiet, realistic studio."
-              : "Préparez l’écrit du TCF Canada dans le calme d’un vrai atelier."}
-          </h1>
+          <h1>{en ? "TCF Canada writing practice" : "Préparer l’écrit du TCF Canada"}</h1>
           <p className="splash-lead">
-            {en
-              ? "Work through real exam combinations under the 60-minute timer, then review quoted evidence, official length checks, and targeted rewrites."
-              : "Travaillez sur des combinaisons réelles chronométrées sur 60 minutes, puis relisez vos phrases avec citations vérifiées, contrôle des longueurs et pistes de réécriture."}
+            {en ? "Choose a topic, write in French and revise with feedback on your own sentences."
+              : "Choisissez un sujet, rédigez en français et retravaillez vos phrases à partir du bilan."}
           </p>
         </div>
 
