@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, RotateCcw } from "lucide-react";
 import { useWorkspace } from "../context/WorkspaceContext";
-import type { SavedMistake } from "../types/aiEvaluation";
+import type { MistakeItem, SavedMistake } from "../types/aiEvaluation";
 import { dueCorrections, matchesCorrection, scheduleCorrection } from "../utils/correctionDrill";
 
-export function CorrectionDrill({ en }: { en: boolean }) {
+export function CorrectionDrill({ en, focus }: { en: boolean; focus?: { cards: MistakeItem[]; description: string } }) {
   const { store, getStoredMistakes } = useWorkspace();
-  const [cards, setCards] = useState<SavedMistake[]>([]);
+  const [dueCards, setCards] = useState<SavedMistake[]>([]);
   const [stage, setStage] = useState<"ready" | "active" | "done">("ready");
   const [index, setIndex] = useState(0);
   const [attempt, setAttempt] = useState("");
@@ -14,6 +14,7 @@ export function CorrectionDrill({ en }: { en: boolean }) {
   const [score, setScore] = useState(0);
   const [saveError, setSaveError] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
+  const cards = focus?.cards ?? dueCards;
   const current = cards[index];
   const refresh = useCallback(() => {
     try { setCards(dueCorrections(getStoredMistakes(), store)); }
@@ -21,7 +22,7 @@ export function CorrectionDrill({ en }: { en: boolean }) {
   }, [getStoredMistakes, store]);
 
   useEffect(() => {
-    if (stage !== "ready") return;
+    if (focus || stage !== "ready") return;
     refresh();
     const unsubscribe = store.subscribe(refresh);
     window.addEventListener("focus", refresh);
@@ -31,7 +32,7 @@ export function CorrectionDrill({ en }: { en: boolean }) {
       window.removeEventListener("focus", refresh);
       window.removeEventListener("storage", refresh);
     };
-  }, [stage, refresh, store]);
+  }, [stage, refresh, store, focus]);
 
   useEffect(() => {
     if (stage === "active") field.current?.focus();
@@ -42,7 +43,8 @@ export function CorrectionDrill({ en }: { en: boolean }) {
     const correct = !reveal && matchesCorrection(attempt, current.corrected_text);
     setMatched(correct);
     if (correct) setScore(total => total + 1);
-    try { scheduleCorrection(store, current, correct); }
+    if (focus) return;
+    try { scheduleCorrection(store, dueCards[index], correct); }
     catch { setSaveError(true); }
   }
   function next() {
@@ -55,10 +57,11 @@ export function CorrectionDrill({ en }: { en: boolean }) {
   return <section className="correction-drill panel" aria-labelledby="drill-heading">
     <div className="drill-heading">
       <RotateCcw size={20} aria-hidden="true" />
-      <h2 id="drill-heading">{en ? "Five-minute correction drill" : "Cinq minutes de révision"}</h2>
+      <h2 id="drill-heading">{focus ? (en ? "Practise this next" : "À travailler en priorité") : en ? "Five-minute correction drill" : "Cinq minutes de révision"}</h2>
     </div>
     {stage === "ready" && <>
-      <p>{en ? "Rewrite up to three passages from your notebook from memory." : "Corrigez de mémoire jusqu’à trois passages de votre carnet."}</p>
+      <p>{focus ? focus.description : en ? "Rewrite up to three passages from your notebook from memory." : "Corrigez de mémoire jusqu’à trois passages de votre carnet."}</p>
+      {focus && <blockquote lang="fr">{cards[0].original_text}</blockquote>}
       <button className="button secondary" onClick={() => {
         setStage("active"); setIndex(0); setScore(0); setSaveError(false);
       }}>{en ? "Start drill" : "Commencer la révision"} <ArrowRight size={15} /></button>
@@ -77,7 +80,7 @@ export function CorrectionDrill({ en }: { en: boolean }) {
       </form>
       {matched !== null && <>
         <div className="drill-feedback" role="status">
-          <strong>{matched ? (en ? "Matches the notebook" : "Conforme au carnet") : (en ? "Notebook correction" : "Correction du carnet")}</strong>
+          <strong>{matched ? (en ? "Matches the correction" : "Conforme à la correction") : (en ? "Suggested correction" : "Correction proposée")}</strong>
           <p lang="fr">{current.corrected_text}</p>
           <p>{current.explanation}</p>
         </div>
@@ -86,8 +89,8 @@ export function CorrectionDrill({ en }: { en: boolean }) {
     </>}
     {stage === "done" && <>
       <p role="status">{en ? `Drill complete · ${score}/${cards.length} matched from memory.` : `Révision terminée · ${score}/${cards.length} réponses retrouvées de mémoire.`}</p>
-      {!saveError && <p>{en ? "Missed corrections return in one day. Matches return in three days." : "Les corrections à revoir reviennent dans un jour, les réponses retrouvées dans trois jours."}</p>}
-      <button className="text-button" onClick={() => { refresh(); setStage("ready"); }}>{en ? "Done" : "Fermer"}</button>
+      {!focus && !saveError && <p>{en ? "Missed corrections return in one day. Matches return in three days." : "Les corrections à revoir reviennent dans un jour, les réponses retrouvées dans trois jours."}</p>}
+      <button className="text-button" onClick={() => { if (!focus) refresh(); setStage("ready"); }}>{en ? "Done" : "Fermer"}</button>
     </>}
     {saveError && <p role="alert">{en ? "The browser could not save the next review date." : "La prochaine date de révision n’a pas pu être enregistrée."}</p>}
   </section>;

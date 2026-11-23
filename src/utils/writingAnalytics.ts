@@ -38,9 +38,24 @@ export function writingAnalytics(submissions: ExamResult[], filter: TaskKey | "a
       previousRate: previous.words ? earlier * 100 / previous.words : null,
     };
   }).sort((a, b) => b.examples.length - a.examples.length || b.earlier - a.earlier);
+  const practiceWindow = windowStats(sessions.slice(0, 5));
+  const recommendation = CANONICAL_CATEGORIES.filter(category => category !== "Autres").map(category => {
+    const examples = practiceWindow.corrections.filter(m => m.category === category &&
+      m.original_text?.trim() && m.corrected_text?.trim() && m.original_text.trim() !== m.corrected_text.trim() &&
+      m.result.answers[m.key]?.includes(m.original_text));
+    const reviewCount = new Set(examples.map(m => m.result.id || m.result)).size;
+    const seen = new Set<string>();
+    const cards = examples.filter(m => {
+      const pair = JSON.stringify([m.original_text, m.corrected_text]);
+      if (seen.has(pair)) return false;
+      seen.add(pair);
+      return true;
+    }).slice(0, 3);
+    return { category, reviewCount, cards };
+  }).filter(group => group.reviewCount >= 2).sort((a, b) => b.reviewCount - a.reviewCount || b.cards.length - a.cards.length)[0];
   const byId = new Map(submissions.filter(s => s.id).map(s => [s.id, s]));
   const latestRewrite = tasks.find(t => t.result.revisionOf && t.feedback.range &&
     byId.get(t.result.revisionOf)?.aiEvaluation?.pedagogical?.tasks[t.key]?.range);
   const original = latestRewrite?.result.revisionOf ? byId.get(latestRewrite.result.revisionOf) : undefined;
-  return { recent, previous, domains, tasks, latestRewrite, original };
+  return { recent, previous, domains, tasks, latestRewrite, original, recommendation, practiceSessions: practiceWindow.sessions };
 }

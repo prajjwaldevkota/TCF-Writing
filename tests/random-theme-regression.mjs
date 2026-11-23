@@ -130,7 +130,7 @@ try {
   applyTheme("light");
   assert.equal(initialTheme(), "light");
   assert.equal(document.documentElement.dataset.theme, "light");
-  assert.equal(meta.get("content"), "#f6f7fb");
+  assert.equal(meta.get("content"), "#f8f7f4");
   globalThis.localStorage = {
     getItem: () => {
       throw new Error("Blocked");

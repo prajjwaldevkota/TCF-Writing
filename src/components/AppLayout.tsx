@@ -108,10 +108,13 @@ export const AppLayout: React.FC<{
           ? "Settings"
           : "Réglages");
   const navigationLinks = links.map(({ view: next, icon: Icon, label }) => (
-    <button
+    <a
       key={next}
       className={`lab-nav ${view === next || (view === "simulator" && next === "library") ? "active" : ""}`}
-      onClick={() => go(next)}
+      href={`#/${next}`}
+      onClick={event => {
+        if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) setMobile(false);
+      }}
       aria-current={view === next ? "page" : undefined}
     >
       <Icon size={19} />
@@ -119,7 +122,7 @@ export const AppLayout: React.FC<{
       {next === "library" && hasDraft && (
         <i aria-label={en ? "Draft saved" : "Brouillon sauvegardé"} />
       )}
-    </button>
+    </a>
   ));
   return (
     <div className={`lab-shell ${view === "simulator" ? "is-writing" : ""}`}>

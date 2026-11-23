@@ -3,17 +3,17 @@
   --heading-font: var(--reading-font);
   --workspace-gutter: clamp(16px, 2vw, 36px);
   --serif: var(--reading-font);
-  --cover: #394fc7;
+  --cover: var(--brand-background);
   --cover-ink: #ffffff;
-  --cover-detail: #e1e6ff;
+  --cover-detail: #e4e1d6;
 }
 .masthead-brand {
   display: inline-flex;
   align-items: center;
   gap: .5rem;
   color: var(--ink);
-  font: 750 1.55rem/1 var(--reading-font);
-  letter-spacing: -.065em;
+  font: 600 1.65rem/1 Georgia, serif;
+  letter-spacing: -.045em;
 }
 .masthead-brand svg { color: var(--teal); }
 .masthead-navigation { display: none; }
@@ -322,3 +322,4 @@ button, input, textarea, select { accent-color: var(--teal); }
 @media (max-width: 480px) {
   .learning-analytics > .segmented { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); width: 100%; }
 }
+.analytics-practice-note { color: var(--muted); margin-bottom: 1rem; }

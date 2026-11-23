@@ -35,3 +35,17 @@ assert.equal(paired.latestRewrite.result, late);
 assert.equal(paired.original, early);
 assert.equal(writingAnalytics([late], "all").latestRewrite, undefined);
 console.log("PASS comparable session windows, word-normalised domain rates, incomplete reviews and task filters.");
+
+function corrected(day, category) {
+  const example = {category, original_text:"je va", corrected_text:"je vais", explanation:"Accord."};
+  return review(day, {task1:"Demain je va au marché."}, {task1:{mistakes:[example,example]}});
+}
+const one = corrected(1,"Grammaire");
+const two = corrected(2,"Grammaire");
+assert.equal(writingAnalytics([one],"all").recommendation,undefined);
+const focus = writingAnalytics([one,two],"task1").recommendation;
+assert.equal(focus.reviewCount,2);
+assert.equal(focus.cards.length,1);
+assert.equal(writingAnalytics([one,two],"task2").recommendation,undefined);
+two.answers.task1 = "Une autre réponse.";
+assert.equal(writingAnalytics([one,two],"all").recommendation,undefined);

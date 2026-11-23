@@ -4,6 +4,7 @@ import type { ExamResult, TaskKey } from "../types/exam";
 import { useLanguage } from "../context/LanguageContext";
 import { CATEGORY_INFO } from "../utils/mistakesStorage";
 import { TASK_INFO, TASK_KEYS, formatSessionDate } from "../utils/practice";
+import { CorrectionDrill } from "../components/CorrectionDrill";
 import { writingAnalytics } from "../utils/writingAnalytics";
 
 function levelRange(range: { lower: string; upper: string }) {
@@ -19,7 +20,7 @@ export function Analytics({ submissions, onOpen, onPractice }: {
   const en = language === "en";
   const [filter, setFilter] = useState<TaskKey | "all">("all");
   const [historyLimit, setHistoryLimit] = useState(8);
-  const { recent, previous, domains, tasks, latestRewrite, original } = useMemo(() => writingAnalytics(submissions, filter), [submissions, filter]);
+  const { recent, previous, domains, tasks, latestRewrite, original, recommendation, practiceSessions } = useMemo(() => writingAnalytics(submissions, filter), [submissions, filter]);
   const originalRange = latestRewrite && original?.aiEvaluation?.pedagogical?.tasks[latestRewrite.key]?.range;
   const peak = domains[0].examples.length;
   const leaders = domains.filter(d => d.examples.length === peak && peak > 0);
@@ -54,6 +55,14 @@ export function Analytics({ submissions, onOpen, onPractice }: {
       <p>{en ? "Save a task-level review to see its corrections and estimated level here." : "Enregistrez un bilan de tâche pour retrouver ici les corrections et le niveau estimé."}</p>
       <button className="button secondary" onClick={onPractice}>{en ? "Browse topics" : "Parcourir les sujets"}</button>
     </section> : <>
+      {recommendation ? <CorrectionDrill key={filter + recommendation.category} en={en} focus={{
+        cards: recommendation.cards,
+        description: en
+          ? `${CATEGORY_INFO[recommendation.category].en} came up in ${recommendation.reviewCount} of your last ${practiceSessions} reviewed sessions. Try correcting your own wording from memory.`
+          : `${CATEGORY_INFO[recommendation.category].fr} · Ce domaine revient dans ${recommendation.reviewCount} de vos ${practiceSessions} dernières séances évaluées. Essayez de corriger votre formulation de mémoire.`,
+      }} /> : <p className="analytics-practice-note">{practiceSessions < 2
+        ? (en ? "A practice suggestion needs at least two sessions with complete, dated reviews." : "Une suggestion de révision nécessite au moins deux séances avec un bilan complet et daté.")
+        : (en ? "No recurring correction area in your latest reviewed sessions." : "Aucun domaine de correction récurrent dans vos dernières séances évaluées.")}</p>}
       <div className="analytics-grid">
         <section className="panel analytics-domains">
           <h2>{en ? "Where to focus" : "Points à travailler"}</h2>
