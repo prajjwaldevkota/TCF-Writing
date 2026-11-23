@@ -1,3 +1,4 @@
+import { limitedBody } from "../server/requestBody.js";
 import { reviewAccount } from "../server/reviewAuth.js";
 import {
   UUID, MODELS, hash, json, database, getJob, getJobStatus, publicJob, queueConfig,
@@ -20,8 +21,8 @@ export async function handler(request: Request): Promise<Response> {
       return json(publicJob(job));
     }
     if (request.method === "PATCH") {
-      const text = await request.text();
-      if (text.length > 1024) return json({ error: "invalid_request" }, 400);
+      const text = await limitedBody(request, 1024);
+      if (text === null) return json({ error: "invalid_request" }, 400);
       let body;
       try { body = JSON.parse(text); } catch { return json({ error: "invalid_request" }, 400); }
       if (!UUID.test(body?.id) || !UUID.test(body?.token)) return json({ error: "not_found" }, 404);
@@ -41,9 +42,8 @@ export async function handler(request: Request): Promise<Response> {
     if (userId instanceof Response) return userId;
     queueConfig();
     if (!credentials().length) return json({ error: "missing_credentials" }, 503);
-    if (Number(request.headers.get("Content-Length")) > 200_000) return json({ error: "request_too_large" }, 413);
-    const text = await request.text();
-    if (text.length > 200_000) return json({ error: "request_too_large" }, 413);
+    const text = await limitedBody(request, 200_000);
+    if (text === null) return json({ error: "request_too_large" }, 413);
     let body;
     try { body = JSON.parse(text); } catch { return json({ error: "invalid_request" }, 400); }
     if (!body || !UUID.test(body.id) || !UUID.test(body.token) || !MODELS.includes(body.model) ||

@@ -1,3 +1,4 @@
+import { limitedBody } from "../server/requestBody.js";
 import { prepareGeminiRequest } from "../server/geminiRequest.js";
 import { reviewAccount } from "../server/reviewAuth.js";
 import {
@@ -72,7 +73,9 @@ export async function handler(request: Request): Promise<Response> {
   }
   let body: any;
   try {
-    body = await request.json();
+    const text = await limitedBody(request, 200_000);
+    if (text === null) return jsonError("Request too large.", 413);
+    body = JSON.parse(text);
   } catch {
     await log({ stage: "request", code: "invalid_request", http_status: 400 });
     return jsonError("Invalid JSON request.", 400);

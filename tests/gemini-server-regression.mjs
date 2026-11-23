@@ -12,7 +12,7 @@ const source = ts
   .outputText.replace(
     /(["'])\.\.\/server\/errorLogs\.js\1/,
     JSON.stringify(errorLogsUrl),
-  ).replace("../server/geminiRequest.js", moduleUrl(compile("server/geminiRequest.ts"))).replace("../server/reviewAuth.js", moduleUrl(compile("server/reviewAuth.ts")));
+  ).replace("../server/requestBody.js", moduleUrl(compile("server/requestBody.ts"))).replace("../server/geminiRequest.js", moduleUrl(compile("server/geminiRequest.ts"))).replace("../server/reviewAuth.js", moduleUrl(compile("server/reviewAuth.ts")));
 const { default: { fetch: handler } } = await import(
   "data:text/javascript;base64," + Buffer.from(source).toString("base64")
 );
@@ -63,6 +63,9 @@ function arrange(primary, backup, responses, legacy = "") {
 }
 const success = () => new Response('{"candidates":[]}', { status: 200 });
 try {
+  arrange("fixture", "", []);
+  assert.equal((await handler(request({ ...body, padding: "é".repeat(100_000) }))).status, 413);
+  assert.equal(calls.length, 0);
   arrange("", "", []);
   for (const headers of [{}, { Authorization: "Bearer expired" }]) {
     const denied = await handler(new Request("https://fixture/api/gemini", { method: "POST", headers }));
