@@ -32,6 +32,7 @@ export function Analytics({ submissions, onOpen, onPractice }: {
   const rateCell = (value: number | null) => <td><span>{rate(value)}</span>
     <span className="analytics-bar" aria-hidden="true"><i style={{ width: maxRate && value ? (value / maxRate * 100) + "%" : 0 }} /></span>
   </td>;
+  const rubricVersions = [...new Set([...previous.samples, ...recent.samples].map(sample => sample.result.aiEvaluation?.rubric_version?.trim()).filter(Boolean))];
   const change = recentTotal !== null && previousTotal !== null ? recentTotal - previousTotal : null;
   const period = (window: typeof recent) => {
     const dates = window.samples;
@@ -86,6 +87,9 @@ export function Analytics({ submissions, onOpen, onPractice }: {
             <span>{period(group)}</span>
             <small>{group.sessions} {en ? "sessions" : "séances"} · {group.words} {en ? "words" : "mots"}</small>
           </div>)}</div>
+          {rubricVersions.length > 1 && <p className="notice warning">{en
+            ? "These sessions used different grading rubrics. A change in correction rate may partly reflect how the writing was graded."
+            : "Ces séances ont été évaluées avec des grilles différentes. L’évolution du taux de corrections peut en partie refléter ce changement."} ({rubricVersions.join(", ")})</p>}
           {change !== null && <strong className="analytics-change">{Math.abs(change) < .005
             ? (en ? "Same correction rate" : "Taux de corrections stable")
             : en ? `${rate(Math.abs(change))} ${change < 0 ? "fewer" : "more"} corrections per 100 words`

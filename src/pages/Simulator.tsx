@@ -199,7 +199,7 @@ export function Simulator({
   const { language } = useLanguage();
   const en = language === "en";
   const [session, setSession] = useState(initialSession);
-  const [saved, setSaved] = useState(true);
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "failed">("saved");
   const [focusWriting, setFocusWriting] = useState(false);
   const [mobilePromptOpen, setMobilePromptOpen] = useState(initialSession.mode !== "exam");
   const [accentsOpen, setAccentsOpen] = useState(false);
@@ -225,7 +225,7 @@ export function Simulator({
     }
     if (!dirtyRef.current || finished.current) return true;
     const ok = savePracticeSession(sessionRef.current);
-    setSaved(ok);
+    setSaveStatus(ok ? "saved" : "failed");
     dirtyRef.current = !ok;
     onDraftChangeRef.current(sessionRef.current);
     return ok;
@@ -300,6 +300,7 @@ export function Simulator({
         if (debounceTimerRef.current !== null) {
           window.clearTimeout(debounceTimerRef.current);
         }
+        setSaveStatus("saving");
         debounceTimerRef.current = window.setTimeout(flushDraft, 250);
       }
     },
@@ -560,11 +561,11 @@ export function Simulator({
           </span>
         )}
         <span
-          className={`writing-save-status ${saved ? "" : "error-text"}`}
+          className={`writing-save-status ${saveStatus === "failed" ? "error-text" : ""}`}
           role="status"
         >
-          {saved ? <Check size={14} /> : <Save size={14} />}{" "}
-          {saved
+          {saveStatus === "saved" ? <Check size={14} /> : <Save size={14} />}{" "}
+          {saveStatus === "saving" ? (en ? "Saving…" : "Sauvegarde en cours…") : saveStatus === "saved"
             ? en
               ? "Saved"
               : "Sauvegardé"
@@ -573,7 +574,7 @@ export function Simulator({
               : "Échec de la sauvegarde"}
         </span>
       </div>
-      {!saved && <div className="notice warning">{downloadButton}</div>}
+      {saveStatus === "failed" && <div className="notice warning">{downloadButton}</div>}
       {isExam && (
         <div className="session-progress">
           <span>

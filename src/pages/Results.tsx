@@ -69,6 +69,9 @@ export function Results({
     ? getStoredSubmissions().find((s) => s.id === result.revisionOf)
     : null;
   const chosen = result.aiEvaluation;
+  const gradingModel = chosen?.model?.trim();
+  const gradedAt = Date.parse(chosen?.created_at || "");
+  const unknown = en ? "Not recorded" : "Non renseigné";
   const assessment = chosen?.pedagogical;
   const feedback = assessment?.tasks[active];
   const hasFeedback = Boolean(feedback || (chosen && !assessment));
@@ -153,6 +156,12 @@ export function Results({
         <div>
           <h1>{en ? "Writing review" : "Bilan de rédaction"}</h1>
           <p>{result.revisionOf ? (en ? "Revision" : "Réécriture") : result.isPracticeMode ? (en ? "Guided practice" : "Pratique guidée") : (en ? "Full mock" : "Examen blanc")} · {formatTime(result.timeUsedSeconds)} · {result.month} {result.year} · {en ? "Set" : "Série"} {result.combination.combinationNumber}</p>
+          {chosen && <p className="review-grader">
+            {en ? "Grading model" : "Modèle de correction"} · <strong>{gradingModel || unknown}</strong>
+            {" · "}{en ? "Graded on" : "Date de correction"} · {Number.isFinite(gradedAt)
+              ? <time dateTime={chosen.created_at}>{new Intl.DateTimeFormat(en ? "en-CA" : "fr-CA", { dateStyle: "medium" }).format(gradedAt)}</time> : unknown}
+            {" · "}{en ? "Rubric" : "Grille"} · {chosen.rubric_version?.trim() || unknown}
+          </p>}
         </div>
         <span className="outline-badge">
           <Check size={15} />
@@ -608,8 +617,8 @@ export function Results({
             {en ? "Review options" : "Options de correction"}
             <ChevronDown size={16} />
           </summary>
-                {chosen?.requested_model &&
-                  chosen.model !== chosen.requested_model && (
+                {gradingModel && chosen?.requested_model &&
+                  gradingModel !== chosen.requested_model && (
                     <p className="notice">
                       {en
                         ? `Automatic fallback: ${chosen.model} produced this review.`
@@ -624,7 +633,6 @@ export function Results({
                   </p>
                 )}
                 <span className="feedback-model">
-                  {chosen?.model} ·{" "}
                   {en
                     ? "Not an official assessment"
                     : "Évaluation non officielle"}
