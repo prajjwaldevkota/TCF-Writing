@@ -7724,6 +7724,30 @@
             "document2": "Avec tous les accidents de la route observés annuellement, sortir son vélo pour se déplacer avec en ville peut être très dangereux. En effet, avec la densité importante de véhicules, le non-respect du Code de la route et le manque de pistes cyclables, pratiquer du vélo en zone urbaine présente de vrais risques d’accident. De plus, faire du vélo de nos jours, c’est s’exposer à des gaz d’échappement toxiques et nocifs pour la santé humaine."
           }
         }
+      },
+      {
+        "combination": 861,
+        "combinationNumber": 59,
+        "tasks": {
+          "task1": {
+            "instruction": "Vous écrivez une lettre à votre ami pour l’inviter à un festival de musique dans votre ville. Vous mentionnez les détails importants tels que le lieu, la date, les artistes invités et toutes les informations pratiques nécessaires.",
+            "minWords": 60,
+            "maxWords": 120
+          },
+          "task2": {
+            "instruction": "Sur votre blog, parlez de votre dernière visite à un restaurant (l'endroit, la nourriture, le service, etc.). Racontez ce que vous avez vécu et dites ce qui vous a vraiment plu.",
+            "minWords": 120,
+            "maxWords": 150
+          },
+          "task3": {
+            "instruction": "Voyage seul ou voyage accompagné ?",
+            "title": "Voyage seul ou voyage accompagné ?",
+            "minWords": 120,
+            "maxWords": 180,
+            "document1": "Voyager seul est une expérience riche et singulière qui présente de nombreux attraits. Tout d'abord, cela offre une liberté totale d'organiser son parcours et ses activités selon ses envies sans avoir à se plier aux contraintes d'un groupe. On découvre ainsi les lieux visités à son propre rythme, en prenant tout le temps nécessaire pour s'imprégner pleinement de leur atmosphère unique. Surtout, voyager en solo permet de sortir de sa zone de confort et de faire d'inestimables rencontres avec les populations locales ou d'autres voyageurs, favorisant ainsi l'ouverture d'esprit et l'enrichissement personnel.",
+            "document2": "S'il comporte des avantages certains, le voyage en solo n'est pas exempt d'inconvénients que l'on ne saurait négliger. Outre le sentiment de solitude qui peut parfois s'installer, l'absence d'un compagnon de route prive le voyageur d'un soutien précieux en cas d'imprévu ou de situation délicate. De plus, certaines activités comme l'exploration de sites reculés ou de régions au climat rude gagnent à être réalisées en groupe pour des raisons évidentes de sécurité. Enfin, partager ses découvertes et ses émotions avec un proche ou des amis demeure l'un des plaisirs uniques du voyage accompagné."
+          }
+        }
       }
     ]
   },
