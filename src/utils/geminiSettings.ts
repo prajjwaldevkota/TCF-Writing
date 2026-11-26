@@ -1,22 +1,13 @@
-export const GEMINI_MODELS = [
-  { id: "gemini-4-hydrogen", label: "Gemini 4 Hydrogen" },
-  { id: "gemini-3.6-flash", label: "Gemini 3.6 Flash" },
-  { id: "gemini-3.5-flash-lite", label: "Gemini 3.5 Flash-Lite" },
-  { id: "gemini-3.1-flash-lite", label: "Gemini 3.1 Flash-Lite" },
-] as const;
-export const GEMINI_FALLBACK_MODELS = [
-  "gemini-4-hydrogen",
-  "gemini-3.6-flash",
-  "gemini-3.5-flash-lite",
-  "gemini-3.1-flash-lite",
-] as const;
+import { GEMINI_MODELS, fallbackModels } from "../../server/geminiModels.js";
+export { GEMINI_MODELS, MODEL_IDS as GEMINI_FALLBACK_MODELS } from "../../server/geminiModels.js";
 export function getGeminiModelChain(initial = getGeminiModel()): string[] {
-  const index = GEMINI_FALLBACK_MODELS.findIndex((model) => model === initial);
-  return index >= 0 ? GEMINI_FALLBACK_MODELS.slice(index) : [initial];
+  return fallbackModels(initial);
 }
 export const GEMINI_MODEL_STORAGE = "tcf_gemini_model";
 export function getGeminiModel(tasks?: readonly string[]): string {
-  return import.meta.env.VITE_GEMINI_MODEL?.trim() ||
+  const configured = import.meta.env.VITE_GEMINI_MODEL?.trim();
+  if (configured === "gemini-3.1-flash-lite") return "gemini-3.6-flash";
+  return configured ||
     (tasks?.length === 1 && tasks[0] === "task1" ? "gemini-3.5-flash-lite" : GEMINI_MODELS[0].id);
 }
 export function setGeminiModel(model: string): void {

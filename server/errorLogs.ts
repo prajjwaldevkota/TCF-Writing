@@ -1,3 +1,4 @@
+import { MODEL_IDS } from "./geminiModels.js";
 import {
   ERROR_CODES,
   ERROR_STAGES,
@@ -5,12 +6,7 @@ import {
   type ErrorLogEntry,
 } from "../src/types/errorLog.js";
 
-const models = new Set([
-  "gemini-4-hydrogen",
-  "gemini-3.6-flash",
-  "gemini-3.5-flash-lite",
-  "gemini-3.1-flash-lite",
-]);
+const models = new Set(MODEL_IDS);
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function requestId(value?: string | null): string {
   return value && uuid.test(value) ? value : crypto.randomUUID();

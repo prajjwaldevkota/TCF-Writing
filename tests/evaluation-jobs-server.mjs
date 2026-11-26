@@ -166,6 +166,26 @@ try {
   assert.equal((await work(stalledBodyJob.id)).status, 200);
   assert.equal(jobs.get(stalledBodyJob.id).model, "gemini-3.6-flash");
 
+  const lite = { ...requestBody(), model: "gemini-3.5-flash-lite" };
+  await enqueue(lite);
+  const beforeLite = providerCalls.length;
+  providerResponses = [response({}, 503), response({}, 503), response({ candidates: [] })];
+  for (const expectedStatus of [503, 503, 200]) {
+    assert.equal((await work(lite.id)).status, expectedStatus);
+  }
+  assert.deepEqual(providerCalls.slice(beforeLite).map(call => new URL(call.url).pathname.split("/").pop().split(":")[0]),
+    ["gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.8-flash"]);
+  assert.equal(jobs.get(lite.id).model, "gemini-3.8-flash");
+  assert.equal(jobs.get(lite.id).status, "completed");
+
+  // Resume a pre-deployment Lite job after its primary model returned 503.
+  const resumed = { ...requestBody(), model: "gemini-3.5-flash-lite" };
+  await enqueue(resumed);
+  Object.assign(jobs.get(resumed.id), { status: "retrying", attempts: 1, next_step: 2 });
+  providerResponses = [response({ candidates: [] })];
+  assert.equal((await work(resumed.id)).status, 200);
+  assert.equal(jobs.get(resumed.id).model, "gemini-3.6-flash");
+
   const concurrent = requestBody();
   await enqueue(concurrent);
   let release;

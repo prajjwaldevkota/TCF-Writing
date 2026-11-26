@@ -9,9 +9,10 @@ export const compile = (file) =>
   }).outputText;
 export const moduleUrl = (source) =>
   "data:text/javascript;base64," + Buffer.from(source).toString("base64");
+export const modelsUrl = moduleUrl(compile("server/geminiModels.ts"));
 const typesUrl = moduleUrl(compile("src/types/errorLog.ts"));
 export const errorLogsUrl = moduleUrl(
-  compile("server/errorLogs.ts").replace(
+  compile("server/errorLogs.ts").replace("./geminiModels.js", modelsUrl).replace(
     /(["'])\.\.\/src\/types\/errorLog\.js\1/,
     JSON.stringify(typesUrl),
   ),

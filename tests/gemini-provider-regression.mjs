@@ -22,7 +22,7 @@ globalThis.localStorage = {
 globalThis.__geminiEnv = {};
 globalThis.__reviewErrors = [];
 const settingsUrl = url(
-  compile("src/utils/geminiSettings.ts").replaceAll(
+  compile("src/utils/geminiSettings.ts").replaceAll("../../server/geminiModels.js", url(compile("server/geminiModels.ts"))).replaceAll(
     "import.meta.env",
     "globalThis.__geminiEnv",
   ),
@@ -104,7 +104,7 @@ function arrange(primary, backup, responses) {
 }
 try {
   assert.equal(settings.getGeminiModel(), "gemini-4-hydrogen");
-  settings.setGeminiModel("gemini-3.1-flash-lite");
+  settings.setGeminiModel("gemini-3.8-flash");
   assert.equal(
     settings.getGeminiModel(),
     "gemini-4-hydrogen",
@@ -115,6 +115,11 @@ try {
   delete globalThis.__geminiEnv.VITE_GEMINI_MODEL;
   assert.equal(settings.getGeminiModel(["task1"]), "gemini-3.5-flash-lite");
   assert.equal(settings.getGeminiModel(["task3"]), "gemini-4-hydrogen");
+  globalThis.__geminiEnv.VITE_GEMINI_MODEL = "gemini-4-hydrogen";
+  delete globalThis.__geminiEnv.VITE_GEMINI_MODEL;
+  arrange("", "", [503, 503].map(status => new Response("{}", { status })).concat(success()));
+  assert.equal((await evaluate(input)).model, "gemini-3.8-flash");
+  assert.deepEqual(calls.map(call => call.body.model), ["gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.8-flash"]);
   globalThis.__geminiEnv.VITE_GEMINI_MODEL = "gemini-4-hydrogen";
   assert.throws(() => settings.setGeminiModel("unknown-model"));
   for (const [primary, backup] of [
@@ -194,11 +199,11 @@ try {
     "",
     Array.from({ length: 4 }, () => new Response("{}", { status: 404 })),
   );
-  await assert.rejects(evaluate(input), /gemini-3.1-flash-lite.*HTTP 404/);
+  await assert.rejects(evaluate(input), /gemini-3.8-flash.*HTTP 404/);
   assert.equal(calls.length, 4);
   assert.deepEqual(
     calls.map((call) => call.body.model),
-    ["gemini-4-hydrogen", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"],
+    ["gemini-4-hydrogen", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.8-flash"],
   );
   const providerTimeout = () => new Response("{}", {
     status: 504,
@@ -219,7 +224,7 @@ try {
   assert.equal((await evaluate(input)).model, "gemini-3.6-flash");
   assert.equal(calls.length, 2);
   arrange("", "", Array.from({ length: 4 }, providerTimeout));
-  await assert.rejects(evaluate(input), /gemini-3.1-flash-lite.*HTTP 504/);
+  await assert.rejects(evaluate(input), /gemini-3.8-flash.*HTTP 504/);
   assert.equal(calls.length, 4, "Provider deadline fallback is bounded");
   for (const headers of [{}, { "Content-Type": "text/html" }]) {
     arrange("", "", [new Response("Gateway timeout", { status: 504, headers })]);

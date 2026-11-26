@@ -1,3 +1,4 @@
+import { MODEL_IDS } from "../server/geminiModels.js";
 import { limitedBody } from "../server/requestBody.js";
 import { prepareGeminiRequest } from "../server/geminiRequest.js";
 import { reviewAccount } from "../server/reviewAuth.js";
@@ -14,12 +15,7 @@ import type { ErrorLogEntry } from "../src/types/errorLog.js";
 // Node.js permits waiting for the full provider response beyond Edge's 25s
 // initial-response deadline. Keep room for two 120s attempts and diagnostics.
 export const config = { maxDuration: 300 };
-const allowedModels = new Set([
-  "gemini-4-hydrogen",
-  "gemini-3.6-flash",
-  "gemini-3.5-flash-lite",
-  "gemini-3.1-flash-lite",
-]);
+const allowedModels = new Set(MODEL_IDS);
 const headers = {
   "Content-Type": "application/json",
   "Cache-Control": "no-store",
