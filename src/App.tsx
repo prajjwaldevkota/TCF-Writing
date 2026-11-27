@@ -1,5 +1,6 @@
 import { useWorkspace, WorkspaceProvider } from "./context/WorkspaceContext";
-import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
+import React, { useSyncExternalStore, Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { ThemeProvider } from "./context/ThemeContext";
 import { Home } from "./pages/Home";
 import { SplashScreen } from "./pages/SplashScreen";
@@ -60,6 +61,18 @@ function route() {
     task: task === "task1" || task === "task2" || task === "task3" ? task as TaskKey : undefined,
   };
 }
+function subscribeToNavigation(listener: () => void) {
+  window.addEventListener("hashchange", listener);
+  return () => window.removeEventListener("hashchange", listener);
+}
+
+function WebsiteAnalytics() {
+  // Only send known page names. Review IDs and auth fragments stay in the browser.
+  const view = useSyncExternalStore(subscribeToNavigation, () => route().view);
+  const path = "/" + view;
+  return <VercelAnalytics route={path} path={path} />;
+}
+
 function MainRouter() {
   const { getStoredSubmissions, saveSubmission, updateStoredSubmission, loadPracticeSession, savePracticeSession, saveEvaluationMistakes, store } = useWorkspace();
   const { user, userName, isConfigured, isPasswordRecovery, loading: authLoading } = useAuth();
@@ -412,6 +425,7 @@ function MainRouter() {
 export function App() {
   return (
     <LanguageProvider>
+      {import.meta.env.PROD && <WebsiteAnalytics />}
       <ThemeProvider>
         <AuthProvider>
           <WorkspaceProvider><MainRouter /></WorkspaceProvider>
