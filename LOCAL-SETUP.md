@@ -7,13 +7,13 @@
 3. For feedback, configure `GEMINI_API_KEY` in `.env.local` before starting Vite.
    The development server provides the same `/api/gemini` route as Vercel.
    Learners do not enter keys in Settings. The model chain is automatic:
-   4 Hydrogen → 3.6 Flash → 3.5 Flash-Lite → 3.1 Flash-Lite.
+   4 Hydrogen → 3.6 Flash → 3.8 Flash → 3.5 Flash-Lite.
 4. Write a guided task or a full mock. Request feedback only when ready.
 5. Export your writing from Settings regularly. Clearing browser data removes
    local submissions, correction review status, and drafts.
 
 Copy `.env.example` to `.env.local` for local feedback credentials or optional
-account storage. `GEMINI_MODEL` optionally overrides the chain starting point (defaults: Flash-Lite for standalone Task 1, Hydrogen otherwise).
+account storage. `GEMINI_MODEL` optionally overrides the chain starting point (default: Hydrogen for every task).
 Model accessibility must match your own provider account. These identifiers are
 public configuration and do not establish grading accuracy.
 
@@ -79,7 +79,7 @@ Vercel project’s environment for the relevant deployment, then redeploy. For e
 ```env
 GEMINI_API_KEY=your-primary-gemini-key
 GEMINI_BACKUP_KEY=your-backup-gemini-key
-# Optional override for every task; omit for task-specific routing
+# Optional override for every task; omit to use the default Gemini model
 # GEMINI_MODEL=gemini-4-hydrogen
 ```
 
@@ -156,9 +156,7 @@ another Gemini request or QStash delivery. The visible-tab interval uses 90%
 fewer periodic status requests than the previous 3-second interval. Polled
 results may take up to one polling interval to appear after completion.
 
-Standalone Task 1 starts at `gemini-3.5-flash-lite`. For other reviews the default model is `gemini-4-hydrogen`, followed by `gemini-3.6-flash`, `gemini-3.5-flash-lite` and
-`gemini-3.1-flash-lite`. If the Vercel project explicitly sets `GEMINI_MODEL`,
-remove that override and rebuild to enable task-specific routing.
+All tasks default to `gemini-4-hydrogen`, followed by 3.6 Flash, 3.8 Flash and 3.5 Flash-Lite. Flash-Lite reviews withhold levels. Remove a deployment `GEMINI_MODEL` override and rebuild to use the default.
 
 References: [QStash publishing](https://upstash.com/docs/qstash/api-reference/messages/publish-a-message),
 [QStash retries](https://upstash.com/docs/qstash/features/retry), and

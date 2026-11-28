@@ -6,7 +6,7 @@ const compile = (file) => ts.transpileModule(fs.readFileSync(file, 'utf8'), {com
 const storage = await import(url(compile('src/utils/storage.ts')));
 const wordCount = url(compile('src/utils/wordCount.ts'));
 const pedagogical = await import(url(compile('src/services/pedagogicalAssessment.ts').replace("'../utils/wordCount'", JSON.stringify(wordCount))));
-const {countFrenchWords} = await import(wordCount);
+const {countFrenchWords, taskWordCount} = await import(wordCount);
 
 const answers = {task1:'Bonjour voici une réponse pour mes amis.',task2:'',task3:''};
 const evaluation = (score, date='2026-11-11T00:00:00Z') => ({overall_score:score, created_at:date});
@@ -21,7 +21,8 @@ const task = () => ({level_evidence:[{quote:'Bonjour',domain:'linguistic',explan
 const payload = () => ({feedback_language:'en', tasks:{task1:task()}});
 const full = {...submission,combination:{tasks:{task1:{instruction:'Invite a friend',minWords:60,maxWords:120},task3:{instruction:'Compare the sources',minWords:120,maxWords:180}}}};
 assert.equal(countFrenchWords("l’ami aujourd’hui porte-monnaie"),3);
-assert.equal(countFrenchWords('bonjour,monde !'),2);
+assert.equal(countFrenchWords('bonjour,monde !'),1);
+assert.equal(countFrenchWords('bonjour,monde !', true),2);
 assert.equal(countFrenchWords('   '),0);
 assert.equal(countFrenchWords('un\ndeux\ttrois'),3);
 const validated=pedagogical.validatePedagogicalAssessment(payload(),['task1'],full);
@@ -39,9 +40,13 @@ for(const mutate of [p=>p.overall_score=11,p=>p.tasks.task1.score=11,p=>p.tasks.
 assert.throws(()=>pedagogical.validatePedagogicalAssessment({feedback_language:'en',tasks:{task3:task()}},['task3'],{...full,combination:{tasks:{...full.combination.tasks,task3:{...full.combination.tasks.task3,document1:'One',document2:'Two'}}},answers:{...answers,task3:'Bonjour, je compare les points de vue.'}}));
 console.log('PASS: persistence, exact-answer deduplication, space-delimited count, task-only ranges, missing-source and blank withholding, numeric-score rejection, priority limit, correction evidence and source-check validation.');
 const repeated=(n)=>Array(n).fill('mot').join(' ');
+assert.deepEqual(taskWordCount(repeated(56)+' !',60,120),{word_count:56,whitespace_count:57,borderline:true});
+assert.equal(taskWordCount(repeated(116),60,120).borderline,false);
+assert.equal(taskWordCount(repeated(123),60,120).borderline,true);
 const complete={...full,isPracticeMode:false,answers:{task1:repeated(60),task2:repeated(120),task3:repeated(120)},combination:{tasks:{task1:{instruction:'Message',minWords:60,maxWords:120},task2:{instruction:'Récit',minWords:120,maxWords:150},task3:{instruction:'Compare',document1:'One source',document2:'Another source',minWords:120,maxWords:180}}}};
 const all=['task1','task2','task3'];
 assert.equal(pedagogical.mockProjectionEligibility(complete,all).eligible,true);
+assert.equal(pedagogical.mockProjectionEligibility({...complete, answers:{...complete.answers,task1:repeated(59)+' !'}},all).eligible,false);
 assert.equal(pedagogical.mockProjectionEligibility({...complete,isPracticeMode:true},all).eligible,false);
 assert.equal(pedagogical.mockProjectionEligibility({...complete,answers:{...complete.answers,task2:''}},all).eligible,false);
 const projectedTask=()=>({...task(),level_evidence:[{quote:'mot mot',domain:'linguistic',explanation:'Evidence.'},{quote:'mot',domain:'pragmatic',explanation:'Evidence.'}]});
@@ -109,3 +114,52 @@ assert.deepEqual(supported.tasks.task3.range,{lower:'B1',upper:'B2'});
 assert.equal(supported.tasks.task3.level_evidence.length,2);
 
 assert.equal(reviewSourceUse(firstView+' '+secondView, ['quartier','habitants']).tasks.task3.range,null);
+
+const {verifyCorrections} = await import(url(compile('src/services/correctionVerification.ts')));
+const diagnostic = () => {
+  const raw = payload();
+  const task = raw.tasks.task1;
+  task.task_fulfilment_audit = [{requirement:'Invite',met:true,finding:'Addressed.'}];
+  task.syntactic_and_lexical_inventory = {structures:[],recurrent_errors:[]};
+  task.best_estimate = 'B1';
+  const proposal = (original_text, corrected_text, kind='error') =>
+    ({kind, severity:'minor',category:'Grammaire',error_type:'fixture',original_text,corrected_text,explanation:'Fixture.'});
+  task.mistakes = [proposal('Bonjour','Salut','improvement'),proposal('réponse','lettre'),proposal('amis','amis'),proposal('mes amis','mes amis proches','improvement'),proposal('pour mes','à mes')];
+  task.priorities = ['Bonjour','réponse','not in answer'].map(quote=>({quote,drill:'Practice '+quote,error_type:'fixture'}));
+  return raw;
+};
+const checked = () => pedagogical.validatePedagogicalAssessment(diagnostic(),['task1'],full,true,'gemini-4-hydrogen');
+assert.equal(checked().tasks.task1.mistakes.length,3);
+assert.equal(checked().tasks.task1.priority_evidence.length,2);
+assert.equal(pedagogical.validatePedagogicalAssessment(diagnostic(),['task1'],full,true,'gemini-3.5-flash-lite').tasks.task1.range,null);
+const vague=diagnostic();vague.tasks.task1.range.upper='C1';
+assert.equal(pedagogical.validatePedagogicalAssessment(vague,['task1'],full,true).tasks.task1.range,null);
+const outside=diagnostic();outside.tasks.task1.best_estimate='C2';
+assert.equal(pedagogical.validatePedagogicalAssessment(outside,['task1'],full,true).tasks.task1.best_estimate,null);
+const wide=projection();wide.mock_projection.upper=10;
+assert.equal(pedagogical.validatePedagogicalAssessment(wide,all,complete).mock_projection,null);
+const audited=checked();
+const revisions=[];
+await verifyCorrections(audited,full,['task1'],async req=>{
+  const {task1} = JSON.parse(req.contents[0].parts[0].text);
+  revisions.push(task1.revised);
+  return {task1:{accepted:revisions.length===1?[0]:[],remaining_errors:['mes amis proches.'].filter(q=>task1.revised.includes(q)),model_answer_ok:false}};
+});
+assert.deepEqual(revisions,['Salut voici une lettre pour mes amis proches.','Salut voici une réponse pour mes amis.']);
+assert.equal(audited.tasks.task1.mistakes.length,1);
+assert.deepEqual(audited.tasks.task1.priorities,['Practice Bonjour']);
+assert.equal(audited.tasks.task1.corrections_incomplete,true);
+const unavailable=checked();unavailable.tasks.task1.model_answer='model answer';
+await verifyCorrections(unavailable,full,['task1'],async()=>{throw Error('offline')});
+assert.equal(unavailable.tasks.task1.model_answer,'');
+assert.deepEqual(unavailable.tasks.task1.mistakes,[]);
+assert.deepEqual(unavailable.tasks.task1.range,{lower:'B1',upper:'B2'});
+for (const invalid of [[0,0],[99]]) {
+  const data=checked();
+  await verifyCorrections(data,full,['task1'],async()=>({task1:{accepted:invalid,remaining_errors:[],model_answer_ok:true}}));
+  assert.deepEqual(data.tasks.task1.mistakes,[]);
+}
+const leftover=checked();
+await verifyCorrections(leftover,full,['task1'],async()=>({task1:{accepted:[0,1,2],remaining_errors:['une lettre'],model_answer_ok:true}}));
+assert.ok(leftover.tasks.task1.validation_warnings.some(w=>w.includes('une lettre')));
+console.log('PASS typed changes, no-op/overlap exclusion, evidence-linked drills, best level, range widths, second review, residual errors and verifier failure.');

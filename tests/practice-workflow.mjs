@@ -44,15 +44,7 @@ const backupModule = await import(
   )
 );
 const backup = backupModule.backupStorage(localStorage);
-const nclcUrl = url(compile("src/utils/nclcComparison.ts"));
-const reviews = await import(
-  url(
-    compile("src/utils/reviewState.ts").replace(
-      /(['"])\.\/nclcComparison\1/,
-      JSON.stringify(nclcUrl),
-    ),
-  )
-);
+const reviews = await import(url(compile("src/utils/reviewState.ts")));
 const combination = {
   combination: 1,
   combinationNumber: 1,
@@ -227,13 +219,13 @@ const savedReview = {
     mock_projection: { lower: 6, upper: 8, rationale: "Fixture evidence." },
   },
 };
-const oldGroq = {...savedReview, model: "groq/legacy", id: "historical"};
-const first = reviews.withGeminiReview({...result, dualAiEvaluation: {gemini: null, groq: oldGroq}}, savedReview);
+const historicalReview = {...savedReview, model: "legacy-fixture", id: "historical"};
+const first = reviews.withGeminiReview({...result, dualAiEvaluation: {gemini: null, archived: historicalReview}}, savedReview);
 assert.equal(first.aiEvaluation.pedagogical.mock_projection.lower, 6);
-assert.equal(first.aiEvaluation.nclc_crosscheck, undefined, "New Gemini reviews are never crosschecked against historical models");
-assert.equal(first.dualAiEvaluation.groq.id, "historical", "Keep historical feedback readable");
+assert.equal(reviews.withGeminiReview({...result, dualAiEvaluation: undefined}, savedReview).dualAiEvaluation, undefined);
+assert.equal(first.dualAiEvaluation.archived.id, "historical", "Keep historical feedback readable");
 assert.equal(reviews.savedGeminiReview(first).id, "review");
-assert.equal(reviews.savedGeminiReview({...result, aiEvaluation: oldGroq}), null);
+assert.equal(reviews.savedGeminiReview({...result, aiEvaluation: historicalReview}), null);
 const local = {
   ...result,
   revisionOf: "parent",

@@ -1,8 +1,10 @@
-import type { NclcComparison } from '../utils/nclcComparison';
 import type { PedagogicalAssessment } from '../services/pedagogicalAssessment';
 export type CefrLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
 
 export interface MistakeItem {
+  kind?: 'error' | 'improvement';
+  severity?: 'minor' | 'major';
+  error_type?: string;
   category: 'Grammaire' | 'Orthographe / Accents' | 'Conjugaison / Temps' | 'Structure de phrase' | 'Vocabulaire' | string;
   original_text: string;
   corrected_text: string;
@@ -35,7 +37,6 @@ export interface TaskEvaluation {
 
 export interface AIEvaluation {
   key_source?: 'primary' | 'backup';
-  nclc_crosscheck?: NclcComparison;
   pedagogical?: PedagogicalAssessment;
   model?: string;
   requested_model?: string;

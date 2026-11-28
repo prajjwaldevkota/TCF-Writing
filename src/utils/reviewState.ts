@@ -2,10 +2,8 @@ import type { AIEvaluation } from "../types/aiEvaluation";
 import type { ExamResult } from "../types/exam";
 export function savedGeminiReview(result: ExamResult): AIEvaluation | null {
   return (
-    result.dualAiEvaluation?.gemini ||
-    (result.aiEvaluation?.model?.startsWith("gemini")
-      ? result.aiEvaluation
-      : null)
+    result.dualAiEvaluation?.gemini ??
+    (result.aiEvaluation?.model?.startsWith("gemini") ? result.aiEvaluation : null)
   );
 }
 /** Retain historical reviews, but never combine a new Gemini assessment with them. */
@@ -16,11 +14,7 @@ export function withGeminiReview(
   return {
     ...result,
     aiEvaluation: review,
-    dualAiEvaluation: {
-      ...result.dualAiEvaluation,
-      gemini: review,
-      groq: result.dualAiEvaluation?.groq || null,
-    },
+    ...(result.dualAiEvaluation && { dualAiEvaluation: { ...result.dualAiEvaluation, gemini: review } }),
   };
 }
 

@@ -15,15 +15,15 @@ export function SubmissionExport({ result }: { result: ExamResult }) {
       className="submission-export"
       aria-label={
         en
-          ? "Export for another AI or tutor"
-          : "Exporter pour une autre IA ou un tuteur"
+          ? "Export your writing"
+          : "Exporter votre rédaction"
       }
     >
       <div>
         <strong>
           {en
-            ? "Use another AI or your tutor"
-            : "Utiliser une autre IA ou votre tuteur"}
+            ? "Copy your submission"
+            : "Copier votre rédaction"}
         </strong>
         <p>
           {en

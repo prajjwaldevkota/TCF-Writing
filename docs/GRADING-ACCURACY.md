@@ -1,148 +1,10 @@
 # Measuring grading accuracy
 
-Current implementation (November 14, 2026): Gemini is the sole active provider.
-Groq execution and its proxy have been removed. Settings selects the Gemini model
-and optional backup key; the same model is retained across one bounded backup
-attempt. New reviews are never combined with historical secondary-provider reviews.
-The provider-comparison experiments below are historical. See [README](../README.md)
-for current request behavior and free-tier references.
+Gemini returns a pedagogical CEFR estimate for each assessed task. A supported estimate requires two distinct quotations from the learner’s response. The validator withholds the level for missing instructions, a blank answer, or a Tâche 3 response without both documents. Eligible full mocks can also receive a separate NCLC writing projection. The [evaluation guide](tcf-writing-evaluation-guide.md) describes the rubric.
 
+A second Gemini request checks proposed edits in context, the revised text for remaining errors, and the illustrative answer. If verification is unavailable, the review omits unchecked edits. The app records the grading model, rubric version and request fingerprint with the review.
 
-The guide is an assessment method, not evidence that the current model is calibrated.
-
-1. Build a held-out set of approximately 30–50 anonymized responses across all three
-   tasks and A2–C1, including borderline B1/B2, strong, weak, missing, off-topic,
-   too-short and copied-source cases. Task 3 examples need the actual documents.
-2. Ask a qualified TCF/FLE assessor to independently label task-level ranges and
-   explain their evidence without seeing the AI judgments. A second assessor helps
-   distinguish model error from legitimate human disagreement.
-3. Pin the model and version the guide. Repeat a representative subset three times.
-   Measure exact/adjacent-band agreement, overgrading and undergrading, range width,
-   missing-source withholding, unsupported correction claims, missed task requirements,
-   and variation across runs. Report these separately for each task. Do not judge
-   success merely by whether a broad AI range includes the human label.
-4. Compare candidate models on the same examples before choosing one. Two passes
-   by the same model are not two independent examiners. Model-to-model agreement
-   measures agreement, not truth.
-5. Keep prompt-development examples separate from the final test set. After changing
-   the prompt/model, rerun the held-out suite and compare against the prior version.
-
-Do not derive a final /20 or NCLC from task ranges. At the learner’s request, complete eligible mocks can now receive a separate
-uncalibrated holistic NCLC range with a rationale. This does not reproduce the
-unpublished official aggregation formula.
-No official-result entry or official-score storage has been added. Such results need
-an explicit learner-supplied source and must remain separate from AI judgments.
-
-Implemented checks cover response shape, maximum five priorities, ordered CEFR ranges,
-quoted corrections present in the original text, exact requested task scope, no numeric
-scores/NCLC, missing-source withholding, blank responses, and mechanical word limits.
-These checks cannot establish whether an AI correction or CEFR judgment is linguistically
-correct; human evaluation is still needed.
-
-Live integration check: one synthetic Task 1 invitation returned B2–C1, one priority,
-all three evidence domains, and null numeric/NCLC values with the configured model.
-This verifies integration, not accuracy. No real exam or benchmark score was inferred.
-
-## Two-model NCLC cross-check
-
-Both independent reviews are retained. The combined headline no longer automatically
-prefers Gemini. Matching intervals are labelled matching; overlapping intervals keep
-the full combined coverage (the union), so an overlap cannot create false precision.
-Disjoint intervals produce a visible disagreement and no combined NCLC estimate.
-A one-model success is explicitly labelled a single-model estimate. Agreement is
-not a calibrated confidence score and does not establish accuracy.
-
-The numerical dimension scores are pedagogical indicators only; agreement in those
-scores is not evidence that an NCLC judgment is correct. Validate against independent
-human-labelled work before treating projections as reliable readiness measurements.
-
-Connection/assessment checks on 2026-11-12 found the previously configured
-`gemini-2.5-flash` and `llama-3.3-70b-versatile` unavailable to these keys (HTTP 404).
-Model-list endpoints accepted both keys. Gemini 3.8 Flash timed out in a minimal
-connection test; it was not selected. The local configuration now pins
-`gemini-3.1-flash-lite` and Groq `openai/gpt-oss-120b`, both verified with minimal
-connection tests AND independent assessments of a synthetic Task 1 invitation.
-The latter correctly produced no full-exam NCLC range. This is an integration
-check, not a validated accuracy benchmark; no learner submissions were used.
-
-## Evidence contract v5
-
-Gemini and Groq now receive the same instruction builder in
-`src/services/evaluationInstructions.ts`, including the same guide and task payload.
-No new dimension points, invented weights or /20 averages are requested or computed.
-Historical reviews remain readable, with an earlier-instructions notice and a way
-to reassess. Strengths, illustrative answers and correction explanations remain.
-
-A level range requires two supporting quotations from the learner's answer, with
-explanations. Harmless apostrophe, hyphen and whitespace differences are resolved
-back to exact original excerpts; invented wording is rejected. Missing prompts,
-missing Task 3 sources and blanks cause withholding. Optional illustrative answers
-that miss the requested word limits are omitted with an explanation.
-
-Each new review stores the rubric version and a SHA-256 fingerprint of its system
-instructions and input payload. Two-model NCLC comparisons refuse to combine
-mismatched request fingerprints. This supports reproducibility; it is not an accuracy
-or confidence metric. Both providers passed a live synthetic Task 1 integration
-check under v5, with two verified quotations each, identical request fingerprints,
-and no numeric score. Human calibration remains outstanding.
-
-## Partial-review recovery
-
-An unmatched or malformed correction is now omitted with a visible warning instead
-of discarding the entire provider review. Only quotations resolved to the learner's
-original text enter the saved correction list/Mistakes Bank. Unicode composition,
-apostrophe, hyphen and spacing variations are matched back to exact original text;
-missing or genuinely different words are not accepted by fuzzy matching.
-
-If fewer than two supporting level quotations survive validation, the task range is
-withheld. A complete-mock NCLC projection is also withheld whenever any task range
-is unsupported. A missing correction section is reported as incomplete, not as an
-error-free answer. Structural errors, invalid score fields and invalid ranges still
-fail validation. Previously saved reviews are not silently rewritten.
-
-## Provider quotas and optional second opinion
-
-The results page uses Gemini by default when its key is available. Groq is an
-explicit optional second opinion; if Groq is the only configured provider, it
-remains usable on its own. NCLC eligibility and evidence requirements do not
-require two providers. Provider agreement is still not calibrated accuracy.
-
-Groq makes one generation per explicit attempt: malformed output, truncation and
-transport timeouts do not cause automatic replay. Concurrent identical requests
-in the same tab share one in-flight promise. A 429 records a cooldown for that
-key/model, using Retry-After (or a 60-second fallback when no usable header is
-provided). Only the hashed key/model identity and deadline are stored. The Vercel
-proxy forwards Retry-After. Quota coordination is local to the browser; two friends
-sharing an account still share the provider's account limits.
-
-Requesting a second opinion reuses successful saved reviews only when both their
-input fingerprint and rubric version match the current request. Groq failure
-preserves a successful Gemini review and its supported single-model NCLC range.
-
-## Practice workflow rebuild
-
-The active app now opens a local-first practice workspace without an authentication
-gate. The NCLC 7 learning goal appears in study guidance only and is not added to
-the grading request. The assessment contract and evidence checks are unchanged.
-The results screen keeps the learner's answer next to its review, offers a
-revision linked to the original submission, and uses saved corrections for
-self-reviewed exercises without additional model calls.
-
-Gemini runs only on an explicit feedback request. Groq is requested separately
-from review options. The matching provider review is cached by input fingerprint,
-rubric and feedback language; concurrent identical requests share one promise.
-Changed answers or language cannot reuse the old review. New complete mocks may
-show a supported Gemini-only NCLC range; no second model is required. A projection
-still remains withheld when the evidence or task requirements do not support it.
-
-Browser QA used isolated profiles and synthetic provider fixtures, including a
-full-mock NCLC display and a Groq 429 after a successful Gemini review. These tests
-verify application behaviour, not the accuracy of a model's judgment. No live
-human-grade calibration or real account-sync test was performed for this rebuild.
-
-## Calibrating the B1/B2 boundary (rubric v7)
-
-Use 10–15 held-out, permission-cleared French scripts with an independent task-level grade, the original assignment and an examiner rationale. Include clean high-B1 scripts, B2 work with minor slips, and Task 3 responses with varying source fidelity. Keep both prompt anchors out of the benchmark. The [FEI examples](https://www.france-education-international.fr/test/exemples-epreuves-tcf) provide assignments. An assignment or an official overall writing score does not establish a task-level gold label.
+## Measuring agreement with a human rater
 
 Store cases in a private JSON array outside the repository. Each record contains a unique `id`, `task`, `answer`, `gold` (one CEFR label), `source` (document/page or assessor reference), `examiner_rationale`, and `requirement` with `instruction`, `minWords`, `maxWords` and both source documents for Task 3. Verify provenance and permission to send the scripts to Google before running.
 
@@ -151,4 +13,17 @@ node scripts/calibrate-writing.mjs /path/to/cases.json --check
 node --env-file=.env.local scripts/calibrate-writing.mjs /path/to/cases.json --run
 ```
 
-The first command validates the inputs offline. The second sends each assignment and answer once to the selected model. Gold labels and examiner comments stay local. It reports each case's range, reference level, model, and whether the range covers, exceeds or falls below the reference. It also counts withholding, provider/validation failures, definite overgrading of B1, definite undergrading of B2, and intervals crossing the B2 threshold. Compare runs on the same held-out cases and model. A B1–B2 interval covers either reference level while leaving the boundary unresolved. Only independent reference data can establish a change in grading accuracy.
+Collect 20–30 responses spanning all tasks and both sides of B1/B2. Preserve both documents for Tâche 3 and keep rewrites and responses to the same assignment in one split. Assign each case a `split` of `development` or `held-out` before tuning prompts. Obtain independent CEFR decisions and rationales from a qualified FLE/TCF rater, preferably two raters with disagreements recorded before adjudication. A later official writing result can be paired with a full mock for a separate ability-level study. Keep per-task and ability-level outcome measures separate.
+
+Run `node scripts/calibrate-writing.mjs cases.json --run --repeat 3` with a provider key in the environment. This makes three grading requests per held-out case. The tool compares level decisions only. It reports exact and within-one-level agreement among rated attempts, directional errors at B1/B2, range coverage, withheld and failed attempts, and how often pairs of rated runs disagree on the best estimate or range. Report coverage alongside agreement so withholding cannot inflate apparent accuracy.
+
+### Public examples for development
+
+| Source | What to compare |
+|---|---|
+| [CIEP examiner-commented DELF script, pp. 94–95](https://rm.coe.int/168045a0cf#page=94) | A candidate requests remote work. The examiner identifies B2 despite local grammatical slips and describes omissions and tone separately. The different exam format limits its use to a qualitative reference. |
+| [TCF Canada Coach, nine annotated responses](https://www.tcfcanadacoach.com/tcf-canada/expression-ecrite/exemples/) | Compare the publisher’s B1, B2 and C1 versions of a cooking-course invitation, a train-trip review and a synthesis about remote work. Six responses illustrate the publisher’s NCLC 7–8 or 9–10 targets. |
+| [Formation TCF Canada, annotated copies](https://formationtcfcanada.com/exemples-copies-corrigees-expression-ecrite-tcf) | Compare the two versions of the late book return, neighbourhood cleanup and city traffic tasks. Check whether an edit fixes a genuine error or makes an already adequate response more effective. |
+| [Centre for Canadian Language Benchmarks, writing](https://www.language.ca/ressourcesexpertise/langue-pour-reussir/cadre/redaction/) | Compare the communicative demands of benchmark 7 and 8 workplace assignments. The page provides task descriptions. |
+
+The publishers describe their NCLC targets as illustrative. Keep these examples in development and exclude them from held-out agreement statistics. No independently rated TCF scripts were available for this revision.

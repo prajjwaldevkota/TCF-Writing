@@ -4,11 +4,10 @@ export function getGeminiModelChain(initial = getGeminiModel()): string[] {
   return fallbackModels(initial);
 }
 export const GEMINI_MODEL_STORAGE = "tcf_gemini_model";
-export function getGeminiModel(tasks?: readonly string[]): string {
+export function getGeminiModel(_tasks?: readonly string[]): string {
   const configured = import.meta.env.VITE_GEMINI_MODEL?.trim();
   if (configured === "gemini-3.1-flash-lite") return "gemini-3.6-flash";
-  return configured ||
-    (tasks?.length === 1 && tasks[0] === "task1" ? "gemini-3.5-flash-lite" : GEMINI_MODELS[0].id);
+  return configured || GEMINI_MODELS[0].id;
 }
 export function setGeminiModel(model: string): void {
   if (

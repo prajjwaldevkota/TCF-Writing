@@ -16,9 +16,10 @@ const diagnostic = object({
   limiting_evidence: strings,
   level_evidence: array(object({ quote: string, domain: { ...string, enum: ['linguistic','pragmatic','sociolinguistic'] }, explanation: string })),
   source_checks: { ...object({ document1: string, document2: string, comparison: string, reformulation: string }), nullable: true },
-  strengths: strings, priorities: strings, risks: strings, feedback: string,
-  mistakes: array(object({ category: string, original_text: string, corrected_text: string, explanation: string })),
+  strengths: strings, priorities: array(object({ quote: string, error_type: string, drill: string })), risks: strings, feedback: string,
+  mistakes: array(object({ kind: { ...string, enum: ['error','improvement'] }, severity: { ...string, enum: ['minor','major'] }, error_type: string, category: string, original_text: string, corrected_text: string, explanation: string })),
   model_answer: string, withholding_reason: string,
+  best_estimate: { ...level, nullable: true },
   range: { ...object({ lower: level, upper: level }), nullable: true },
 });
 

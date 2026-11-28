@@ -184,6 +184,7 @@ export function notebookStorage(store: WorkspaceStorage) {
       const taskLabel = tKey === 'task1' ? 'Tâche 1' : tKey === 'task2' ? 'Tâche 2' : 'Tâche 3';
 
       for (const item of taskEval.mistakes) {
+        if (item.kind === "improvement") continue;
         if (!item.original_text && !item.corrected_text) continue;
 
         const normCategory = normalizeCategory(item.category);
@@ -264,6 +265,7 @@ export function notebookStorage(store: WorkspaceStorage) {
         const taskLabel = tKey === 'task1' ? 'Tâche 1' : tKey === 'task2' ? 'Tâche 2' : 'Tâche 3';
 
         for (const item of taskEval.mistakes) {
+          if (item.kind === "improvement") continue;
           if (!item || (!item.original_text && !item.corrected_text)) continue;
 
           const isDuplicate = result.some(

@@ -18,7 +18,7 @@ import type { ExamResult, TaskKey } from "../types/exam";
 import { useLanguage } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
 
-import { countFrenchWords, formatTime } from "../utils/wordCount";
+import { taskWordCount, formatTime } from "../utils/wordCount";
 import { practicedKeys, TASK_INFO, TASK_KEYS } from "../utils/practice";
 import { withGeminiReview } from "../utils/reviewState";
 import { reviewSubmission, resumeSubmissionReview } from "../services/reviewWorkflow";
@@ -144,8 +144,12 @@ export function Results({
     // evaluation just because the learner opened this page.
     if (hasPendingEvaluationJob(result.id, user?.id)) void review(true, true);
   }, [result.id, authLoading, user?.id]);
-  const words = countFrenchWords(result.answers[active]);
   const requirement = result.combination.tasks[active];
+  const { word_count: words, whitespace_count, borderline } = taskWordCount(result.answers[active], requirement.minWords, requirement.maxWords);
+  const fullMock = !result.isPracticeMode && TASK_KEYS.every(key => chosen?.evaluated_tasks.includes(key));
+  const projectionNote = en
+    ? "This is an uncalibrated AI readiness projection. It is not an official result and not the product of an official scoring formula."
+    : "Cette projection IA non calibrée estime votre préparation. Elle ne constitue ni un résultat officiel ni le produit d’une formule de notation officielle.";
   return (
     <div className="page-enter writing-report">
       <button className="text-button back-link" onClick={onHomeClick}>
@@ -168,16 +172,23 @@ export function Results({
           {en ? "Saved in this browser" : "Enregistré dans ce navigateur"}
         </span>
       </div>
-      {!result.isPracticeMode && projection && (
+      {fullMock && assessment && <p>{en ? "Pedagogical level range for each task:" : "Plage de niveau pédagogique pour chaque tâche :"}{" "}
+        {TASK_KEYS.map(key => {
+          const task = assessment.tasks[key];
+          const level = task?.range;
+          return `${en ? "Task" : "Tâche"} ${key.slice(-1)} — ${level ? level.lower + "–" + level.upper : task?.withholding_reason || (en ? "withheld" : "suspendue")}`;
+        }).join(" · ")}
+      </p>}
+      {fullMock && projection && (
         <section className="exam-estimate" aria-labelledby="estimate-heading">
           <div className="estimate-range">
-            <h2 id="estimate-heading">{en ? "Full mock estimate" : "Estimation de l’examen blanc"}</h2>
+            <h2 id="estimate-heading">{en ? "NCLC writing projection:" : "Projection NCLC en expression écrite :"}</h2>
             <div className="estimate-score"><span>NCLC</span> <strong>{projection.lower === 3 ? "<4" : projection.lower}–{projection.upper === 10 ? "10+" : projection.upper}</strong></div>
           </div>
           <div className="estimate-reading">
             <h3>{en ? "Basis for the estimate" : "Justification de l’estimation"}</h3>
             <p>{projection.rationale}</p>
-            <small className="estimate-note">{en ? "Uncalibrated practice estimate based on the three tasks. Only the TCF issues an official result." : "Estimation de pratique non calibrée, fondée sur les trois tâches. Seul le TCF délivre un résultat officiel."}</small>
+            <small className="estimate-note">{projectionNote}</small>
           </div>
         </section>
       )}
@@ -235,6 +246,9 @@ export function Results({
               className={`badge ${words >= requirement.minWords && words <= requirement.maxWords ? "sage" : words < requirement.minWords ? "rose" : "sand"}`}
             >
               {words} / {requirement.minWords}–{requirement.maxWords} {en ? "words" : "mots"}
+              {borderline && (en
+                ? ` · Borderline count: ${words} excluding standalone signs, ${whitespace_count} including them.`
+                : ` · Décompte proche de la limite : ${words} sans les signes isolés, ${whitespace_count} avec ces signes.`)}
             </span>
           </div>
           {words < requirement.minWords && (
@@ -337,8 +351,8 @@ export function Results({
                 <div>
                   <span className="eyebrow">
                     {en
-                      ? "Estimated CEFR range"
-                      : "Plage de niveau CECRL estimée"}
+                      ? "Pedagogical level range for this task:"
+                      : "Plage de niveau pédagogique pour cette tâche :"}
                   </span>
                   <h2>
                     {feedback.range
@@ -348,7 +362,13 @@ export function Results({
                         : "Niveau suspendu"}
                   </h2>
                 </div>
+                {feedback.best_estimate && <p>{en ? "Best estimate" : "Niveau le plus probable"} · {feedback.best_estimate}</p>}
                 <p>{feedback.feedback}</p>
+                <small>{en ? "This assessment is not official." : "Cette évaluation n’est pas officielle."}{" "}
+                  {fullMock
+                    ? (en ? "Only an official TCF Canada result determines the final /20 score and NCLC level." : "Seul un résultat officiel du TCF Canada détermine la note finale sur 20 et le niveau NCLC.")
+                    : (en ? "One isolated task cannot determine the final /20 score or NCLC level." : "Une tâche isolée ne permet pas de déterminer la note finale sur 20 ni le niveau NCLC.")}
+                </small>
                 {feedback.withholding_reason && (
                   <p className="notice warning">
                     {feedback.withholding_reason}
@@ -358,8 +378,8 @@ export function Results({
                   <div className="feedback-retry">
                     <p>
                       {en
-                        ? "A withheld level is not a low grade. You can request a fresh review or copy your work for another AI or tutor. A new review uses API quota."
-                        : "Un niveau suspendu n’est pas une mauvaise note. Demandez un nouveau bilan ou copiez votre travail pour une autre IA ou un tuteur. Un nouveau bilan consomme du quota API."}
+                        ? "A withheld level is not a low grade. You can request a fresh review or copy your work for a tutor. A new review uses API quota."
+                        : "Un niveau suspendu n’est pas une mauvaise note. Demandez un nouveau bilan ou copiez votre travail pour un tuteur. Un nouveau bilan consomme du quota API."}
                     </p>
                     <button
                       className="button secondary"
@@ -396,7 +416,7 @@ export function Results({
                     {feedback.priorities.map((p, i) => (
                       <li key={i}>
                         <span>{i + 1}</span>
-                        {p}
+                        {feedback.priority_evidence?.[i] && <strong>« {feedback.priority_evidence[i].quote} » · {feedback.priority_evidence[i].error_type} — </strong>}{p}
                       </li>
                     ))}
                   </ol>
@@ -413,13 +433,8 @@ export function Results({
                 <div className="notice warning">
                   <AlertCircle size={18} />
                   <div>
-                    <strong>
-                      {en
-                        ? "Task requirements to check"
-                        : "Points de conformité à vérifier"}
-                    </strong>
                     {feedback.risks.map((risk, i) => (
-                      <p key={i}>{risk}</p>
+                      <p key={i}><strong>{en ? "Admissibility risk:" : "Risque de non-recevabilité :"}</strong> {risk}</p>
                     ))}
                   </div>
                 </div>
@@ -506,7 +521,7 @@ export function Results({
             <div className="correction-grid">
               {feedback.mistakes.map((m, i) => (
                 <article className="correction-card" key={i}>
-                  <span className="badge neutral">{m.category}</span>
+                  <span className="badge neutral">{m.kind === 'improvement' ? (en ? "Optional improvement" : "Amélioration facultative") : m.category}</span>
                   <p className="before-text">{m.original_text}</p>
                   <p className="after-text">
                     <ArrowRight size={14} />
@@ -593,6 +608,7 @@ export function Results({
           <summary>{en ? "Full mock NCLC estimate" : "Estimation NCLC de l’examen blanc"} <ChevronDown size={16} /></summary>
           <div className="review-nclc">
               <p>
+                {fullMock && (en ? "NCLC writing projection: withheld: " : "Projection NCLC en expression écrite suspendue : ")}
                 {!eligibility.eligible
                     ? en
                       ? eligibility.reason_en
@@ -604,9 +620,7 @@ export function Results({
                         : "Demandez le bilan de cet examen blanc pour consulter sa plage estimée.")}
               </p>
             <p className="footnote">
-              {en
-                ? "An uncalibrated practice range, not an official result. One isolated task cannot determine a final /20 score or NCLC level."
-                : "Plage de pratique non calibrée, sans valeur officielle. Une tâche isolée ne détermine ni la note finale sur 20 ni le niveau NCLC."}
+              {projectionNote}
             </p>
           </div>
         </details>

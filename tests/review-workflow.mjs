@@ -10,13 +10,7 @@ const compile = (file) =>
   }).outputText;
 const url = (source) =>
   "data:text/javascript;base64," + Buffer.from(source).toString("base64");
-const nclc = url(compile("src/utils/nclcComparison.ts"));
-const state = url(
-  compile("src/utils/reviewState.ts").replace(
-    /(['"])\.\/nclcComparison\1/,
-    JSON.stringify(nclc),
-  ),
-);
+const state = url(compile("src/utils/reviewState.ts"));
 let calls = 0,
   release;
 let hash = "same";

@@ -15,7 +15,7 @@ import {
 import { validatePedagogicalAssessment } from "./pedagogicalAssessment";
 import { ExamResult, TaskKey } from "../types/exam";
 import { AIEvaluation, TaskEvaluation, CefrLevel } from "../types/aiEvaluation";
-import { countFrenchWords } from "../utils/wordCount";
+import { verifyCorrections } from "./correctionVerification";
 
 import { getGeminiModel, getGeminiModelChain } from "../utils/geminiSettings";
 import {
@@ -364,9 +364,28 @@ async function evaluateGeminiRequest(
       activeTaskKeys,
       result,
       true,
+      modelName,
     );
     if (assessment.feedback_language !== feedbackLanguage)
       throw new Error("AI returned the wrong feedback language.");
+    await verifyCorrections(assessment, result, activeTaskKeys, async request => {
+      const model = "gemini-3.6-flash";
+      const personalKey = customApiKey?.trim();
+      const session = personalKey ? undefined : (await supabase?.auth.getSession())?.data.session;
+      if (!personalKey && (!session?.access_token || (owner && session.user.id !== owner))) throw new Error("Session expired");
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (personalKey) headers["x-goog-api-key"] = personalKey;
+      else headers.Authorization = `Bearer ${session!.access_token}`;
+      const response = await fetch(personalKey
+        ? `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent` : "/api/gemini", {
+        method: "POST", headers, signal: AbortSignal.timeout(personalKey ? 120000 : 270000),
+        body: JSON.stringify(personalKey ? request : { model, request }),
+      });
+      if (!response.ok) throw new Error("Verification unavailable");
+      const candidate = (await response.json()).candidates?.[0];
+      if (candidate?.finishReason !== "STOP") throw new Error("Incomplete verification");
+      return safeParseGeminiJson(candidate.content.parts.filter((p: any) => !p.thought).map((p: any) => p.text).join(""));
+    });
     const tasks: AIEvaluation["tasks"] = {};
     for (const key of activeTaskKeys) {
       const task = assessment.tasks[key]!;

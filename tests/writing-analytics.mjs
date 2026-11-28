@@ -4,7 +4,7 @@ import { build } from "esbuild";
 const bundle = await build({ entryPoints: ["src/utils/writingAnalytics.ts"], bundle: true, format: "esm", write: false });
 const { writingAnalytics } = await import("data:text/javascript;base64," + Buffer.from(bundle.outputFiles[0].text).toString("base64"));
 const task = (category, count, extra = {}) => ({
-  mistakes: Array.from({length: count}, () => ({category})), ...extra,
+  corrections_checked:true, mistakes: Array.from({length: count}, () => ({category,kind:"error"})), ...extra,
 });
 function review(day, responses, tasks) {
   return { createdAt: new Date(2026, 0, day).toISOString(), answers: responses, aiEvaluation: { pedagogical: { tasks } } };
@@ -37,8 +37,8 @@ assert.equal(writingAnalytics([late], "all").latestRewrite, undefined);
 console.log("PASS comparable session windows, word-normalised domain rates, incomplete reviews and task filters.");
 
 function corrected(day, category) {
-  const example = {category, original_text:"je va", corrected_text:"je vais", explanation:"Accord."};
-  return review(day, {task1:"Demain je va au marché."}, {task1:{mistakes:[example,example]}});
+  const example = {category,kind:"error", original_text:"je va", corrected_text:"je vais", explanation:"Accord."};
+  return review(day, {task1:"Demain je va au marché."}, {task1:{corrections_checked:true,mistakes:[example,example]}});
 }
 const one = corrected(1,"Grammaire");
 const two = corrected(2,"Grammaire");
@@ -49,3 +49,10 @@ assert.equal(focus.cards.length,1);
 assert.equal(writingAnalytics([one,two],"task2").recommendation,undefined);
 two.answers.task1 = "Une autre réponse.";
 assert.equal(writingAnalytics([one,two],"all").recommendation,undefined);
+
+const mixedEdits = corrected(3,"Grammaire");
+mixedEdits.aiEvaluation.pedagogical.tasks.task1.mistakes[0] = {...mixedEdits.aiEvaluation.pedagogical.tasks.task1.mistakes[0],kind:"improvement"};
+const current = writingAnalytics([mixedEdits],"all");
+assert.equal(current.recent.corrections.length,1);
+delete mixedEdits.aiEvaluation.pedagogical.tasks.task1.corrections_checked;
+assert.equal(writingAnalytics([mixedEdits],"all").recent.sessions,0);

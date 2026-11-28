@@ -2,7 +2,7 @@
 
 ## Reference templates
 
-While writing, click **Ouvrir les modèles / Open templates** above the editor.
+In guided practice, select **Modèles / Templates**.
 The drawer stays alongside your writing on desktop, and can be closed on mobile.
 It follows the active task. Filter T1/T2/T3, search by purpose, then select a structure.
 The original explanations are English and the adaptable writing structures are French.
@@ -13,8 +13,7 @@ The source is your `Downloads/TCFFormation/writing-study/WRITING-TEMPLATES.md`, 
 into `src/data/writingTemplates.md`. The source in Downloads was not changed.
 
 In targeted practice, **Copy French structure** copies the selected code block;
-paste it into the editor and replace every bracket. Full-mock mode allows reference
-reading but keeps copying disabled. These are study aids, not official scoring rules.
+paste it into the editor and replace every bracket. Full mocks hide the templates. These are study aids, not official scoring rules.
 The application renders the source as text rather than executable HTML.
 
 ## Request an NCLC estimate
@@ -22,16 +21,7 @@ The application renders the source as text rather than executable HTML.
 1. Choose **Full Exam / Examen complet** from the library.
 2. Complete all three tasks inside their requested word ranges. Task 3 needs the
    actual prompt and both source documents.
-3. Finish the mock. On Results, click **Estimate NCLC / Estimer le NCLC**.
-4. This requests a new assessment from the configured provider(s). Read the range
-   and rationale in the review. If both models run, compare the separate estimates.
+3. Finish the mock, sign in, and request feedback on the results page.
+4. Read the NCLC writing projection and its rationale, or the reason it was withheld.
 
-The Results page explains missing eligibility conditions. Targeted practice,
-missing responses, missing sources and word-limit violations do not receive a
-full-mock NCLC estimate. Serious task-fulfilment risks can also cause the assessor
-to withhold it. You can still request task-level feedback using the ordinary AI button.
-
-The NCLC estimate is a holistic, uncalibrated AI projection, never a conversion of
-weighted practice dimension scores and never an official result. No unpublished
-examiner aggregation formula is claimed. A new click can use both configured APIs;
-no extra requests happen just from opening templates or the instructions.
+Gemini estimates the range holistically across the three responses. Missing inputs, word-limit violations, and significant task-fulfilment risks can prevent a projection. Guided practice gives task-level feedback.

@@ -19,15 +19,15 @@ target.
   practice has an optional timer; full mocks hide the writing aids and finish at
   60 minutes. The timer survives reloads.
 - **Review:** request Gemini feedback explicitly. **Copier tout**
-  exports the prompts, source documents and original answers for another AI or tutor,
+  exports the prompts, source documents and original answers for a tutor,
   with a manual copy fallback when clipboard access is blocked. Read evidence, corrections and
   revision priorities alongside the original text, then rewrite the same task.
-  Both versions remain in your journal. The starting model depends on the tasks; an optional backup key is read on the Vercel server.
+  Both versions remain in your journal.
 - **My corrections:** practise correcting your own sentences before revealing
   saved corrections. The reviewed status is self-reported, not a mastery score.
 - **My progress:** session counts, revisions, task balance, and supported full-mock
   NCLC ranges, plus a seven-day activity tracker shared with the home page. Missing estimates are not displayed as zero.
-- **Settings:** configure your own keys, choose English or French feedback,
+- **Settings:** choose English or French feedback,
   export/import a practice backup, or use the optional existing Supabase account.
 
 The moon/sun control in the top bar switches between light and dark mode. The
@@ -42,7 +42,7 @@ npm ci
 npm run dev -- --host 127.0.0.1
 ```
 
-Open the URL printed by Vite. An account and Supabase are optional. Feedback
+Open the URL printed by Vite. You can practise locally without an account. Sign in to request feedback. Grading
 uses `/api/gemini`, which reads the deployment's server credentials. Learners do
 not need personal API keys. Your writing and saved corrections remain usable
 without AI. Drafts and local-mode work belong to this browser profile; use a
@@ -52,7 +52,7 @@ Configure `GEMINI_API_KEY` and optionally `GEMINI_BACKUP_KEY` in Vercel (or
 `.env.local` for local development). The function also accepts the existing
 `VITE_GEMINI_API_KEY` and `GEMINI_BACKUP_API_KEY` names for compatibility; their
 values are excluded from browser builds. Existing browser-entered keys are ignored.
-Task 1 alone starts with Gemini 3.5 Flash-Lite. All other reviews start with Gemini 4 Hydrogen. Set `GEMINI_MODEL` to override both routes.
+All writing tasks start with Gemini 4 Hydrogen by default. Set `GEMINI_MODEL` to override the starting model.
 
 See [LOCAL-SETUP.md](LOCAL-SETUP.md) for optional account storage and Vercel setup.
 
@@ -72,15 +72,15 @@ Gemini uses `src/services/evaluationInstructions.ts`, the supplied
 A task receives a pedagogical CEFR range only when supporting excerpts can be
 verified against the learner's original text. Full-mock NCLC projections remain
 broad, optional and non-official. An isolated task does not determine final /20
-or NCLC. Historical reviews remain readable; new reviews do not combine models.
+or NCLC. A separate Flash request checks proposed edits, examples and the edited text. A rejected edit triggers a final check of the retained edits. Verification failures preserve grading feedback and omit unchecked edits.
 
 There are no automatic evaluation requests. Matching saved reviews are reused
 only when the requested starting model, answer fingerprint and rubric match.
 A successful fallback review is reused rather than restarting the chain. The actual
 model and original requested model are saved separately and shown with the review. Concurrent identical
 requests share one in-flight call. For each model, the optional backup key is tried at most once after a supported
-HTTP error. The model chain runs automatically: **4 Hydrogen → 3.6 Flash → 3.5 Flash-Lite →
-3.1 Flash-Lite**. HTTP 404 (model unavailable) and 429 (quota) advance after available keys are exhausted.
+HTTP error. The model chain runs automatically: **4 Hydrogen → 3.6 Flash → 3.8 Flash →
+3.5 Flash-Lite**. HTTP 404 (model unavailable) and 429 (quota) advance after available keys are exhausted.
 A confirmed provider 502, 503 or 504 moves directly to the next model. Hosting gateway 504 responses are
 logged as timeouts and stop with a saved-writing message. There
 are at most four models and two keys per model. It stops on the first successful
@@ -109,8 +109,7 @@ jobs remain available for diagnosis. See [background review setup](LOCAL-SETUP.m
 
 Completed reviews also have a private **7-day response cache** in the existing
 Supabase job store. It matches the exact model request (including answers,
-questions, language and generation settings) and rubric version. A cache hit
-returns saved output without publishing a QStash message or calling Gemini.
+questions, language and generation settings) and rubric version. A cache hit reuses the grading response. Turning that response into a new review still runs correction verification.
 Both review endpoints verify a Supabase session before generating feedback.
 The cache belongs to the verified account. Output becomes cacheable only after the browser
 accepts it through the existing evidence validator. Failed, blocked and truncated
@@ -119,7 +118,7 @@ responses are excluded. Matching completed browser jobs are also reused directly
 [supabase/evaluation-cache.sql](supabase/evaluation-cache.sql) before deploying
 this feature on an existing database.
 
-Outside standalone Task 1, the automatic default chain is Gemini 4 Hydrogen, 3.6 Flash, 3.5 Flash-Lite, then 3.1 Flash-Lite.
+The final Flash-Lite fallback can supply feedback only. Its task levels and projection are withheld.
 `GEMINI_MODEL` may override its starting point; no browser selection is needed. These have published [free API tiers](https://ai.google.dev/gemini-api/docs/pricing),
 checked November 14, 2026. Project access and limits vary; a model selection does
 not change billing settings. [Google quotas](https://ai.google.dev/gemini-api/docs/rate-limits)

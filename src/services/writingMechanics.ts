@@ -1,5 +1,5 @@
 import type { TaskKey, TaskRequirement } from '../types/exam';
-import { countFrenchWords } from '../utils/wordCount';
+import { taskWordCount } from '../utils/wordCount';
 
 function tokens(text: string) {
   return Array.from(text.matchAll(/[\p{L}\p{M}\p{N}]+(?:['’\-][\p{L}\p{M}\p{N}]+)*/gu), match => ({
@@ -35,14 +35,15 @@ export function sourceOverlap(answer: string, documents: string[]) {
 }
 
 export function writingFacts(key: TaskKey, req: TaskRequirement, answer: string) {
-  const count = countFrenchWords(answer);
+  const counts = taskWordCount(answer, req.minWords, req.maxWords);
+  const count = counts.word_count;
   const missing: string[] = [];
   if (!req.instruction?.trim()) missing.push('instruction');
   if (key === 'task3') {
     if (!req.document1?.trim()) missing.push('document1');
     if (!req.document2?.trim()) missing.push('document2');
   }
-  return { word_count: count, required: [req.minWords, req.maxWords],
+  return { ...counts, required: [req.minWords, req.maxWords],
     status: count < req.minWords ? 'UNDER_MINIMUM' : count > req.maxWords ? 'OVER_MAXIMUM' : 'IN_RANGE',
     blank: count === 0, missing_fields: missing,
     source_overlap: key === 'task3' && !missing.includes('document1') && !missing.includes('document2')

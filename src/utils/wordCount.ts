@@ -1,10 +1,15 @@
-/**
- * Counts words in French text sensibly according to TCF writing exam standards.
- * Ignores multiple spaces, leading/trailing whitespace, and counts each nonempty sequence of signs.
- */
-export function countFrenchWords(text: string): number {
-  // Space-delimited signs; whitespace from editor line breaks is a separator too.
-  return text.trim() ? text.trim().split(/\s+/u).length : 0;
+/** The simulator excludes standalone signs by default. */
+export function countFrenchWords(text: string, includeStandaloneSigns = false): number {
+  const tokens = text.match(/\S+/gu) ?? [];
+  return includeStandaloneSigns ? tokens.length : tokens.filter(token => /[\p{L}\p{N}]/u.test(token)).length;
+}
+
+export function taskWordCount(text: string, minimum: number, maximum: number) {
+  const word_count = countFrenchWords(text);
+  const whitespace_count = countFrenchWords(text, true);
+  const borderline = [word_count, whitespace_count].some(count =>
+    Math.abs(count - minimum) <= 3 || Math.abs(count - maximum) <= 3);
+  return { word_count, whitespace_count, borderline };
 }
 
 /**

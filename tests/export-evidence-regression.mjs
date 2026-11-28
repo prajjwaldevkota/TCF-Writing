@@ -55,7 +55,9 @@ const revised = buildEvaluationInstructions({
     document1: 'Un petit jardin public très calme', document2: 'petit jardin public très' } } }
 }, ['task3'], 'fr');
 const fact = JSON.parse(revised.userPrompt).tasks[0].facts;
-assert.equal(fact.word_count, 8);
+assert.equal(fact.word_count, 7);
+assert.equal(fact.whitespace_count, 8);
+assert.equal(input.full_mock_eligible, false);
 assert.equal(fact.status, 'UNDER_MINIMUM');
 assert.equal(fact.source_overlap.covered_tokens, 6);
 assert.equal(fact.source_overlap.total_tokens, 7);

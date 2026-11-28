@@ -1,8 +1,8 @@
 export const GEMINI_MODELS = [
   { id: "gemini-4-hydrogen", label: "Gemini 4 Hydrogen" },
   { id: "gemini-3.6-flash", label: "Gemini 3.6 Flash" },
-  { id: "gemini-3.5-flash-lite", label: "Gemini 3.5 Flash-Lite" },
   { id: "gemini-3.8-flash", label: "Gemini 3.8 Flash" },
+  { id: "gemini-3.5-flash-lite", label: "Gemini 3.5 Flash-Lite" },
 ] as const;
 
 export const MODEL_IDS: string[] = GEMINI_MODELS.map(model => model.id);

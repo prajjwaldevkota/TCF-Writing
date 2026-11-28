@@ -3,7 +3,7 @@ import { cleanDocumentText, normalizeParagraphText } from "./cleanText";
 import { practicedKeys, TASK_INFO, TASK_KEYS } from "./practice";
 import { countFrenchWords, formatTime } from "./wordCount";
 
-/** Plain text for a tutor or another AI. Preserve answers exactly as written. */
+/** Plain text for sharing with a tutor. Preserve answers exactly as written. */
 export function submissionExport(
   result: ExamResult,
   onlyTask?: TaskKey,

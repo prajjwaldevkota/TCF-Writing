@@ -16,13 +16,13 @@ export function writingAnalytics(submissions: ExamResult[], filter: TaskKey | "a
   ).sort((a, b) => b.date - a.date);
 
   // Split by submission so all three tasks from a mock stay in the same period.
-  const comparable = tasks.filter(t => t.date > 0 && !t.feedback.corrections_incomplete && Array.isArray(t.feedback.mistakes));
+  const comparable = tasks.filter(t => t.date > 0 && !t.feedback.corrections_incomplete && t.feedback.corrections_checked === true && Array.isArray(t.feedback.mistakes));
   const sessions = [...new Set(comparable.map(t => t.result))];
   const size = Math.min(5, Math.ceil(sessions.length / 2));
   function windowStats(group: ExamResult[]) {
     const samples = comparable.filter(t => group.includes(t.result));
     const words = samples.reduce((sum, t) => sum + t.words, 0);
-    const corrections = samples.flatMap(t => t.feedback.mistakes.map(m => ({
+    const corrections = samples.flatMap(t => t.feedback.mistakes.filter(m => m.kind === 'error').map(m => ({
       ...m, category: normalizeCategory(m.category), key: t.key, result: t.result,
     })));
     return { sessions: group.length, words, corrections, samples };

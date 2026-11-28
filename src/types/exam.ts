@@ -35,9 +35,7 @@ import { AIEvaluation } from './aiEvaluation';
 
 export interface DualAiEvaluation {
   gemini: AIEvaluation | null;
-  groq: AIEvaluation | null;
-  geminiError?: string | null;
-  groqError?: string | null;
+  [legacyField: string]: unknown;
 }
 
 export interface ExamResult {

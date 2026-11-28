@@ -76,7 +76,7 @@ export function Analytics({ submissions, onOpen, onPractice }: {
             <tbody>{domains.filter(d => d.category !== "Autres" || d.examples.length || d.earlier).map(d => <tr key={d.category}>
               <th scope="row">{CATEGORY_INFO[d.category][en ? "en" : "fr"]}</th>{rateCell(d.previousRate)}{rateCell(d.recentRate)}
             </tr>)}</tbody></table>}
-          <small>{en ? "Counts reflect what the reviewer flagged. A zero means that no correction was recorded in that area." : "Ces chiffres reflètent les observations du bilan. Un zéro signifie qu’aucune correction n’a été relevée dans ce domaine."}</small>
+          <small>{en ? "Rates use complete reviews that passed the second correction check. Only changes classified as errors count. Earlier reviews remain in your task history." : "Les taux utilisent les bilans complets ayant passé la seconde vérification. Seules les modifications classées comme erreurs sont comptées. Les anciens bilans restent dans votre historique."}</small>
         </section>
         <section className="panel analytics-trend">
           <h2>{en ? "Change over time" : "Évolution dans le temps"}</h2>

@@ -56,6 +56,8 @@ import {safeParseGeminiJson} from ${JSON.stringify(parserUrl)};
 import {getRateLimitDeadline,recordRateLimit,rateLimitMessage} from ${JSON.stringify(rateUrl)};
 import {getGeminiModel,getGeminiModelChain} from ${JSON.stringify(settingsUrl)};
 const {buildEvaluationInstructions,instructionFingerprint,validatePedagogicalAssessment}=globalThis.__geminiFixture;
+import { verifyCorrections as actualVerification } from ${JSON.stringify(url(compile("src/services/correctionVerification.ts")))};
+const verifyCorrections=(...args)=>globalThis.__geminiFixture.checkEdits ? actualVerification(...args) : Promise.resolve();
 const createLogRequestId=()=>crypto.randomUUID();
 const getClientDiagnostics=()=>({browser:"chrome",platform:"windows",viewport_width:1536,viewport_height:740,online:true});
 const reportReviewError=entry=>globalThis.__reviewErrors.push(entry);
@@ -67,6 +69,7 @@ const { evaluateTcfSubmissionWithGemini: evaluate } = await import(
 );
 const input = {
   isPracticeMode: true,
+  combination: {tasks:{task1:{instruction:"Invite a friend."}}},
   practiceTasks: ["task1"],
   answers: { task1: "Bonjour", task2: "", task3: "" },
 };
@@ -110,16 +113,23 @@ try {
     "gemini-4-hydrogen",
     "Ignore obsolete manual model choices",
   );
+  globalThis.__geminiFixture.checkEdits = true;
+  arrange("", "", [success(), success(JSON.stringify({task1:{accepted:[],remaining_errors:[],model_answer_ok:false}}))]);
+  const audited = await evaluate(input);
+  assert.equal(audited.pedagogical.tasks.task1.corrections_checked,true);
+  assert.equal(calls.length,2);
+  assert.equal(calls[1].body.model,"gemini-3.6-flash");
+  delete globalThis.__geminiFixture.checkEdits;
   globalThis.__geminiEnv.VITE_GEMINI_MODEL = "gemini-3.5-flash-lite";
   assert.equal(settings.getGeminiModel(), "gemini-3.5-flash-lite");
   delete globalThis.__geminiEnv.VITE_GEMINI_MODEL;
-  assert.equal(settings.getGeminiModel(["task1"]), "gemini-3.5-flash-lite");
+  assert.equal(settings.getGeminiModel(["task1"]), "gemini-4-hydrogen");
   assert.equal(settings.getGeminiModel(["task3"]), "gemini-4-hydrogen");
   globalThis.__geminiEnv.VITE_GEMINI_MODEL = "gemini-4-hydrogen";
   delete globalThis.__geminiEnv.VITE_GEMINI_MODEL;
   arrange("", "", [503, 503].map(status => new Response("{}", { status })).concat(success()));
   assert.equal((await evaluate(input)).model, "gemini-3.8-flash");
-  assert.deepEqual(calls.map(call => call.body.model), ["gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.8-flash"]);
+  assert.deepEqual(calls.map(call => call.body.model), ["gemini-4-hydrogen", "gemini-3.6-flash", "gemini-3.8-flash"]);
   globalThis.__geminiEnv.VITE_GEMINI_MODEL = "gemini-4-hydrogen";
   assert.throws(() => settings.setGeminiModel("unknown-model"));
   for (const [primary, backup] of [
@@ -199,11 +209,11 @@ try {
     "",
     Array.from({ length: 4 }, () => new Response("{}", { status: 404 })),
   );
-  await assert.rejects(evaluate(input), /gemini-3.8-flash.*HTTP 404/);
+  await assert.rejects(evaluate(input), /gemini-3.5-flash-lite.*HTTP 404/);
   assert.equal(calls.length, 4);
   assert.deepEqual(
     calls.map((call) => call.body.model),
-    ["gemini-4-hydrogen", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.8-flash"],
+    ["gemini-4-hydrogen", "gemini-3.6-flash", "gemini-3.8-flash", "gemini-3.5-flash-lite"],
   );
   const providerTimeout = () => new Response("{}", {
     status: 504,
@@ -224,7 +234,7 @@ try {
   assert.equal((await evaluate(input)).model, "gemini-3.6-flash");
   assert.equal(calls.length, 2);
   arrange("", "", Array.from({ length: 4 }, providerTimeout));
-  await assert.rejects(evaluate(input), /gemini-3.8-flash.*HTTP 504/);
+  await assert.rejects(evaluate(input), /gemini-3.5-flash-lite.*HTTP 504/);
   assert.equal(calls.length, 4, "Provider deadline fallback is bounded");
   for (const headers of [{}, { "Content-Type": "text/html" }]) {
     arrange("", "", [new Response("Gateway timeout", { status: 504, headers })]);

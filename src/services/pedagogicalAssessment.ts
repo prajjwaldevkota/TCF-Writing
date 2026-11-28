@@ -1,6 +1,6 @@
 import { ExamResult, TaskKey } from '../types/exam';
 import { countFrenchWords } from '../utils/wordCount';
-import { DimensionScore } from '../types/aiEvaluation';
+import type { DimensionScore, MistakeItem } from '../types/aiEvaluation';
 
 export const LEVELS = ['A1 not achieved', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
 
@@ -8,6 +8,8 @@ export interface PedagogicalTask {
   task_fulfilment_audit?: { requirement: string; met: boolean; finding: string }[];
   syntactic_and_lexical_inventory?: { structures: string[]; recurrent_errors: string[] };
   range: { lower: string; upper: string } | null;
+  best_estimate?: string | null;
+  priority_evidence?: { quote: string; error_type: string; drill: string }[];
   withholding_reason: string;
   communication_pass: string;
   language_pass: string;
@@ -25,8 +27,9 @@ export interface PedagogicalTask {
   validation_warnings?: string[];
   omitted_corrections?: number;
   corrections_incomplete?: boolean;
+  corrections_checked?: boolean;
   level_evidence?: { quote:string; domain:'linguistic'|'pragmatic'|'sociolinguistic'; explanation:string }[];
-  mistakes: { category: string; original_text: string; corrected_text: string; explanation: string }[];
+  mistakes: MistakeItem[];
 }
 
 export interface PedagogicalAssessment {
@@ -96,7 +99,7 @@ function normalizeStringList(value: unknown, fieldName: string): string[] {
   return out;
 }
 
-export function validatePedagogicalAssessment(raw: any, keys: TaskKey[], result: ExamResult, requireDiagnostic = false): PedagogicalAssessment {
+export function validatePedagogicalAssessment(raw: any, keys: TaskKey[], result: ExamResult, requireDiagnostic = false, model = ''): PedagogicalAssessment {
   if (!raw || !['en', 'fr'].includes(raw.feedback_language) || !raw.tasks || typeof raw.tasks !== 'object') throw new Error('Incomplete AI assessment.');
   for (const k of Object.keys(raw.tasks)) {
     if (!keys.includes(k as TaskKey) && raw.tasks[k] == null) delete raw.tasks[k];
@@ -123,6 +126,7 @@ export function validatePedagogicalAssessment(raw: any, keys: TaskKey[], result:
     }
     for (const name of ['communication_pass', 'language_pass']) if (typeof task[name] !== 'string' || !task[name].trim()) throw new Error(`Missing evidence: ${key}/${name}`);
     for (const name of ['linguistic', 'pragmatic', 'sociolinguistic']) if (typeof task.domains?.[name] !== 'string' || !task.domains[name].trim()) throw new Error(`Missing domain: ${name}`);
+    const proposedPriorities = task.priorities;
     for (const name of ['limiting_evidence', 'priorities', 'risks'] as const) {
       task[name] = normalizeStringList(task[name], name);
     }
@@ -153,6 +157,18 @@ export function validatePedagogicalAssessment(raw: any, keys: TaskKey[], result:
         ? (blank ? 'No response provided; a level cannot be assessed.' : missingPrompt ? 'The original task instructions are required to assess task fulfilment.' : 'The prompt and both documents are required to assess source fidelity and comparison.')
         : (blank ? 'Aucune réponse fournie : le niveau ne peut pas être évalué.' : missingPrompt ? 'La consigne originale est nécessaire pour évaluer la réalisation de la tâche.' : 'La consigne et les deux documents sont nécessaires pour évaluer la fidélité et la comparaison.');
     }
+    if (task.range) {
+      const lower = LEVELS.indexOf(task.range.lower);
+      const upper = LEVELS.indexOf(task.range.upper);
+      const best = LEVELS.indexOf(task.best_estimate);
+      if (model.includes('flash-lite') || upper - lower > 1 || (requireDiagnostic && (best < lower || best > upper))) {
+        task.range = null;
+        task.withholding_reason = model.includes('flash-lite')
+          ? (raw.feedback_language === 'en' ? 'Level withheld because a Flash-Lite model supplied this review.' : 'Niveau suspendu car le bilan provient d’un modèle Flash-Lite.')
+          : (raw.feedback_language === 'en' ? 'The review could not narrow the estimate to a supported level within two adjacent levels.' : 'Le bilan ne permet pas de retenir un niveau parmi deux niveaux adjacents.');
+      }
+    }
+    if (task.range === null) task.level_evidence = [];
     if (task.range !== null) {
       const answer = result.answers[key] || '';
       const suppliedTexts = [req.instruction, ...(key === 'task3' ? [req.document1, req.document2] : [])]
@@ -193,6 +209,7 @@ export function validatePedagogicalAssessment(raw: any, keys: TaskKey[], result:
         task.validation_warnings.push(task.withholding_reason);
       }
     }
+    if (task.range === null) task.best_estimate = null;
     if (blank) { task.strengths=[]; task.level_evidence=[]; task.model_answer=''; }
     if (task.model_answer) {
       const count=countFrenchWords(task.model_answer);
@@ -206,18 +223,41 @@ export function validatePedagogicalAssessment(raw: any, keys: TaskKey[], result:
     // A bad correction must not discard independently supported feedback.
     const corrections=Array.isArray(task.mistakes)?task.mistakes:[];
     task.corrections_incomplete=!Array.isArray(task.mistakes);
-    const verifiedCorrections=[];
+    const verifiedCorrections: MistakeItem[]=[];
     const seenCorrections=new Set<string>();
+    const spans: { start: number; end: number }[] = [];
+    const answer = result.answers[key] || '';
     for (const m of (blank ? [] : corrections)) {
       if (!m || ['category','original_text','corrected_text','explanation'].some(k=>typeof m[k]!=='string' || !m[k].trim())) {task.omitted_corrections++;continue;}
       const excerpt=findOriginalExcerpt(result.answers[key] || '',m.original_text);
       if (excerpt===null) {task.omitted_corrections++;continue;}
       const identity=JSON.stringify([excerpt,m.corrected_text]);
       if(seenCorrections.has(identity))continue;
+      const start = answer.indexOf(excerpt);
+      const end = start + excerpt.length;
+      if (excerpt.trim().normalize('NFC') === m.corrected_text.trim().normalize('NFC') ||
+          answer.indexOf(excerpt, start + 1) >= 0 ||
+          spans.some(span => start < span.end && span.start < end) ||
+          (requireDiagnostic && (!['error','improvement'].includes(m.kind) || !['minor','major'].includes(m.severity) ||
+            typeof m.error_type !== 'string' || !m.error_type.trim()))) {
+        task.omitted_corrections++;
+        continue;
+      }
+      spans.push({ start, end });
       seenCorrections.add(identity);
       verifiedCorrections.push({...m,original_text:excerpt});
     }
     task.mistakes=verifiedCorrections;
+    if (requireDiagnostic) {
+      task.priority_evidence = (Array.isArray(proposedPriorities) ? proposedPriorities : []).flatMap(item => {
+        if (typeof item?.quote !== 'string' || typeof item?.error_type !== 'string' || !item.error_type.trim() ||
+            typeof item?.drill !== 'string' || !item.drill.trim()) return [];
+        const quote = findOriginalExcerpt(answer, item.quote);
+        if (!verifiedCorrections.some(m => m.original_text === quote && m.error_type === item.error_type)) return [];
+        return [{ quote, error_type: item.error_type, drill: item.drill }];
+      });
+      task.priorities = task.priority_evidence.map((item: { drill: string }) => item.drill);
+    }
     if(task.omitted_corrections || task.corrections_incomplete) {
       task.corrections_incomplete=true;
       task.validation_warnings.push(raw.feedback_language==='en'
@@ -244,7 +284,11 @@ export function validatePedagogicalAssessment(raw: any, keys: TaskKey[], result:
     if (!Number.isInteger(p.lower) || !Number.isInteger(p.upper) || p.lower < 3 || p.upper > 10 || p.lower >= p.upper || typeof p.rationale !== 'string' || !p.rationale.trim()) {
       throw new Error('Invalid NCLC mock-exam projection: a justified range is required.');
     }
-    raw.projection_withholding_reason = '';
+    if (p.upper - p.lower > 2) {
+      raw.mock_projection = null;
+      raw.projection_withholding_reason = raw.feedback_language === 'en'
+        ? 'The estimate spans more than two NCLC points.' : 'L’estimation couvre plus de deux points NCLC.';
+    } else raw.projection_withholding_reason = '';
   } else {
     raw.mock_projection = null;
     raw.projection_withholding_reason = typeof raw.projection_withholding_reason === 'string' && raw.projection_withholding_reason.trim()

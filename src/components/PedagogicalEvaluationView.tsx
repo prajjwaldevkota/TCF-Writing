@@ -293,17 +293,17 @@ const TaskCard: React.FC<{
               </span>
               <div>
                 <strong className="block text-xs font-bold">
-                  {en ? 'TCF Official Word Count Check' : 'Contrôle officiel de longueur TCF'}
+                  {en ? 'Practice word count' : 'Décompte de pratique'}
                 </strong>
                 <p className="text-xs mt-0.5 leading-relaxed">
                   {userWordCount < minWords
                     ? en
-                      ? `Your text has ${userWordCount} words (minimum required: ${minWords} words). Falling below the minimum threshold incurs an automatic grade ceiling (-1 to -2 CEFR levels).`
-                      : `Votre texte contient ${userWordCount} mots (minimum requis : ${minWords} mots). Un texte sous le seuil minimal entraîne un plafonnement automatique (-1 à -2 niveaux CECRL).`
+                      ? `Your text has ${userWordCount} words (minimum required: ${minWords} words).`
+                      : `Votre texte contient ${userWordCount} mots (minimum requis : ${minWords} mots).`
                     : userWordCount > maxWords
                     ? en
-                      ? `Your text has ${userWordCount} words (+${userWordCount - maxWords} words over ${maxWords}). Slight excess is tolerated if coherent, though manage your 60-minute exam time.`
-                      : `Votre texte contient ${userWordCount} mots (+${userWordCount - maxWords} mots au-dessus de ${maxWords}). Un léger dépassement reste toléré, mais surveillez votre temps global.`
+                      ? `Your text has ${userWordCount} words (+${userWordCount - maxWords} words over ${maxWords}).`
+                      : `Votre texte contient ${userWordCount} mots (+${userWordCount - maxWords} mots au-dessus de ${maxWords}).`
                     : en
                       ? `Word target met: ${userWordCount} words (required range: ${minWords}–${maxWords} words).`
                       : `Longueur conforme : ${userWordCount} mots (plage requise : ${minWords}–${maxWords} mots).`}
